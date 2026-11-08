@@ -8,6 +8,10 @@ import { EXPENSE_CATEGORIES, PAYMENT_METHODS, formatKRW } from '@/utils/expense'
 import { approvalProblem, expenseCorrectionFields, normalizeExpenseCorrections, pendingReceipt, receiptApprovalShortcut, type ExpenseReviewPatch } from '@/utils/expenseReview';
 import { checkDuplicateReceipt } from '@/utils/settlementCalculator';
 import { updateHqExpenseReviewDb } from '@/utils/expenseHqStorage';
+import { HqDispatchTimeField } from '@/components/hq/ui/HqDispatchTimeField';
+import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
+import { TossDatePicker } from '@/components/common/TossDatePicker';
+import { parseFlexibleTimeInput, formatTimeKoreanAmPm } from '@/components/hq/HqQuickDispatch';
 
 interface Props {
   expense: HqExpenseRecord;
@@ -144,14 +148,75 @@ export default function HqReceiptReviewWorkspace({ expense, expenses, bookings, 
           <p className="text-xs text-slate-500">{saved.ocrExtracted ? 'OCR 추출 결과가 있습니다. 원본과 대조해 수정하세요.' : 'OCR 확인 정보가 없습니다. 원본을 직접 확인하세요.'} 수정 저장과 승인은 별개입니다.</p>
           <fieldset disabled={busy} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="text-sm sm:col-span-2">상호<input className={inputClass} value={fields.merchant} maxLength={200} onChange={event => setFields({ ...fields, merchant: event.target.value })}/></label>
-            <label className="text-sm">지출 날짜<input type="date" className={inputClass} value={fields.rawDate} onChange={event => setFields({ ...fields, rawDate: event.target.value })}/></label>
-            <label className="text-sm">지출 시간<input type="time" className={inputClass} value={fields.time} onChange={event => setFields({ ...fields, time: event.target.value })}/></label>
-            <label className="text-sm">항목<select className={inputClass} value={fields.category} onChange={event => setFields({ ...fields, category: event.target.value as typeof fields.category })}>{Object.entries(EXPENSE_CATEGORIES).map(([key, item]) => <option key={key} value={key}>{item.label}</option>)}</select></label>
+            <TossDatePicker
+              label="지출 날짜"
+              value={fields.rawDate}
+              onChange={next => setFields(previous => ({ ...previous, rawDate: next }))}
+              heightClass="h-11"
+            />
+            <HqDispatchTimeField
+              label="지출 시간"
+              value={fields.time}
+              onChange={next => setFields(previous => ({ ...previous, time: next }))}
+              parseInput={parseFlexibleTimeInput}
+              formatValue={formatTimeKoreanAmPm}
+              compact
+              disabled={busy}
+            />
+            <div className="min-w-0">
+              <p className="mb-1 text-[12px] font-semibold text-[#52647A]">지출 항목</p>
+              <HqSearchSelect
+                label="지출 항목 선택"
+                size="sm"
+                value={fields.category}
+                onChange={next => setFields(previous => ({ ...previous, category: next as typeof fields.category }))}
+                options={Object.entries(EXPENSE_CATEGORIES).map(([key, item]) => ({ value: key, label: item.label }))}
+                placeholder="항목 선택"
+                disabled={busy}
+              />
+            </div>
             <label className="text-sm">금액 (원)<input inputMode="numeric" className={inputClass} value={amount} onChange={event => setAmount(event.target.value)}/></label>
-            <label className="text-sm sm:col-span-2">결제자·결제수단<select className={inputClass} value={fields.paymentMethod} onChange={event => setFields({ ...fields, paymentMethod: event.target.value as typeof fields.paymentMethod })}><option value="unspecified">결제 미확인</option>{PAYMENT_METHODS.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label>
-            <label className="text-sm sm:col-span-2">연결 예약<select className={inputClass} value={fields.bookingId || ''} onChange={event => setFields({ ...fields, bookingId: event.target.value || null })}><option value="">예약 연결 없음</option>
-              {fields.bookingId && !eligibleBookings.some(row => (row.scheduleId || row.id) === fields.bookingId) && <option value={fields.bookingId}>현재 연결 예약 · {saved.customerName || fields.bookingId}</option>}
-              {eligibleBookings.map(row => <option key={row.id} value={row.scheduleId || row.id}>{row.pickupDate} {row.pickupTime} · {row.customerName} · {row.pickupLocation}</option>)}</select></label>
+            <div className="min-w-0 sm:col-span-2">
+              <p className="mb-1 text-[12px] font-semibold text-[#52647A]">결제자·결제수단</p>
+              <HqSearchSelect
+                label="결제자 및 결제수단 선택"
+                size="sm"
+                value={fields.paymentMethod}
+                onChange={next => setFields(previous => ({ ...previous, paymentMethod: next as typeof fields.paymentMethod }))}
+                options={[
+                  { value: 'unspecified', label: '결제 미확인' },
+                  ...PAYMENT_METHODS.map(item => ({ value: item.key, label: item.label })),
+                ]}
+                placeholder="결제수단 선택"
+                disabled={busy}
+              />
+            </div>
+            <div className="min-w-0 sm:col-span-2">
+              <p className="mb-1 text-[12px] font-semibold text-[#52647A]">연결 예약</p>
+              <HqSearchSelect
+                label="검수 영수증의 예약 연결"
+                size="sm"
+                value={fields.bookingId || ''}
+                onChange={next => setFields(previous => ({ ...previous, bookingId: next || null }))}
+                options={[
+                  ...(fields.bookingId && !eligibleBookings.some(row => (row.scheduleId || row.id) === fields.bookingId)
+                    ? [{
+                        value: fields.bookingId,
+                        label: `현재 연결 예약 · ${saved.customerName || fields.bookingId}`,
+                        subtitle: '이 예약은 현재 기사·차량 조건에 해당하지 않습니다.',
+                        disabled: true,
+                      }] : []),
+                  ...eligibleBookings.map(row => ({
+                    value: row.scheduleId || row.id,
+                    label: `${row.pickupDate} ${row.pickupTime} · ${row.customerName}`,
+                    subtitle: row.pickupLocation,
+                  })),
+                ]}
+                placeholder="예약 연결 없음"
+                emptyLabel="예약 연결 없음"
+                disabled={busy}
+              />
+            </div>
             <label className="text-sm sm:col-span-2">주소<input className={inputClass} value={fields.address} maxLength={1000} onChange={event => setFields({ ...fields, address: event.target.value })}/></label>
             <label className="text-sm sm:col-span-2">메모<textarea className={inputClass} value={fields.memo} maxLength={5000} onChange={event => setFields({ ...fields, memo: event.target.value })}/></label>
             <label className="text-sm sm:col-span-2">검수 의견<textarea className={inputClass} value={notes} maxLength={5000} onChange={event => setNotes(event.target.value)}/></label>

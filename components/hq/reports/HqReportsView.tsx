@@ -42,8 +42,6 @@ import {
   getSettlementReportsServerSnapshot,
   getSettlementReportsSnapshot,
   getVehiclePresetsSnapshot,
-  resetDemoPipelineData,
-  runDemoPipelineScenario,
   saveDriverProfiles,
   saveVehiclePresets,
   subscribeSettlementReports,
@@ -52,6 +50,13 @@ import {
 } from "@/utils/settlementStorage";
 import { formatKRW } from "@/utils/expense";
 import { haptics } from "@/utils/haptics";
+import { HqDateRangePicker } from "@/components/hq/ui/HqDateRangePicker";
+import { HqSearchSelect } from "@/components/hq/ui/HqSearchSelect";
+import { ALL_HQ_DATES, matchesHqDateRange, formatHqDateRangeLabel, type HqDateRange } from "@/utils/hqDateRange";
+import { exportSettlementSummaryCsv } from "@/utils/settlementSummaryCsv";
+import { buildHqSettlementProfitTrend } from "@/utils/hqSettlementProfitTrend";
+import { getKstTodayDateStr } from "@/utils/dispatchConflictDetector";
+import { resolveHqDateBounds } from "@/utils/hqDateRange";
 
 export interface HqReportsViewProps {
   initialSearchQuery?: string;
@@ -86,6 +91,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
   // Filters
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [statusFilter, setStatusFilter] = useState<"all" | SettlementReportStatus>("all");
+  const [dateRange, setDateRange] = useState<HqDateRange>(ALL_HQ_DATES);
   const [selectedReportId, setSelectedReportId] = useState<string>(() => {
     if (initialCustomerId) {
       const match = reports.find((r) => r.customerId === initialCustomerId);
@@ -112,9 +118,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
   // Modals
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
   const [isContractModalOpen, setIsContractModalOpen] = useState(false);
-  const [showDevConsole, setShowDevConsole] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const [demoLogs, setDemoLogs] = useState<string[]>([]);
   const [confirmDirectCostsOnApprove, setConfirmDirectCostsOnApprove] = useState(false);
 
   // Contract Edit Form State
@@ -155,9 +159,14 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
     return dateStr.replace(/-/g, ". ");
   };
 
-  // Filtered reports
+  // Global period selection is shared by events, profitability and the ledger.
+  const periodReports = useMemo(() => reports.filter(r =>
+    matchesHqDateRange(r.rawDate || r.eventDate, dateRange)
+  ), [reports, dateRange]);
+
+  // Status/search refine only the event list; period is global.
   const filteredReports = useMemo(() => {
-    return reports.filter((r) => {
+    return periodReports.filter((r) => {
       if (statusFilter !== "all" && r.status !== statusFilter) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -176,31 +185,30 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
       }
       return true;
     });
-  }, [reports, statusFilter, searchQuery]);
+  }, [periodReports, statusFilter, searchQuery]);
 
   const selectedReport = useMemo(() => {
     return (
-      reports.find((r) => r.id === selectedReportId) ||
+      filteredReports.find((r) => r.id === selectedReportId) ||
       filteredReports[0] ||
-      reports[0] ||
       null
     );
-  }, [reports, filteredReports, selectedReportId]);
+  }, [filteredReports, selectedReportId]);
 
   // Dashboard Aggregate KPIs
   const dashboardKpis = useMemo(() => {
-    const totalRevenue = reports.reduce((s, r) => s + r.supplyAmount, 0);
-    const totalDriverLabor = reports.reduce((s, r) => s + r.totalDriverLaborCost, 0);
-    const totalApprovedExpenses = reports.reduce((s, r) => s + r.totalApprovedExpenses, 0);
-    const totalDirectProfit = reports.reduce((s, r) => s + r.totalDirectProfit, 0);
+    const totalRevenue = periodReports.reduce((s, r) => s + r.supplyAmount, 0);
+    const totalDriverLabor = periodReports.reduce((s, r) => s + r.totalDriverLaborCost, 0);
+    const totalApprovedExpenses = periodReports.reduce((s, r) => s + r.totalApprovedExpenses, 0);
+    const totalDirectProfit = periodReports.reduce((s, r) => s + r.totalDirectProfit, 0);
     const avgMargin =
       totalRevenue > 0 ? Number(((totalDirectProfit / totalRevenue) * 100).toFixed(1)) : 0;
-    const totalOvertimeMin = reports.reduce((s, r) => s + r.totalOvertimeMinutes, 0);
-    const totalOvertimeFare = reports.reduce((s, r) => s + r.totalOvertimeFare, 0);
-    const approvedCount = reports.filter(
+    const totalOvertimeMin = periodReports.reduce((s, r) => s + r.totalOvertimeMinutes, 0);
+    const totalOvertimeFare = periodReports.reduce((s, r) => s + r.totalOvertimeFare, 0);
+    const approvedCount = periodReports.filter(
       (r) => r.status === "approved" || r.status === "invoiced"
     ).length;
-    const pendingCount = reports.length - approvedCount;
+    const pendingCount = periodReports.length - approvedCount;
 
     return {
       totalRevenue,
@@ -213,7 +221,14 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
       approvedCount,
       pendingCount,
     };
-  }, [reports]);
+  }, [periodReports]);
+
+  const profitTrend = useMemo(() => {
+    const periodEnd = resolveHqDateBounds(dateRange)?.to || getKstTodayDateStr();
+    return buildHqSettlementProfitTrend(periodReports, periodEnd);
+  }, [periodReports, dateRange]);
+  const trendHasActualData = profitTrend.some(day => day.reportCount > 0);
+  const trendMaxAbsolute = Math.max(1, ...profitTrend.map(day => Math.abs(day.directProfit)));
 
   // Open contract editor for selected report
   const handleOpenContractModal = () => {
@@ -253,7 +268,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
   const handleDownloadClientCsv = () => {
     if (!selectedReport) return;
     if (selectedReport.status !== "approved" && selectedReport.status !== "invoiced") {
-      alert("관리자 검토·승인 완료 후 고객사 제출용 확정 정산서를 다운로드할 수 있습니다.");
+      showToast("관리자 검토·승인 완료 후 고객사 제출용 확정 정산서를 다운로드할 수 있습니다.");
       return;
     }
     haptics.selection();
@@ -283,6 +298,26 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
     showToast("본사 내부용 배차별 수익성 분석 Excel(CSV) 다운로드가 완료되었습니다.");
   };
 
+  // Comprehensive export includes every row in the selected period.
+  const handleDownloadAllSummaryCsv = () => {
+    if (!periodReports.length) {
+      showToast('선택한 기간에 내보낼 정산 리포트가 없습니다.');
+      return;
+    }
+    const csv = exportSettlementSummaryCsv(periodReports);
+    const blob = new Blob([String.fromCharCode(0xfeff) + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    try {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `[본사내부용]_행사정산총괄_${formatHqDateRangeLabel(dateRange).replace(/[^가-힣0-9.-]/g, '_')}.csv`;
+      a.click();
+      showToast(`선택 기간의 ${periodReports.length}건을 Excel(CSV)로 내보냈습니다.`);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  };
+
   // Print / PDF Export
   const handlePrintPdf = () => {
     if (!selectedReport) return;
@@ -291,7 +326,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
       selectedReport.status !== "approved" &&
       selectedReport.status !== "invoiced"
     ) {
-      alert("관리자 검토·승인 완료 후 고객사 제출용 PDF/인쇄가 가능합니다.");
+      showToast("관리자 검토·승인 완료 후 고객사 제출용 PDF/인쇄가 가능합니다.");
       return;
     }
     haptics.selection();
@@ -302,14 +337,14 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
     switch (status) {
       case "approved":
         return (
-          <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+          <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-[#F2F5FA] text-[#546984] border border-[#EEF1F6] inline-flex items-center gap-1">
             <CheckCircle2 className="w-3 h-3" />
             <span>승인 완료</span>
           </span>
         );
       case "invoiced":
         return (
-          <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-blue-50 text-[#0050FF] border border-blue-200 inline-flex items-center gap-1">
+          <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-200 inline-flex items-center gap-1">
             <Receipt className="w-3 h-3" />
             <span>청구 완료</span>
           </span>
@@ -360,7 +395,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
       );
     }
     return (
-      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700">
+      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[#F2F5FA] text-[#546984]">
         고객사 계약단가
       </span>
     );
@@ -389,10 +424,10 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
 
             {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
             <div className="absolute bottom-full left-0 mb-2 hidden group-hover/report:flex flex-col items-start pointer-events-none z-[100]">
-              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+              <span className="whitespace-nowrap rounded-lg bg-white px-2.5 py-1 text-[11px] font-semibold text-[#53647B] shadow-[0_5px_18px_rgba(35,49,78,0.12)] animate-in fade-in-50 duration-150">
                 고객사 정산과 기사 인건비, 배차별 직접이익을 종합 분석해요
               </span>
-              <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-4 shadow-xs" />
+              <div className="w-2 h-2 bg-white rotate-45 -mt-1 ml-4 shadow-xs" />
             </div>
           </div>
 
@@ -407,17 +442,11 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => {
-              haptics.lightTap();
-              showToast("정산 기간 필터: 전체 기간이 선택되어 있습니다.");
-            }}
-            className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/80 cursor-pointer shadow-2xs transition-colors"
-            title="정산 기간 필터"
-          >
-            <Calendar className="w-4 h-4" />
-          </button>
+          <HqDateRangePicker
+            value={dateRange}
+            onChange={(next) => { setDateRange(next); setShowHeaderMenu(false); }}
+            label="행사 정산"
+          />
 
           <div className="relative">
             <button
@@ -445,20 +474,10 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                   }}
                   className="w-full text-left px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
                 >
-                  <Settings2 className="w-3.5 h-3.5 text-[#0050FF]" />
+                  <Settings2 className="w-3.5 h-3.5 text-[#1E60F3]" />
                   <span>기본 요금 및 인건비 설정</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowHeaderMenu(false);
-                    setShowDevConsole(!showDevConsole);
-                  }}
-                  className="w-full text-left px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 border-t border-slate-100 mt-1 pt-1.5 cursor-pointer"
-                >
-                  <Settings2 className="w-3.5 h-3.5 text-slate-400" />
-                  <span>{showDevConsole ? "테스트 콘솔 닫기" : "테스트 콘솔 열기"}</span>
-                </button>
+
               </div>
             )}
           </div>
@@ -476,13 +495,13 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
             }}
             className={`pb-2.5 font-bold transition-all relative cursor-pointer ${
               activeSubTab === "events"
-                ? "text-[#3182F6]"
+                ? "text-[#1E60F3]"
                 : "text-slate-500 hover:text-slate-800"
             }`}
           >
             <span>행사별 정산</span>
             {activeSubTab === "events" && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#3182F6] rounded-full" />
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1E60F3] rounded-full" />
             )}
           </button>
           <button
@@ -493,13 +512,13 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
             }}
             className={`pb-2.5 font-bold transition-all relative cursor-pointer ${
               activeSubTab === "profitability"
-                ? "text-[#3182F6]"
+                ? "text-[#1E60F3]"
                 : "text-slate-500 hover:text-slate-800"
             }`}
           >
             <span>수익성 분석</span>
             {activeSubTab === "profitability" && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#3182F6] rounded-full" />
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1E60F3] rounded-full" />
             )}
           </button>
           <button
@@ -510,86 +529,17 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
             }}
             className={`pb-2.5 font-bold transition-all relative cursor-pointer ${
               activeSubTab === "comprehensive"
-                ? "text-[#3182F6]"
+                ? "text-[#1E60F3]"
                 : "text-slate-500 hover:text-slate-800"
             }`}
           >
             <span>종합 리포트</span>
             {activeSubTab === "comprehensive" && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#3182F6] rounded-full" />
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1E60F3] rounded-full" />
             )}
           </button>
         </div>
       </div>
-
-      {/* Dev Console (if enabled) */}
-      {showDevConsole && (
-        <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 space-y-2.5 animate-in fade-in duration-150 print:hidden">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="px-2 py-0.5 rounded bg-blue-600 text-white text-[10px] font-black tracking-wide">
-                DEV TEST CONSOLE
-              </span>
-              <span className="text-xs font-black text-white">
-                E2E 업무·정산 파이프라인 시나리오 실행기
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {(
-                [
-                  { code: "A", label: "시나리오 A (단일차량)" },
-                  { code: "B", label: "시나리오 B (복수3대)" },
-                  { code: "C", label: "시나리오 C (수정·재계산)" },
-                  { code: "D", label: "시나리오 D (경계조건)" },
-                  { code: "ALL", label: "전체 A~D 실행" },
-                ] as const
-              ).map((btn) => (
-                <button
-                  key={btn.code}
-                  type="button"
-                  onClick={() => {
-                    haptics.selection();
-                    const res = runDemoPipelineScenario(btn.code);
-                    setDemoLogs(res.summaryLog);
-                    const firstDemo = res.reports.find((r) => r.isDemoScenario);
-                    if (firstDemo) setSelectedReportId(firstDemo.id);
-                    showToast(`시나리오 ${btn.code} E2E 데이터 생성 및 정산 검증 완료`);
-                  }}
-                  className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
-                    btn.code === "ALL"
-                      ? "bg-[#0050FF] hover:bg-blue-600 text-white shadow-xs"
-                      : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
-                  }`}
-                >
-                  {btn.label}
-                </button>
-              ))}
-
-              <button
-                type="button"
-                onClick={() => {
-                  haptics.lightTap();
-                  resetDemoPipelineData();
-                  setDemoLogs([]);
-                  showToast("DEMO 시나리오 데이터가 초기화되었습니다.");
-                }}
-                className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-800/70 cursor-pointer"
-              >
-                초기화
-              </button>
-            </div>
-          </div>
-
-          {demoLogs.length > 0 && (
-            <div className="p-2.5 rounded-xl bg-slate-950/90 border border-slate-800 text-[11px] text-emerald-300 font-mono space-y-1">
-              {demoLogs.map((logLine, i) => (
-                <div key={i}>✓ {logLine}</div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Sub-Tab Content 1: 행사별 정산 (Split Master-Detail View) */}
       {activeSubTab === "events" && (
@@ -613,17 +563,20 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                   className="w-full pl-8.5 pr-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
                 />
               </div>
-              <select
+              <HqSearchSelect
+                label="정산 상태 필터"
+                size="sm"
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="w-full px-3 py-2 bg-white border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="all">전체</option>
-                <option value="draft">청구 대기</option>
-                <option value="reviewing">검토 중</option>
-                <option value="approved">승인 완료</option>
-                <option value="invoiced">청구 완료</option>
-              </select>
+                onChange={(next) => setStatusFilter(next as "all" | SettlementReportStatus)}
+                placeholder="전체 상태"
+                options={[
+                  { value: "all", label: "전체 상태" },
+                  { value: "draft", label: "청구 대기" },
+                  { value: "reviewing", label: "검토 중" },
+                  { value: "approved", label: "승인 완료" },
+                  { value: "invoiced", label: "청구 완료" },
+                ]}
+              />
             </div>
 
             {/* Cards List */}
@@ -738,7 +691,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                               }}
                               className="w-full text-left px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
                             >
-                              <Settings2 className="w-3.5 h-3.5 text-[#0050FF]" />
+                              <Settings2 className="w-3.5 h-3.5 text-[#1E60F3]" />
                               <span>계약·요율 설정</span>
                             </button>
                             <button
@@ -924,7 +877,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                               <span className="text-[11px] text-slate-400 font-medium block">
                                 {reportViewMode === "client_external" ? "청구 소계" : "배차 직접이익"}
                               </span>
-                              <span className="text-xs sm:text-sm font-bold text-[#3182F6] mt-0.5 block">
+                              <span className="text-xs sm:text-sm font-bold text-[#1E60F3] mt-0.5 block">
                                 {reportViewMode === "client_external" ? (
                                   formatKRW(v.vehicleFareSubtotal)
                                 ) : (
@@ -1008,7 +961,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                                         </td>
                                         <td className="py-2.5 px-3">
                                           {exp.billableToCustomer ? (
-                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#F2F5FA] text-[#546984] border border-[#EEF1F6]">
                                               고객사 청구 실비
                                             </span>
                                           ) : (
@@ -1019,7 +972,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                                         </td>
                                         <td className="py-2.5 px-3">
                                           {exp.status === "승인 완료" ? (
-                                            <span className="px-2 py-0.5 rounded text-[10px] font-black bg-blue-50 text-[#0050FF] border border-blue-200">
+                                            <span className="px-2 py-0.5 rounded text-[10px] font-black bg-blue-50 text-[#1E60F3] border border-blue-200">
                                               승인 완료
                                             </span>
                                           ) : (
@@ -1102,7 +1055,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                               : "별도 확인 (미포함)"}
                           </span>
                         </div>
-                        <div className="flex justify-between text-sm font-black text-[#3182F6] pt-2 border-t border-slate-200">
+                        <div className="flex justify-between text-sm font-black text-[#1E60F3] pt-2 border-t border-slate-200">
                           <span>최종 청구 합계</span>
                           <span>{formatKRW(selectedReport.grandTotal)}</span>
                         </div>
@@ -1152,7 +1105,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                               -{formatKRW(selectedReport.totalVehicleDirectCost + selectedReport.totalOtherDirectCost)}
                             </span>
                           </div>
-                          <div className="flex justify-between text-sm font-black text-[#3182F6] pt-2 border-t border-slate-200">
+                          <div className="flex justify-between text-sm font-black text-[#1E60F3] pt-2 border-t border-slate-200">
                             <span>배차 직접이익</span>
                             <span>
                               {formatKRW(selectedReport.totalDirectProfit)} ({selectedReport.averageDirectMarginPercent}%)
@@ -1195,7 +1148,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                       );
                       showToast("정산 리포트 검토 및 승인이 완료되어 고객사 청구서 발행이 활성화되었습니다.");
                     }}
-                    className="px-5 py-2.5 rounded-xl bg-[#3182F6] hover:bg-blue-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                    className="px-5 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
                   >
                     <CheckCircle2 className="w-4 h-4" />
                     <span>검토 완료 및 청구 승인</span>
@@ -1215,7 +1168,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
             <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-2xs flex flex-col justify-between">
               <div className="flex items-center justify-between text-xs text-slate-500 font-bold">
                 <span>총 매출 (공급가)</span>
-                <Building2 className="w-4 h-4 text-[#3182F6]" />
+                <Building2 className="w-4 h-4 text-[#1E60F3]" />
               </div>
               <div className="text-lg sm:text-xl font-black text-slate-900 mt-2">
                 {formatKRW(dashboardKpis.totalRevenue)}
@@ -1248,11 +1201,11 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
             </div>
 
             <div className="bg-white rounded-2xl border border-blue-100 p-4 shadow-2xs flex flex-col justify-between bg-blue-50/20">
-              <div className="flex items-center justify-between text-xs text-[#3182F6] font-bold">
+              <div className="flex items-center justify-between text-xs text-[#1E60F3] font-bold">
                 <span>배차 직접이익</span>
-                <TrendingUp className="w-4 h-4 text-[#3182F6]" />
+                <TrendingUp className="w-4 h-4 text-[#1E60F3]" />
               </div>
-              <div className="text-lg sm:text-xl font-black text-[#3182F6] mt-2">
+              <div className="text-lg sm:text-xl font-black text-[#1E60F3] mt-2">
                 {formatKRW(dashboardKpis.totalDirectProfit)}
               </div>
               <div className="text-[11px] text-blue-500/80 font-medium mt-1">
@@ -1263,9 +1216,9 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
             <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-2xs flex flex-col justify-between">
               <div className="flex items-center justify-between text-xs text-slate-500 font-bold">
                 <span>평균 마진율</span>
-                <BarChart3 className="w-4 h-4 text-emerald-500" />
+                <BarChart3 className="w-4 h-4 text-[#8294AC]" />
               </div>
-              <div className="text-lg sm:text-xl font-black text-emerald-600 mt-2">
+              <div className="text-lg sm:text-xl font-black text-[#52647A] mt-2">
                 {dashboardKpis.avgMargin}%
               </div>
               <div className="text-[11px] text-slate-400 font-medium mt-1">목표: 35.0% 이상</div>
@@ -1274,10 +1227,10 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
             <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-2xs flex flex-col justify-between">
               <div className="flex items-center justify-between text-xs text-slate-500 font-bold">
                 <span>정산 현황</span>
-                <CheckCircle2 className="w-4 h-4 text-[#3182F6]" />
+                <CheckCircle2 className="w-4 h-4 text-[#1E60F3]" />
               </div>
               <div className="text-lg sm:text-xl font-black text-slate-900 mt-2">
-                {dashboardKpis.approvedCount} / {reports.length}
+                {dashboardKpis.approvedCount} / {periodReports.length}
               </div>
               <div className="text-[11px] text-slate-400 font-medium mt-1">
                 승인완료 {dashboardKpis.approvedCount}건
@@ -1291,49 +1244,46 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
             <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-100 p-5 shadow-2xs space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-slate-900">수익성 추이</h3>
-                <span className="text-xs font-semibold text-slate-400">최근 7일 정산</span>
+                <span className="text-xs font-semibold text-slate-400">기간 내 최근 7일 · 실제 행사</span>
               </div>
 
-              <div className="h-44 w-full flex flex-col justify-end relative pt-6">
-                <div className="absolute right-4 top-2 bg-[#3182F6] text-white text-[11px] font-bold px-2.5 py-1 rounded-full shadow-md shadow-blue-500/25 flex items-center gap-1">
-                  <span>{formatKRW(dashboardKpis.totalDirectProfit)}</span>
+              {trendHasActualData ? (
+                <div role="img" aria-label="기간별 실제 정산 직접이익, 행사 날짜 기준" className="grid min-h-48 grid-cols-7 gap-1.5 py-2">
+                  {profitTrend.map(day => (
+                    <div key={day.date} className="flex min-w-0 flex-col items-center justify-end gap-1.5">
+                      <div className="flex h-28 w-full flex-col">
+                        <div className="flex h-14 items-end justify-center">
+                          {day.directProfit > 0 && (
+                            <div title={`${day.date} · 행사 ${day.reportCount}건 · 직접이익 ${formatKRW(day.directProfit)}`}
+                              style={{ height: `${Math.max(5, Math.abs(day.directProfit) / trendMaxAbsolute * 100)}%` }}
+                              className="w-[min(22px,70%)] rounded-t-[6px] bg-[#1E60F3]/85" />
+                          )}
+                        </div>
+                        <div className="h-px w-full shrink-0 bg-[#E7ECF4]" />
+                        <div className="flex h-14 items-start justify-center">
+                          {day.directProfit < 0 && (
+                            <div title={`${day.date} · 행사 ${day.reportCount}건 · 손실 ${formatKRW(day.directProfit)}`}
+                              style={{ height: `${Math.max(5, Math.abs(day.directProfit) / trendMaxAbsolute * 100)}%` }}
+                              className="w-[min(22px,70%)] rounded-b-[6px] bg-[#C88980]/85" />
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-semibold text-[#8290A4] tabular-nums">{day.label}</span>
+                      <span title={`${day.date}: ${day.reportCount}건`}
+                        className="max-w-full truncate text-[10px] font-medium tabular-nums text-[#61728D]">
+                        {day.reportCount ? formatKRW(day.directProfit) : '—'}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-
-                <svg className="w-full h-32 overflow-visible" viewBox="0 0 500 120" preserveAspectRatio="none">
-                  <defs>
-                    <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#3182F6" stopOpacity="0.18" />
-                      <stop offset="100%" stopColor="#3182F6" stopOpacity="0.0" />
-                    </linearGradient>
-                  </defs>
-                  <line x1="0" y1="20" x2="500" y2="20" stroke="#F1F5F9" strokeWidth="1" strokeDasharray="3 3" />
-                  <line x1="0" y1="60" x2="500" y2="60" stroke="#F1F5F9" strokeWidth="1" strokeDasharray="3 3" />
-                  <line x1="0" y1="100" x2="500" y2="100" stroke="#F1F5F9" strokeWidth="1" strokeDasharray="3 3" />
-
-                  <path
-                    d="M 15 105 C 80 100, 140 70, 200 90 C 260 110, 320 60, 380 75 C 430 85, 460 30, 485 28 L 485 118 L 15 118 Z"
-                    fill="url(#profitGrad)"
-                  />
-                  <path
-                    d="M 15 105 C 80 100, 140 70, 200 90 C 260 110, 320 60, 380 75 C 430 85, 460 30, 485 28"
-                    fill="none"
-                    stroke="#3182F6"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                  />
-                  <circle cx="485" cy="28" r="4.5" fill="#FFFFFF" stroke="#3182F6" strokeWidth="2.5" />
-                </svg>
-
-                <div className="flex justify-between text-[11px] font-semibold text-slate-400 pt-2 border-t border-slate-100">
-                  <span>10/29</span>
-                  <span>10/30</span>
-                  <span>10/31</span>
-                  <span>11/01</span>
-                  <span>11/02</span>
-                  <span>11/03</span>
-                  <span className="font-bold text-[#3182F6]">11/04</span>
+              ) : (
+                <div className="flex min-h-48 flex-col items-center justify-center gap-2 text-center">
+                  <BarChart3 className="size-7 text-[#BBC7D7]" />
+                  <p className="text-[12px] font-medium text-[#73839D]">
+                    최근 7일 동안 정산된 행사 데이터가 없습니다.
+                  </p>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* 비용 구성 (5 cols) */}
@@ -1366,7 +1316,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                       cy="50"
                       r="38"
                       fill="transparent"
-                      stroke="#3182F6"
+                      stroke="#1E60F3"
                       strokeWidth="12"
                       strokeDasharray="238.76"
                       strokeDashoffset={
@@ -1384,7 +1334,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
 
                 <div className="space-y-2 text-xs">
                   <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#3182F6] shrink-0" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#1E60F3] shrink-0" />
                     <div className="min-w-0">
                       <span className="text-slate-500 font-medium block text-[11px]">직접이익</span>
                       <span className="font-extrabold text-slate-900 truncate block">
@@ -1427,13 +1377,13 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
           <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">전체 행사 정산 총괄 명세서</h3>
-                <p className="text-xs text-slate-400 mt-0.5">승인 대기 및 승인 완료된 전체 리포트 현황</p>
+                <h3 className="text-sm font-bold text-slate-900">행사 정산 총괄 명세서 · {periodReports.length}건</h3>
+                <p className="text-xs text-slate-400 mt-0.5">선택한 기간의 리포트 현황 · {formatHqDateRangeLabel(dateRange)}</p>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={handleDownloadClientCsv}
+                  onClick={handleDownloadAllSummaryCsv}
                   className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer"
                 >
                   <img src="/images/icons/icon_excel.png" alt="Excel" className="w-3.5 h-3.5 object-contain" />
@@ -1458,10 +1408,14 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {reports.map((r) => (
+                  {periodReports.map((r) => (
                     <tr
                       key={r.id}
                       onClick={() => {
+                        // A ledger row must open the exact report selected, even
+                        // if event-only status/search filters were active earlier.
+                        setStatusFilter("all");
+                        setSearchQuery("");
                         setSelectedReportId(r.id);
                         setActiveSubTab("events");
                       }}
@@ -1473,7 +1427,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                       <td className="py-2.5 px-3 text-center font-semibold text-slate-600">{r.totalVehiclesCount}대</td>
                       <td className="py-2.5 px-3 text-right font-bold text-slate-900">{formatKRW(r.grandTotal)}</td>
                       <td className="py-2.5 px-3 text-right text-rose-600 font-semibold">-{formatKRW(r.totalDriverLaborCost)}</td>
-                      <td className="py-2.5 px-3 text-right font-bold text-[#3182F6]">{formatKRW(r.totalDirectProfit)}</td>
+                      <td className="py-2.5 px-3 text-right font-bold text-[#1E60F3]">{formatKRW(r.totalDirectProfit)}</td>
                       <td className="py-2.5 px-3 text-center font-bold text-slate-700">{r.averageDirectMarginPercent}%</td>
                       <td className="py-2.5 px-3 text-center">{getStatusBadge(r.status)}</td>
                     </tr>
@@ -1487,8 +1441,8 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
 
       {/* Modal 1: 기본 요금 프리셋 & 기사 인건비 관리 모달 */}
       {isPresetModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-5">
+        <div className="fixed inset-0 z-50 bg-[#17233B]/25 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[20px] shadow-[0_20px_52px_rgba(35,49,78,0.12)] max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <h3 className="text-base font-black text-slate-900">
@@ -1669,8 +1623,8 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
 
       {/* Modal 2: 고객사/행사별 계약 단가 및 초과요율 설정 모달 */}
       {isContractModalOpen && selectedReport && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 space-y-4">
+        <div className="fixed inset-0 z-50 bg-[#17233B]/25 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[20px] shadow-[0_20px_52px_rgba(35,49,78,0.12)] max-w-lg w-full p-6 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <h3 className="text-base font-black text-slate-900">
@@ -1692,16 +1646,18 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
             <div className="space-y-3 text-xs">
               <div>
                 <label className="block font-bold text-slate-700 mb-1">적용 요금 단계 (우선순위)</label>
-                <select
+                <HqSearchSelect
+                  label="정산 적용 요금 단계"
                   value={editPricingSource}
-                  onChange={(e) => setEditPricingSource(e.target.value as PricingTierSource)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800"
-                >
-                  <option value="preset">1단계: 공통 임시 요금 프리셋</option>
-                  <option value="customer_contract">2단계: 고객사별 계약 요금 (프리셋보다 우선)</option>
-                  <option value="event_special">3단계: 행사별 특별 요금</option>
-                  <option value="booking_override">4단계: 개별 배차 관리자 확정 요금</option>
-                </select>
+                  onChange={(next) => setEditPricingSource(next as PricingTierSource)}
+                  placeholder="계약 요금 단계 선택"
+                  options={[
+                    { value: "preset", label: "1단계: 공통 임시 요금 프리셋" },
+                    { value: "customer_contract", label: "2단계: 고객사별 계약 요금" },
+                    { value: "event_special", label: "3단계: 행사별 특별 요금" },
+                    { value: "booking_override", label: "4단계: 개별 배차 관리자 확정 요금" },
+                  ]}
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1741,20 +1697,22 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                 </div>
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">초과시간 반올림 규칙</label>
-                  <select
+                  <HqSearchSelect
+                    label="초과시간 반올림 규칙"
                     value={`${editRoundingUnit}-${editRoundingMethod}`}
-                    onChange={(e) => {
-                      const [u, m] = e.target.value.split('-');
-                      setEditRoundingUnit(parseInt(u, 10));
-                      setEditRoundingMethod(m as 'ceil' | 'round' | 'floor' | 'exact');
+                    onChange={(next) => {
+                      const [unit, method] = next.split("-");
+                      setEditRoundingUnit(Number(unit));
+                      setEditRoundingMethod(method as 'ceil' | 'round' | 'floor' | 'exact');
                     }}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800"
-                  >
-                    <option value="30-ceil">30분 단위 올림</option>
-                    <option value="10-ceil">10분 단위 올림</option>
-                    <option value="60-ceil">1시간 단위 올림</option>
-                    <option value="1-exact">분 단위 실계산</option>
-                  </select>
+                    placeholder="초과시간 계산 방식"
+                    options={[
+                      { value: "30-ceil", label: "30분 단위 올림" },
+                      { value: "10-ceil", label: "10분 단위 올림" },
+                      { value: "60-ceil", label: "1시간 단위 올림" },
+                      { value: "1-exact", label: "분 단위 실계산" },
+                    ]}
+                  />
                 </div>
               </div>
 
@@ -1762,15 +1720,17 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                 <label className="block font-bold text-slate-700 mb-1">
                   부가세(VAT) 처리 기준 (임의 가산 금지)
                 </label>
-                <select
+                <HqSearchSelect
+                  label="정산 부가세 처리 기준"
                   value={editVatMode}
-                  onChange={(e) => setEditVatMode(e.target.value as VatHandlingMode)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800"
-                >
-                  <option value="unset">미확정 (별도 확인 · 임의 가산 안 함)</option>
-                  <option value="excluded">부가세 별도 (+10% 가산)</option>
-                  <option value="included">부가세 포함 (단가에 포함됨)</option>
-                </select>
+                  onChange={(next) => setEditVatMode(next as VatHandlingMode)}
+                  placeholder="부가세 처리 기준"
+                  options={[
+                    { value: "unset", label: "미확정", subtitle: "별도 확인 · 임의 가산하지 않음" },
+                    { value: "excluded", label: "부가세 별도", subtitle: "공급가액에 10% 가산" },
+                    { value: "included", label: "부가세 포함", subtitle: "단가에 이미 포함" },
+                  ]}
+                />
               </div>
             </div>
 
@@ -1796,7 +1756,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
 
       {/* Toast Notification */}
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-xl flex items-center gap-2">
+        <div className="fixed bottom-6 right-6 z-50 bg-[#F7F9FC] text-[#253552] text-xs font-semibold px-4 py-2.5 rounded-[14px] shadow-[0_8px_28px_rgba(35,49,78,0.12)] flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toastMsg}</span>
         </div>
