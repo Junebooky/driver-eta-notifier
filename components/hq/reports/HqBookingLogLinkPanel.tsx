@@ -107,7 +107,7 @@ export function HqBookingLogLinkPanel({onLinked}:{onLinked:()=>Promise<void>}) {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <p className="mb-1.5 text-[11px] font-semibold text-[#75849A]">미연결 운행일지</p>
-                <HqSearchSelect label="운행일지 선택" size="sm" value={logId} onChange={setLogId}
+                <HqSearchSelect label="운행일지 선택" size="sm" value={logId} onChange={setLogId} placeholder="운행일지 선택"
                   options={records.logs.map(row=>({
                     value:row.id,
                     label:[row.driving_date,row.driver_name||'기사 미등록',row.vehicle_plate||'차량 미등록'].join(' · '),
