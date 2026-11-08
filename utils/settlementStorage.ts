@@ -1003,6 +1003,12 @@ export function updateSettlementReportStatus(
   adminNotes?: string,
   areAllDirectCostsConfirmed?: boolean
 ): EventSettlementReport | null {
+  // Browser drafts have no authoritative server approval trail. Never let a
+  // browser status toggle turn a working copy into an externally approved bill.
+  // Node-only legacy fixture tests can still exercise the old calculation path.
+  if (typeof window !== 'undefined' && (newStatus === 'approved' || newStatus === 'invoiced')) {
+    return null;
+  }
   const reports = getSettlementReportsSnapshot();
   let updatedItem: EventSettlementReport | null = null;
 
