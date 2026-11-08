@@ -80,7 +80,7 @@ export function HqBookingLogLinkPanel({onLinked}:{onLinked:()=>Promise<void>}) {
           <div>
             <p className="text-[13px] font-bold text-[#17233B]">예약 · 운행일지 연결 검토</p>
             <p className="text-[11px] leading-5 text-[#8290A4]">
-              미연결 운행일지 {records.logs?.length??'—'}건 · 자동 연결하지 않음
+              미연결 운행일지 {records.logs?.length??'—'}건 · 조건이 명확하지 않은 기록만 검토
             </p>
           </div>
         </div>
