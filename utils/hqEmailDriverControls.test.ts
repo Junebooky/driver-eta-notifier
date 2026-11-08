@@ -38,6 +38,11 @@ test('driver form and table filters share A-plan search select', () => {
   assert.match(table, /setStatusFilter\(next as typeof statusFilter\)/);
   assert.match(table, /setCurrentPage\(1\)/);
   assert.doesNotMatch(table, /<select\b/);
+  assert.match(table, /<HqModal/);
+  assert.match(table, /setDriverToRemove\(driver\)/);
+  assert.match(table, /deleteDriver\(driverToRemove\.id\)/);
+  assert.match(table, /setRemoveError\(/);
+  assert.doesNotMatch(table, /window\.confirm\(|alert\('등록 해제에 실패/);
 });
 
 test('driver image manager uses active fleet and captured-target confirmation', () => {
