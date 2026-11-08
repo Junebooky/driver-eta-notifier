@@ -65,6 +65,7 @@ async function run(): Promise<void> {
     estimatedTimeFormatted: '10:00',
     statusText: '정상 출발',
     diffMinutes: 0,
+    arrivalLocationText: '제2여객터미널 1층 (출구 배정 중)',
     departureLocationText: ozoneDoor.departureLocationText,
     suggestedDoor: ozoneDoor.suggestedDoor,
     targetPreset: getFlightLocationPreset(t2.terminal, 'departure', 'ICN'),
