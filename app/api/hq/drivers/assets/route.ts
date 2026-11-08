@@ -120,7 +120,7 @@ export async function GET(req: NextRequest) {
     }
 
     const [bundle, vehicleAssetSummary] = await Promise.all([
-      getDriverVehicleBundle(driverId, resolvedVehicle.uuid, undefined, org),
+      getDriverVehicleBundle(driverId, resolvedVehicle.uuid, undefined, org, resolvedVehicle),
       getDriverVehicleAssetSummary(driverId, org),
     ]);
     return NextResponse.json({
