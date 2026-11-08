@@ -3,6 +3,7 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {CheckCircle2, ChevronDown, FileText, RefreshCw, ShieldCheck} from 'lucide-react';
 import type {LedgerDocument, LedgerAction, SettlementContract, SettlementTotals} from '@/lib/settlement/serverLedger';
+import {HqSearchSelect} from '@/components/hq/ui/HqSearchSelect';
 
 type ScheduleChoice = {
   id:string;date:string;customerName:string;eventName:string;
@@ -146,15 +147,17 @@ export function HqServerSettlementPanel(){
           )}
           {choices.length>0 && (
             <>
-              <label className="flex flex-col gap-1.5 text-[11px] font-semibold text-[#75849A]">
-                서버에 등록된 예약 선택
-                <select aria-label="정산할 실제 예약" value={selected} onChange={e=>setSelected(e.target.value)}
-                  className="min-h-11 w-full rounded-xl bg-[#F7F9FC] px-3 text-[13px] font-medium text-[#253552] outline-none focus:ring-2 focus:ring-[#1E60F3]/25">
-                  {choices.map(s=><option key={s.id} value={s.id}>
-                    {s.date} · {s.customerName} · {s.vehiclePlate||'차량 미배정'} · {s.driverName||'기사 미배정'}
-                  </option>)}
-                </select>
-              </label>
+              <div className="space-y-1.5">
+                <p className="text-[11px] font-semibold text-[#75849A]">서버에 등록된 예약 선택</p>
+                <HqSearchSelect label="정산할 실제 예약" size="sm" value={selected}
+                  onChange={setSelected} placeholder="예약 선택"
+                  options={choices.map(item=>({
+                    value:item.id,
+                    label:[item.date,item.customerName,item.vehiclePlate||'차량 미배정'].join(' · '),
+                    subtitle:item.driverName||'기사 미배정',
+                    status:docs.some(d=>d.schedule_id===item.id)?'정산 기록 있음':undefined,
+                  }))}/>
+              </div>
               {schedule && <div className="flex flex-wrap items-center gap-2 text-[11px] text-[#8290A4]">
                 <span>{schedule.eventName||'행사명 미등록'}</span><span>·</span>
                 <span>{schedule.vehicleModel||'차종 미등록'}</span>
@@ -184,22 +187,25 @@ export function HqServerSettlementPanel(){
                         {field('overtimeHourlyRate','시간당 초과요금 (원)','number')}
                         {field('driverLaborCost','확인된 기사 인건비 (원)','number')}
                         {field('baseHours','기본 서비스 시간 (시간)','number')}
-                        <label className="flex flex-col gap-1 text-[11px] font-semibold text-[#53647B]">
-                          초과시간 올림 단위
-                          <select value={form.roundingMinutes} onChange={e=>setField('roundingMinutes',e.target.value)}
-                            className="min-h-10 rounded-xl bg-[#F7F9FC] px-3 text-[13px] text-[#253552] outline-none">
-                            <option value="1">1분</option><option value="10">10분</option>
-                            <option value="30">30분</option><option value="60">60분</option>
-                          </select>
-                        </label>
-                        <label className="flex flex-col gap-1 text-[11px] font-semibold text-[#53647B]">
-                          부가세 기준
-                          <select value={form.vatMode} onChange={e=>setField('vatMode',e.target.value)}
-                            className="min-h-10 rounded-xl bg-[#F7F9FC] px-3 text-[13px] text-[#253552] outline-none">
-                            <option value="unset">미확정</option><option value="included">요금에 포함</option>
-                            <option value="excluded">요금 별도</option>
-                          </select>
-                        </label>
+                        <div className="space-y-1">
+                          <p className="text-[11px] font-semibold text-[#53647B]">초과시간 올림 단위</p>
+                          <HqSearchSelect label="초과시간 올림 단위" size="sm"
+                            value={form.roundingMinutes} onChange={value=>setField('roundingMinutes',value)}
+                            placeholder="반올림 단위" options={[
+                              {value:'1',label:'1분'},{value:'10',label:'10분'},
+                              {value:'30',label:'30분'},{value:'60',label:'60분'},
+                            ]}/>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[11px] font-semibold text-[#53647B]">부가세 기준</p>
+                          <HqSearchSelect label="정산 부가세 기준" size="sm"
+                            value={form.vatMode} onChange={value=>setField('vatMode',value)}
+                            placeholder="부가세 처리" options={[
+                              {value:'unset',label:'미확정'},
+                              {value:'included',label:'요금에 포함'},
+                              {value:'excluded',label:'요금 별도'},
+                            ]}/>
+                        </div>
                       </div>
                       <button type="button" disabled={busy||loading||form.vatMode==='unset'}
                         onClick={()=>void action('price')}
