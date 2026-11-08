@@ -37,4 +37,6 @@ test('reports view hides preview fixtures and blocks external csv, print, approv
   assert.match(view, /handleDownloadClientCsv[\s\S]*?canPublishHqSettlementReport\(selectedReport\)/);
   assert.match(view, /handlePrintPdf[\s\S]*?canPublishHqSettlementReport\(selectedReport\)/);
   assert.match(view, /disabled=\{!canPublishHqSettlementReport\(selectedReport\)\}/);
+  const storage = load('utils/settlementStorage.ts');
+  assert.match(storage, /typeof window !== 'undefined' && \(newStatus === 'approved' \|\| newStatus === 'invoiced'\)/);
 });
