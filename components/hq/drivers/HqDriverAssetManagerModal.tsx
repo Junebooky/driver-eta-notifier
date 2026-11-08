@@ -22,13 +22,12 @@ import {
   DriverVehicleAssetBundle,
 } from '@/types/driverVehicleAsset';
 import {
-  VIP_REAL_VEHICLES,
-  VipRealVehicle,
   resolveVehicleEntity,
   getVehicleImage,
 } from '@/utils/vehicleData';
 import { haptics } from '@/utils/haptics';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
+import { useHqFleetRegistry } from '@/hooks/useHqFleetRegistry';
 
 export interface HqDriverAssetManagerModalProps {
   isOpen: boolean;
@@ -48,12 +47,8 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
   onAssetUpdated,
 }) => {
   const [selectedDriverId, setSelectedDriverId] = useState<string>(initialDriverId || '');
-  const [selectedVehiclePlate, setSelectedVehiclePlate] = useState<string>(() => {
-    if (initialVehiclePlate && VIP_REAL_VEHICLES.some((v) => v.plate === initialVehiclePlate)) {
-      return initialVehiclePlate;
-    }
-    return VIP_REAL_VEHICLES[0]?.plate || '125호 9982';
-  });
+  const fleet = useHqFleetRegistry(isOpen);
+  const [selectedVehiclePlate, setSelectedVehiclePlate] = useState<string>(initialVehiclePlate || '');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [vehicleSearchQuery, setVehicleSearchQuery] = useState<string>('');
 
@@ -80,37 +75,35 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
   const pcInputRef = useRef<HTMLInputElement>(null);
   const mobileInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync initial props
+  // Match caller selection, but never resurrect archived or browser-only cars.
   useEffect(() => {
     if (initialDriverId) setSelectedDriverId(initialDriverId);
-    if (initialVehiclePlate && VIP_REAL_VEHICLES.some((v) => v.plate === initialVehiclePlate)) {
-      setSelectedVehiclePlate(initialVehiclePlate);
-    } else if (VIP_REAL_VEHICLES.length > 0) {
-      setSelectedVehiclePlate(VIP_REAL_VEHICLES[0].plate);
-    }
+    setSelectedVehiclePlate(initialVehiclePlate || '');
   }, [initialDriverId, initialVehiclePlate, isOpen]);
 
-  // Set default driver and vehicle if none selected
   useEffect(() => {
-    if (!selectedDriverId && drivers.length > 0) {
-      setSelectedDriverId(drivers[0].id);
-    }
-    if (!selectedVehiclePlate && VIP_REAL_VEHICLES.length > 0) {
-      setSelectedVehiclePlate(VIP_REAL_VEHICLES[0].plate);
-    }
-  }, [drivers, selectedDriverId, selectedVehiclePlate]);
-
-  const activeDriver = useMemo(() => {
-    return drivers.find((d) => d.id === selectedDriverId) || drivers[0] || null;
+    if (!selectedDriverId && drivers.length > 0) setSelectedDriverId(drivers[0].id);
   }, [drivers, selectedDriverId]);
 
-  const activeVehicle = useMemo(() => {
-    const targetPlate =
-      selectedVehiclePlate && VIP_REAL_VEHICLES.some((v) => v.plate === selectedVehiclePlate)
-        ? selectedVehiclePlate
-        : VIP_REAL_VEHICLES[0]?.plate || '125호 9982';
-    return resolveVehicleEntity(targetPlate);
-  }, [selectedVehiclePlate]);
+  useEffect(() => {
+    if (!isOpen || fleet.loading || fleet.error || !fleet.vehicles.length) return;
+    if (!fleet.vehicles.some(vehicle => vehicle.plate === selectedVehiclePlate)) {
+      setSelectedVehiclePlate(fleet.vehicles[0].plate);
+    }
+  }, [isOpen, fleet.loading, fleet.error, fleet.vehicles, selectedVehiclePlate]);
+
+  const activeDriver = useMemo(
+    () => drivers.find(driver => driver.id === selectedDriverId) || drivers[0] || null,
+    [drivers, selectedDriverId],
+  );
+  const activeVehicle = useMemo(() =>
+    fleet.vehicles.find(vehicle => vehicle.plate === selectedVehiclePlate) ||
+    fleet.vehicles[0] ||
+    resolveVehicleEntity('미배정'),
+    [fleet.vehicles, selectedVehiclePlate],
+  );
+  const assetVehicleReady = !fleet.loading && !fleet.error &&
+    fleet.vehicles.some(vehicle => vehicle.plate === selectedVehiclePlate);
 
   // Clean vehicle display name (eliminating double brand names like '벤츠 벤츠...')
   const displayVehicleName = useMemo(() => {
@@ -126,25 +119,25 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
     return `${brand} ${model}`.trim();
   }, [activeVehicle]);
 
-  // Category Tabs Configuration
-  const categoryTabs = useMemo(() => [
-    { key: 'all', label: '전체', count: VIP_REAL_VEHICLES.length, icon: Car },
-    { key: 'sprinter', label: '스프린터', count: 9, icon: Bus },
-    { key: 'staria', label: '스타리아', count: 4, icon: Truck },
-    { key: 'carnival', label: '카니발', count: 2, icon: Truck },
-    { key: 'genesis', label: '제네시스', count: 4, icon: Car },
-    { key: 's_class', label: 'S-클래스', count: 1, icon: Car },
-  ], []);
+  // Counts reflect registered active vehicles, not an obsolete fixed stock list.
+  const categoryTabs = useMemo(() => ([
+    { key: 'all', label: '전체', icon: Car },
+    { key: 'sprinter', label: '스프린터', icon: Bus },
+    { key: 'staria', label: '스타리아', icon: Truck },
+    { key: 'carnival', label: '카니발', icon: Truck },
+    { key: 'genesis', label: '제네시스', icon: Car },
+    { key: 's_class', label: 'S-클래스', icon: Car },
+  ]).map(tab => ({
+    ...tab, count: tab.key === 'all'
+      ? fleet.vehicles.length : fleet.vehicles.filter(vehicle => vehicle.category === tab.key).length,
+  })), [fleet.vehicles]);
 
-  // Filtered vehicles based on category and search
-  const filteredVehicles = useMemo(() => {
-    return VIP_REAL_VEHICLES.filter((v) => {
-      const matchesCategory = selectedCategory === 'all' || v.category === selectedCategory;
-      const q = vehicleSearchQuery.trim().toLowerCase();
-      const matchesSearch = !q || v.plate.toLowerCase().includes(q) || v.model.toLowerCase().includes(q);
-      return matchesCategory && matchesSearch;
-    });
-  }, [selectedCategory, vehicleSearchQuery]);
+  const filteredVehicles = useMemo(() => fleet.vehicles.filter(vehicle => {
+    const matchesCategory = selectedCategory === 'all' || vehicle.category === selectedCategory;
+    const query = vehicleSearchQuery.trim().toLowerCase();
+    return matchesCategory && (!query || vehicle.plate.toLowerCase().includes(query) ||
+      vehicle.model.toLowerCase().includes(query));
+  }), [fleet.vehicles, selectedCategory, vehicleSearchQuery]);
 
   // Count total completed vehicles for this driver
   const completedVehiclesCount = useMemo(() => {
