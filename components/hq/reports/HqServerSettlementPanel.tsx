@@ -4,6 +4,7 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {CheckCircle2, ChevronDown, FileText, RefreshCw, ShieldCheck} from 'lucide-react';
 import type {LedgerDocument, LedgerAction, SettlementContract, SettlementTotals} from '@/lib/settlement/serverLedger';
 import {HqSearchSelect} from '@/components/hq/ui/HqSearchSelect';
+import {HqBookingLogLinkPanel} from '@/components/hq/reports/HqBookingLogLinkPanel';
 
 type ScheduleChoice = {
   id:string;date:string;customerName:string;eventName:string;
@@ -139,6 +140,7 @@ export function HqServerSettlementPanel(){
       </div>
       {expanded && (
         <div className="mt-4 space-y-4">
+          <HqBookingLogLinkPanel onLinked={refresh}/>
           {loading && <p role="status" className="text-[12px] text-[#8290A4]">서버 정산 자료를 불러오는 중입니다.</p>}
           {error && <p role="alert" className="rounded-xl bg-[#FFF7F5] p-3 text-[12px] text-[#A25F58]">{error}</p>}
           {info && <p role="status" className="rounded-xl bg-[#F6F8FC] p-3 text-[12px] text-[#52647A]">{info}</p>}
