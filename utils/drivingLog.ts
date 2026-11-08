@@ -7,6 +7,7 @@
 
 import { DriverProfile } from '@/types';
 import { passengerSummaryFromProfile, withCurrentProfilePassenger } from './drivingLogPassenger';
+import { belongsToDrivingLogDraftScope } from './drivingLogContinuity';
 
 export interface RouteStopItem {
   id: string;
@@ -399,7 +400,7 @@ export const loadDrivingLogDraft = (
       const raw=localStorage.getItem(`${DRIVING_LOG_STORAGE_PREFIX}${scopedReportId}`);
       if(raw){
         const stored=JSON.parse(raw);
-        if(stored.driverId===driverId && (stored.bookingId || null)===(bookingId || null) && stored.rawDate===dateIso){
+        if(belongsToDrivingLogDraftScope(stored,{reportId:scopedReportId,rawDate:dateIso,driverId,bookingId})){
           const normalized = withCurrentProfilePassenger(stored,driverProfile.passengerName);
           return {
             ...normalized,

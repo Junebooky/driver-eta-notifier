@@ -383,6 +383,31 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
     },
   };
 
+  // Emulates the existing service-role atomic SQL RPC for HTTP submission testing.
+  (supabaseAdmin as any).rpc = async (fn: string, args: any) => {
+    if (fn !== 'link_driving_log_to_booking')
+      return { data: null, error: {message:'Unsupported RPC in mock'} };
+    const row = mockDrivingLogs.find(x => x.id === args.p_log &&
+      x.organization_id === args.p_org);
+    const booking = mockSchedules.find(x => x.id === args.p_booking &&
+      x.org_id === args.p_org);
+    if (!row || !booking) return {data:null,error:{message:'NOT_FOUND'}};
+    if (row.booking_id && row.booking_id !== booking.id)
+      return {data:null,error:{message:'LOG_ALREADY_LINKED'}};
+    if (mockDrivingLogs.some(x => x.id !== row.id && x.booking_id === booking.id))
+      return {data:null,error:{message:'BOOKING_HAS_LOG'}};
+    row.booking_id = booking.id;
+    let expenseCount = 0;
+    for (const exp of mockExpenses) {
+      if (exp.organization_id === args.p_org && (exp as any).driving_log_id === row.id &&
+        !exp.booking_id) {
+        exp.booking_id = booking.id;
+        expenseCount++;
+      }
+    }
+    return {data:{ok:true,expenseCount},error:null};
+  };
+
   // Driver A (윤태준), Driver B (민성호), HQ Admin
   const driverAToken = signCockpitSession({
     userId: DRIVER_A_UUID,
@@ -1042,5 +1067,85 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
     assert.strictEqual(autoUuidRes.status, 200);
     const autoUuidData = await autoUuidRes.json();
     assert.match(autoUuidData.log.id, UUID_V4_REGEX, 'Server MUST assign an RFC 4122 UUID v4 when temporary ID is passed');
+  });
+  // --------------------------------------------------------------------------
+  // 14. Real HTTP submit -> unique booking RPC -> HQ read -> same-row re-submit
+  // --------------------------------------------------------------------------
+  await test('14. Server auto-link persists a uniquely assigned submission without duplicate HQ logs', async () => {
+    const newId = '77777777-7777-4777-8777-777777777777';
+    const logId = 'ccccccc7-cccc-4ccc-8ccc-ccccccccccc7';
+    mockSchedules.push({
+      id: newId,
+      org_id: 'vip_limousine_korea',
+      driver_id: DRIVER_A_UUID,
+      date: '2026-11-12',
+      end_date: '2026-11-12',
+      dispatch_status: 'published',
+      customer_name: '자동 연결 고객사',
+      driver_name: '윤태준',
+      vehicle_plate: '116허 1514',
+      vehicle_no: '116허 1514',
+      schedule_meta: {driver_id: DRIVER_A_UUID},
+    });
+    const payload = {
+      id: logId, driverId: DRIVER_A_UUID, drivingDate: '2026-11-12',
+      driverName: '윤태준', vehiclePlate: '116허 1514',
+      startKm: '100,000', endKm: '100,120',
+      stops: [{place:'인천공항',time:'10:00'}],status:'검토 대기',
+    };
+    const send = (input: any) => postDrivingLogs(new NextRequest('http://localhost:3000/api/driving-logs',{
+      method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${driverAToken}`},
+      body:JSON.stringify(input),
+    }));
+    const first = await send(payload);
+    assert.equal(first.status,200);
+    const firstData = await first.json();
+    assert.equal(firstData.bookingLink.status,'auto_linked');
+    assert.equal(firstData.log.id,logId);
+    assert.equal(firstData.log.bookingId,newId);
+    assert.equal(mockDrivingLogs.filter(x=>x.id===logId).length,1);
+    const beforeResubmit=mockDrivingLogs.length;
+    const second = await send({...payload,bookingId:newId});
+    assert.equal(second.status,200);
+    assert.equal((await second.json()).log.bookingId,newId);
+    assert.equal(mockDrivingLogs.length,beforeResubmit);
+    const hq = await getDrivingLogs(new NextRequest(
+      `http://localhost:3000/api/driving-logs?bookingId=${newId}`,
+      {headers:{Authorization:`Bearer ${hqAdminToken}`}},
+    ));
+    assert.equal(hq.status,200);
+    const list = await hq.json();
+    assert.equal(list.logs.length,1);
+    assert.equal(list.logs[0].id,logId);
+  });
+
+  await test('15. Two published bookings on one day require HQ review rather than guessing', async () => {
+    for (const [id,company] of [
+      ['88888888-8888-4888-8888-888888888888','오전'],
+      ['99999999-9999-4999-8999-999999999999','오후'],
+    ]) {
+      mockSchedules.push({
+        id,org_id:'vip_limousine_korea',driver_id:DRIVER_A_UUID,
+        date:'2026-11-13',end_date:'2026-11-13',
+        dispatch_status:'published',customer_name:company,
+        driver_name:'윤태준',vehicle_plate:'116허 1514',vehicle_no:'116허 1514',
+        schedule_meta:{driver_id:DRIVER_A_UUID},
+      });
+    }
+    const res=await postDrivingLogs(new NextRequest('http://localhost:3000/api/driving-logs',{
+      method:'POST',
+      headers:{'Content-Type':'application/json',Authorization:`Bearer ${driverAToken}`},
+      body:JSON.stringify({
+        id:'ddddddd7-dddd-4ddd-8ddd-ddddddddddd7',
+        drivingDate:'2026-11-13',vehiclePlate:'116허 1514',
+        startKm:'100,120',endKm:'100,180',stops:[{place:'호텔',time:'12:00'}],
+        status:'검토 대기',
+      }),
+    }));
+    assert.equal(res.status,200);
+    const data=await res.json();
+    assert.equal(data.bookingLink.status,'review_required');
+    assert.equal(data.bookingLink.reason,'multiple_candidates');
+    assert.equal(data.log.bookingId,null);
   });
 });
