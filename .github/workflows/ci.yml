@@ -71,3 +71,29 @@ jobs:
       - run: npm run test:db
         env:
           TEST_DATABASE_URL: postgresql://postgres:isolated-ci-only@localhost:5432/dispatch_test
+
+  settlement-database:
+    name: Postgres settlement ledger and approval integrity
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: isolated-ci-only
+          POSTGRES_DB: settlement_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node --require ./scripts/test-safety.cjs --import tsx tests/settlement-postgres.integration.ts
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:isolated-ci-only@localhost:5432/settlement_test
