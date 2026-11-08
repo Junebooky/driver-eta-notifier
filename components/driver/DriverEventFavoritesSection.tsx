@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { CalendarDays, ChevronDown, MapPin, Route, RefreshCw } from 'lucide-react';
-import type { DriverEventFavorite, DriverEventRoute, DriverEventStop } from '@/utils/driverEventFavorites';
+import { CalendarDays, ChevronDown, MapPin, ArrowRight, RefreshCw } from 'lucide-react';
+import { getEventRouteLegs, type DriverEventFavorite, type DriverEventLeg, type DriverEventStop } from '@/utils/driverEventFavorites';
 
 type Props = {
   events: DriverEventFavorite[];
-  onLoadRoute: (route: DriverEventRoute) => void;
+  onLoadLeg: (leg: DriverEventLeg) => void;
   onSelectStop?: (stop: DriverEventStop) => void;
   isLoading?: boolean;
   error?: string | null;
@@ -23,7 +23,7 @@ function formatDate(date: string): string {
 
 /** A-style read-only event navigation view shared by the driver schedule and favorites. */
 export function DriverEventFavoritesSection({
-  events, onLoadRoute, onSelectStop, isLoading, error, onRefresh, compact = false,
+  events, onLoadLeg, onSelectStop, isLoading, error, onRefresh, compact = false,
 }: Props) {
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
@@ -136,15 +136,35 @@ export function DriverEventFavoritesSection({
                                       </li>
                                     ))}
                                   </ol>
-                                  <button type="button" disabled={!route.ready} onClick={() => onLoadRoute(route)}
-                                    className="mt-3.5 flex w-full items-center justify-center gap-1.5 rounded-[12px] bg-[#1E60F3] px-3 py-3 text-[13px] font-bold text-white transition-colors hover:bg-[#174BC4] disabled:cursor-not-allowed disabled:bg-[#E8EDF5] disabled:text-[#92A0B4]">
-                                    <Route className="h-4 w-4" /> 이 날짜 전체 경로 불러오기
-                                  </button>
-                                  {!route.ready && (
-                                    <p className="mt-2 text-[11px] leading-relaxed text-[#8290A5]">
-                                      {route.fullItinerary ? '확정되지 않은 장소가 있어 본사에서 주소 확인 후 경로를 불러올 수 있습니다.' : '이전 예약에는 전체 경유지가 저장되지 않아 경로를 자동으로 불러올 수 없습니다.'}
+                                  <div className="mt-4 border-t border-[#EEF1F5] pt-3">
+                                    <p className="mb-2.5 text-[12px] font-bold text-[#25344D]">이동 구간 선택</p>
+                                    {getEventRouteLegs(route).length > 0 ? (
+                                      <div className="space-y-2">
+                                        {getEventRouteLegs(route).map((leg) => (
+                                          <div key={leg.id} className="rounded-[12px] bg-[#F7F8FB] px-3 py-3">
+                                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                              <span className="shrink-0 text-[11px] font-semibold text-[#8290A5]">{leg.index + 1}구간</span>
+                                              <span className="min-w-0 break-words text-[12px] font-semibold text-[#25344D]">{leg.origin.name}</span>
+                                              <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[#A8B5C8]" />
+                                              <span className="min-w-0 break-words text-[12px] font-semibold text-[#25344D]">{leg.destination.name}</span>
+                                            </div>
+                                            <button type="button" disabled={!leg.ready} onClick={() => onLoadLeg(leg)}
+                                              aria-label={`${leg.index + 1}구간 ${leg.origin.name}에서 ${leg.destination.name}까지 불러오기`}
+                                              className="mt-2.5 flex min-h-10 w-full items-center justify-center rounded-[11px] bg-white px-3 text-[12px] font-bold text-[#1E60F3] shadow-[0_2px_8px_rgba(35,49,78,0.035)] transition-colors hover:bg-[#EFF4FF] disabled:cursor-not-allowed disabled:bg-[#E8EDF5] disabled:text-[#9BA9BA]">
+                                              {leg.samePlace ? '같은 장소 · 이동 불필요' : leg.ready ? '이 구간 불러오기' : '장소 확인 필요'}
+                                            </button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <p className="text-[11px] leading-relaxed text-[#8290A5]">
+                                        이전 예약에는 전체 경유지가 저장되지 않아 이동 구간을 자동으로 만들 수 없습니다.
+                                      </p>
+                                    )}
+                                    <p className="mt-2.5 text-[11px] leading-relaxed text-[#8290A5]">
+                                      각 구간은 출발지와 목적지만 설정합니다. 표시된 시간은 원본 일정 기준이며, 다음 출발 시각을 임의로 추정하지 않습니다.
                                     </p>
-                                  )}
+                                  </div>
                                 </div>
                               ))}
                             </div>
