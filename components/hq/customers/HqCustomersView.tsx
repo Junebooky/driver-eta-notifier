@@ -518,7 +518,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
             className="mx-5 mb-3 sm:mx-6"
           />
 
-          {needle}
+          {/* Customer Cards List */}
           <div className="max-h-[610px] flex-1 space-y-1.5 overflow-y-auto overscroll-contain px-3 pb-3">
             {isLoadingDb && customers.length === 0 ? (
               <div className="p-12 text-center text-slate-400">
