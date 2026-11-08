@@ -15,6 +15,7 @@ import {
   exportDrivingLogsToCsv,
 } from '@/utils/drivingLogHqStorage';
 import { HqDrivingLogsFilterBar } from './HqDrivingLogsFilterBar';
+import { ALL_HQ_DATES, matchesHqDateRange, type HqDateRange } from '@/utils/hqDateRange';
 import { HqDrivingLogsTable } from './HqDrivingLogsTable';
 import { HqDrivingLogDetailPanel } from './HqDrivingLogDetailPanel';
 import { HqLogExpenseDetailModal } from './HqLogExpenseDetailModal';
@@ -44,7 +45,7 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
   const {error:dbError,refreshing:isRefreshing,refresh:handleRefreshLogs}=useReportingRefresh(fetchHqDrivingLogsFromDb);
 
   // Filters
-  const [dateRange] = useState('전체 기간');
+  const [dateRange, setDateRange] = useState<HqDateRange>(ALL_HQ_DATES);
   const [selectedDriver, setSelectedDriver] = useState<string>('전체');
   const [selectedVehicle, setSelectedVehicle] = useState<string>('전체');
   const [selectedCustomer, setSelectedCustomer] = useState<string>('전체');
@@ -98,6 +99,8 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
   // Filter logs based on user selections
   const filteredLogs = useMemo(() => {
     return logs.filter((log) => {
+      // The selected local KST driving date is inclusive; exports use this exact filtered list.
+      if (!matchesHqDateRange(log.rawDate, dateRange)) return false;
       // 1. Status Filter
       if (selectedStatus !== '전체' && log.status !== selectedStatus) {
         return false;
@@ -137,7 +140,7 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
 
       return true;
     });
-  }, [logs, selectedStatus, selectedDriver, selectedVehicle, selectedCustomer, searchQuery]);
+  }, [logs, dateRange, selectedStatus, selectedDriver, selectedVehicle, selectedCustomer, searchQuery]);
 
   // Paginated logs
   const paginatedLogs = useMemo(() => {
@@ -237,6 +240,7 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
       {/* 1. Filter Bar */}
       <HqDrivingLogsFilterBar
         dateRange={dateRange}
+        onChangeDateRange={(next) => { setDateRange(next); setCurrentPage(1); }}
         driverOptions={driverOptions}
         selectedDriver={selectedDriver}
         onSelectDriver={(d) => {
