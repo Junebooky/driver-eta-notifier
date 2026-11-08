@@ -29,7 +29,11 @@ export async function GET(req:NextRequest){
    const focusText=req.nextUrl.searchParams.get('focusRow');
    const focusRow=focusText===null?undefined:Number(focusText);
    if(focusRow!==undefined&&(!/^\d{1,5}$/.test(focusText!)||!Number.isInteger(focusRow)||focusRow<2||focusRow>25000))throw new Error('이동할 Excel 행을 확인해 주세요.');
-   return privateJson({ok:true,version:w.id,year:w.year,filename:w.filename,...readWorkbookGrid(w.bytes,month,300,offset,focusRow)});
+   const view=readWorkbookGrid(w.bytes,month,300,offset,focusRow);
+   const linked=new Set(Object.values(w.manifest||{})
+    .filter(where=>where.sheet===view.month).map(where=>where.row));
+   return privateJson({ok:true,version:w.id,year:w.year,filename:w.filename,...view,
+    linkedRows:view.rows.filter(row=>linked.has(row.row)).map(row=>row.row)});
   }
   if(version&&version!=='original'&&!UUID.test(version))throw new Error('버전을 확인해 주세요.');
   if(req.nextUrl.searchParams.get('download')==='1'){
