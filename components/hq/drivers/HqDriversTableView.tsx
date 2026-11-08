@@ -29,6 +29,7 @@ import { formatPhoneNumber } from '@/utils/formatters';
 import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
 import { HqDriverEditModal } from './HqDriverEditModal';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
+import { HqModal } from '@/components/hq/ui/HqModal';
 
 export interface HqDriversTableViewProps {
   onSelectDriver: (driverId: string) => void;
@@ -88,6 +89,9 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
   } | null>(null);
   const [editingDriver, setEditingDriver] = useState<HqDriverSummary | null>(null);
   const [driverIconError, setDriverIconError] = useState(false);
+  const [driverToRemove, setDriverToRemove] = useState<HqDriverSummary | null>(null);
+  const [removingDriver, setRemovingDriver] = useState(false);
+  const [removeError, setRemoveError] = useState('');
   const pageSize = 10;
 
   // Helper to determine real-time operation status:
@@ -679,21 +683,12 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
 
                               <button
                                 type="button"
-                                onClick={async () => {
+                                onClick={() => {
                                   haptics.warningPulse();
                                   setMenuOpenDriverId(null);
                                   setMenuPosition(null);
-                                  const confirmed = window.confirm(
-                                    `'${driver.name}' 기사님을 목록에서 등록 해제하시겠습니까?\n배정된 운행 기록이 있는 경우 기사 배정만 해제됩니다.`
-                                  );
-                                  if (confirmed) {
-                                    const ok = await deleteDriver(driver.id);
-                                    if (ok) {
-                                      haptics.success();
-                                    } else {
-                                      alert('등록 해제에 실패했습니다.');
-                                    }
-                                  }
+                                  setRemoveError('');
+                                  setDriverToRemove(driver);
                                 }}
                                 className="w-full py-2 px-3 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer transition-colors"
                               >
@@ -778,7 +773,54 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
         </div>
       </div>
 
-      {/* Driver Edit Modal */}
+      <HqModal
+        isOpen={Boolean(driverToRemove)}
+        title="기사 등록 해제"
+        subtitle={driverToRemove ? `${driverToRemove.name} 기사님의 등록 상태를 변경합니다.` : undefined}
+        onClose={() => { if (!removingDriver) { setDriverToRemove(null); setRemoveError(''); } }}
+        footer={
+          <>
+            <button type="button" disabled={removingDriver}
+              onClick={() => { setDriverToRemove(null); setRemoveError(''); }}
+              className="min-h-11 rounded-[13px] bg-[#F7F9FC] px-4 text-[12px] font-semibold text-[#60728B] disabled:opacity-50">
+              취소
+            </button>
+            <button type="button" disabled={removingDriver}
+              onClick={async () => {
+                if (!driverToRemove || removingDriver) return;
+                setRemovingDriver(true);
+                setRemoveError('');
+                try {
+                  const ok = await deleteDriver(driverToRemove.id);
+                  if (!ok) {
+                    setRemoveError('등록 해제에 실패했습니다. 서버 연결과 배차 상태를 확인해 주세요.');
+                    return;
+                  }
+                  haptics.success();
+                  setDriverToRemove(null);
+                } catch (error) {
+                  setRemoveError(error instanceof Error ? error.message : '등록 해제에 실패했습니다.');
+                } finally {
+                  setRemovingDriver(false);
+                }
+              }}
+              className="min-h-11 rounded-[13px] bg-[#A85C54] px-4 text-[12px] font-semibold text-white disabled:opacity-50">
+              {removingDriver ? '등록 해제 중…' : '등록 해제'}
+            </button>
+          </>
+        }
+      >
+        <p className="text-[13px] leading-relaxed text-[#5D6C82]">
+          등록 해제된 기사는 새 배차에 지정할 수 없습니다. 기존 운행 기록이 있는 경우 기사 배정만 해제될 수 있습니다.
+        </p>
+        {removeError && (
+          <p role="alert" className="mt-3 rounded-[12px] bg-[#FFF5F3] p-3 text-[12px] font-medium text-[#A45B54]">
+            {removeError}
+          </p>
+        )}
+      </HqModal>
+
+      {anchor}
       {editingDriver && (
         <HqDriverEditModal
           isOpen={Boolean(editingDriver)}
