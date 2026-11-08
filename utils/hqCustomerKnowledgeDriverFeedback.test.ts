@@ -72,19 +72,26 @@ test('customer operations show in-page failures, not fake success alerts', () =>
   assert.match(register, /if \(result !== false\)/);
 });
 
-test('knowledge management uses honest local feedback and shared modal actions', () => {
+test('HQ knowledge saves to shared server with version and explicit import review', () => {
   const view = source('components/hq/knowledge/HqFieldKnowledgeView.tsx');
-  assert.match(view, /saveFieldKnowledgeItem\(editingItem\)/);
-  assert.match(view, /!saveFieldKnowledgeItem\(editingItem\)/);
-  assert.match(view, /!deleteFieldKnowledgeItem\(editingItem\.id\)/);
+  const driver = source('components/knowledge/DriverFieldKnowledgeModal.tsx');
+  const hook = source('hooks/useSharedFieldKnowledge.ts');
+  assert.match(view, /useSharedFieldKnowledge\(\)/);
+  assert.match(view, /mutateSharedFieldKnowledge\(existing \? 'PUT' : 'POST'/);
+  assert.match(view, /expectedVersion: editingItem\.version/);
+  assert.match(view, /mutateSharedFieldKnowledge\('DELETE'/);
+  assert.match(view, /action: 'import'/);
+  assert.match(view, /getBrowserKnowledgeImportReview\(\)/);
+  assert.match(view, /selectedLegacyIds\.includes/);
   assert.match(view, /isValidFieldKnowledgeImageUrl\(photoUrlDraft\)/);
-  assert.equal((view.match(/<HqModal/g) || []).length, 2);
-  assert.match(view, /<HqSearchSelect/);
+  assert.equal((view.match(/<HqModal/g) || []).length, 3);
+  assert.doesNotMatch(view, /saveFieldKnowledgeItem\(|deleteFieldKnowledgeItem\(|getStoredFieldKnowledge\(/);
   assert.doesNotMatch(view, /<select\b|window\.prompt\(|window\.confirm\(/);
-  assert.match(view, /기사 앱이나 다른 기기에는 자동 공유되지 않습니다/);
-  assert.match(view, /onClick=\{confirmDeleteItem\}/);
-  assert.match(view, /onClick=\{savePhotoUrl\}/);
-  assert.match(view, /이 브라우저에 저장했습니다/);
+  assert.match(view, /회사 공용 DB에 저장되었습니다/);
+  assert.match(driver, /useSharedFieldKnowledge\(isOpen\)/);
+  assert.doesNotMatch(driver, /getStoredFieldKnowledge|INITIAL_FIELD_KNOWLEDGE_ITEMS/);
+  assert.match(hook, /\/api\/field-knowledge/);
+  assert.match(hook, /30000/);
 });
 
 test('driver memo stays attached to its own driver and reports server failure', () => {
