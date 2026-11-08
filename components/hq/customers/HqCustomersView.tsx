@@ -52,6 +52,8 @@ import {
 } from '@/utils/expenseHqStorage';
 import { HqExpenseRecord, HqExpenseStatus } from '@/types/expenseHq';
 import { formatKRW } from '@/utils/expense';
+import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
+import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
 
 export interface HqCustomersViewProps {
   initialSearchQuery?: string;
@@ -69,6 +71,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
   const [isLoadingDb, setIsLoadingDb] = useState(true);
   const [dbErrorMessage, setDbErrorMessage] = useState<string | null>(null);
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
+  const [operationMessage, setOperationMessage] = useState<string | null>(null);
 
   const isFetchingRef = React.useRef(false);
 
@@ -304,6 +307,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
     if (!currentTarget || isTogglingFavorite) return;
 
     setIsTogglingFavorite(true);
+    setOperationMessage(null);
     const updated = { ...currentTarget, isFavorite: !currentTarget.isFavorite };
 
     try {
@@ -316,10 +320,10 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
           return next;
         });
       } else {
-        alert('즐겨찾기 상태를 DB에 저장하지 못했습니다.');
+        setOperationMessage('즐겨찾기 상태를 서버에 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.');
       }
     } catch (err: any) {
-      alert(`즐겨찾기 변경 오류: ${err.message}`);
+      setOperationMessage(`즐겨찾기 변경 오류: ${err instanceof Error ? err.message : '서버 연결을 확인해 주세요.'}`);
     } finally {
       setIsTogglingFavorite(false);
     }
@@ -329,6 +333,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
   const handleRegisterCustomer = async (newCustomerDraft: HqCustomer): Promise<boolean> => {
     setIsLoadingDb(true);
     setDbErrorMessage(null);
+    setOperationMessage(null);
 
     try {
       const res = await saveContactToCrmDb({
@@ -347,7 +352,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
       });
 
       if (!res.success || !res.clientId) {
-        alert(`고객사 등록 실패: ${res.message || '서버 저장에 실패했습니다.'}`);
+        setOperationMessage(`고객사 등록 실패: ${res.message || '서버 저장에 실패했습니다.'}`);
         return false;
       }
 
@@ -360,11 +365,13 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
         haptics.success();
         return true;
       } else {
-        alert(`고객사는 등록되었으나 목록을 갱신하지 못했습니다: ${refreshRes.error}`);
-        return false;
+        // The server confirmed the new customer. Do not keep the form open:
+        // retrying the POST here could create a duplicate customer.
+        setOperationMessage('고객사는 서버에 등록됐지만 목록 갱신에 실패했습니다. 새로고침으로 확인해 주세요.');
+        return true;
       }
     } catch (err: any) {
-      alert(`고객사 등록 중 네트워크 오류가 발생했습니다: ${err.message}`);
+      setOperationMessage(`고객사 등록 중 네트워크 오류가 발생했습니다: ${err instanceof Error ? err.message : '서버 연결을 확인해 주세요.'}`);
       return false;
     } finally {
       setIsLoadingDb(false);
@@ -374,10 +381,11 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
   // Update customer handler - strictly awaits DB update
   const handleUpdateCustomer = async (updated: HqCustomer): Promise<boolean> => {
     setIsLoadingDb(true);
+    setOperationMessage(null);
     try {
       const ok = await updateHqCustomerInDb(updated);
       if (!ok) {
-        alert('고객사 정보를 DB에 저장하지 못했습니다.');
+        setOperationMessage('고객사 정보를 서버에 저장하지 못했습니다. 변경사항을 확인한 뒤 다시 시도해 주세요.');
         return false;
       }
       setCustomers((prev) => {
@@ -387,7 +395,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
       });
       return true;
     } catch (err: any) {
-      alert(`고객사 정보 저장 중 오류가 발생했습니다: ${err.message}`);
+      setOperationMessage(`고객사 정보 저장 중 오류가 발생했습니다: ${err instanceof Error ? err.message : '서버 연결을 확인해 주세요.'}`);
       return false;
     } finally {
       setIsLoadingDb(false);
@@ -483,27 +491,34 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
               />
             </div>
 
-            {/* Filter Dropdown */}
-            <div className="relative">
-              <select
+            <div className="min-w-[148px]">
+              <HqSearchSelect
+                label="고객사 등급 필터"
+                size="sm"
                 value={tierFilter}
-                onChange={(e) => {
-                  setTierFilter(e.target.value as 'all' | 'VIP' | '주요' | '일반' | 'favorite');
+                onChange={(next) => {
+                  setTierFilter(next as 'all' | 'VIP' | '주요' | '일반' | 'favorite');
                   setCurrentPage(1);
                 }}
-                className="h-11 cursor-pointer appearance-none rounded-[14px] bg-white pl-3.5 pr-8 text-[13px] font-medium text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.045)] outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20"
-              >
-                <option value="all">전체</option>
-                <option value="VIP">VIP</option>
-                <option value="주요">주요 고객</option>
-                <option value="일반">일반 고객</option>
-                <option value="favorite">즐겨찾기 ⭐</option>
-              </select>
-              <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                placeholder="전체 고객"
+                options={[
+                  { value: 'all', label: '전체 고객' },
+                  { value: 'VIP', label: 'VIP' },
+                  { value: '주요', label: '주요 고객' },
+                  { value: '일반', label: '일반 고객' },
+                  { value: 'favorite', label: '즐겨찾기' },
+                ]}
+              />
             </div>
           </div>
 
-          {/* Customer Cards List */}
+          <HqInlineFeedback
+            message={operationMessage}
+            onDismiss={() => setOperationMessage(null)}
+            className="mx-5 mb-3 sm:mx-6"
+          />
+
+          {needle}
           <div className="max-h-[610px] flex-1 space-y-1.5 overflow-y-auto overscroll-contain px-3 pb-3">
             {isLoadingDb && customers.length === 0 ? (
               <div className="p-12 text-center text-slate-400">
