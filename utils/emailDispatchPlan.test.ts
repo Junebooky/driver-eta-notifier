@@ -26,6 +26,7 @@ test('two flights, two passenger arrival groups, ONE Staria slot create one driv
  assert.match(first.notes,/2차 NH867 도착 09:05 \(Guest C\)/);
  assert.match(first.notes,/전원 합류 후 이동/);
  assert.equal(first.passengerCount,3);
+ assert.equal(first.passengerName,'Guest A, Guest B, Guest C');
  assert.equal(first.groupTotalVehicles,1);
  assert.equal(plan[1].notes.includes('공항 입국 그룹별 픽업'),false,
   'November 18 shared arrivals should not leak into the next service day');
@@ -104,7 +105,7 @@ test('each driver receives ONLY assigned flight numbers, riders and airport note
      {date:day,flightNumber:'NH867',role:'arrival' as const,destinationAirport:'GMP',
       scheduledArrival:'09:05',passengers:['Guest C']},
    ]};
- const vehicles=slots().map((s,i)=>({...s,assignedFlightKeys:[day+':'+(i===0?'KE2104':'NH867')]}));
+ const vehicles=slots().map((s,i)=>({...s,sharedRouteConfirmed:true,assignedFlightKeys:[day+':'+(i===0?'KE2104':'NH867')]}));
  const rows=buildEmailDispatchPlan(d,vehicles,'published').filter(x=>x.date===day);
  assert.equal(rows.length,2);
  assert.deepEqual(rows.map(r=>r.flightNumber),['KE2104','NH867']);
@@ -128,7 +129,7 @@ test('multi-driver flight assignment must be explicit, unique, and have verified
  const two=slots();
  assert.throws(()=>buildEmailDispatchPlan(source,two,'published'),/담당 차량/);
  assert.throws(()=>buildEmailDispatchPlan(source,two.map(s=>({...s,assignedFlightKeys:[day+':KE2104',day+':NH867']})),'published'),/담당 차량/);
- const mapped=two.map((s,i)=>({...s,assignedFlightKeys:[day+':'+(i===0?'KE2104':'NH867')]}));
+ const mapped=two.map((s,i)=>({...s,sharedRouteConfirmed:true,assignedFlightKeys:[day+':'+(i===0?'KE2104':'NH867')]}));
  const unknown={...source,flights:[source.flights[0],{...source.flights[1],passengers:[]}]};
  assert.throws(()=>buildEmailDispatchPlan(unknown,mapped,'published'),/탑승객 이름/);
  const duplicated={...source,flights:[source.flights[0],{...source.flights[1],passengers:['Guest A']}]};
