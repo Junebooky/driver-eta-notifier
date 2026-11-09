@@ -121,6 +121,7 @@ export interface HqEmailExtractedDraft {
   sourceMessageId?: string;
   sourceSenderEmail?: string;
   sourceAttachments?: Array<{ filename: string; kind: 'excel' | 'pdf' | 'docx'; sha256: string }>;
+  documentAnalysis?: Array<{ filename: string; kind: 'excel' | 'pdf' | 'docx'; reviewedSheets: string[] }>;
   sourceInReplyTo?: string;
   sourceReferences?: string[];
   pickupDate: string; // YYYY-MM-DD

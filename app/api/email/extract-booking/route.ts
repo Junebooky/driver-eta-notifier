@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
     let sourceInReplyTo = '';
     let sourceReferences: string[] = [];
     let ignoredAttachments: string[] = [];
+    let sourceSentAt: string | undefined;
 
     if (!emailId) {
       return NextResponse.json({ ok: false, error: 'emailId는 필수 항목입니다.' }, { status: 400 });
@@ -49,6 +50,7 @@ export async function POST(request: NextRequest) {
         sourceMessageId = source.messageId;
         sourceInReplyTo = source.inReplyTo;
         sourceReferences = source.references;
+        sourceSentAt = source.sentAt;
         const analysis = analyzeScheduleAttachments(source.attachments);
         attachments = analysis.analyzed;
         ignoredAttachments = analysis.ignored;
@@ -99,6 +101,7 @@ export async function POST(request: NextRequest) {
       sourceMessageId,
       sourceInReplyTo,
       sourceReferences,
+      sourceSentAt,
     });
 
     if (!result.ok) {

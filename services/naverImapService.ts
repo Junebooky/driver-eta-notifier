@@ -12,6 +12,7 @@
 
 import { ImapFlow } from 'imapflow';
 import { simpleParser } from 'mailparser';
+import { createHash } from 'node:crypto';
 import { HqEmailSummary, HqEmailDetail } from '@/types/emailHq';
 import { classifyEmailCandidate } from '@/utils/emailClassifier';
 import type { ScheduleAttachmentInput } from '@/services/emailAttachmentIntake';
@@ -34,7 +35,10 @@ export function selectUserEmailAttachments<T extends {
     if (inline && !documentFile && (String(file.contentType || '').startsWith('image/') || !filename)) return false;
     if (!filename && inline) return false;
     // MIME duplicates of the same named file should not create two file icons.
-    const signature = filename.toLowerCase() + ':' + (file.content?.length ?? file.size ?? 0);
+    // Equal name and size do not imply equal content (common for revisions).
+    const signature = filename.toLowerCase() + ':' + (file.content
+      ? createHash('sha256').update(file.content).digest('hex')
+      : `metadata:${file.size ?? 0}`);
     if (seen.has(signature)) return false;
     seen.add(signature);
     return true;
@@ -343,6 +347,7 @@ export async function fetchNaverEmailForAnalysis(uid: number): Promise<{
   messageId: string;
   inReplyTo: string;
   references: string[];
+  sentAt?: string;
 }> {
   if (!Number.isSafeInteger(uid) || uid <= 0 || !isNaverImapConfigured()) {
     throw new Error('네이버 메일 연결 또는 메일 식별값을 확인해 주세요.');
@@ -367,6 +372,7 @@ export async function fetchNaverEmailForAnalysis(uid: number): Promise<{
         senderName: addresses[0]?.name || '',
         replyTo: parsed.replyTo?.value?.[0]?.address || '',
         bodyText: parsed.text || '',
+        sentAt: parsed.date?.toISOString(),
         attachments: attachmentList,
         messageId: parsed.messageId || '',
         inReplyTo: parsed.inReplyTo || '',
