@@ -7,12 +7,17 @@ import { haptics } from '@/utils/haptics';
 import { sanitizePlaceName } from '@/utils/formatters';
 import { DispatchRouteTimeline } from '@/components/common/DispatchRouteTimeline';
 import { RouteForecastChip } from '@/components/driver/RouteForecastChip';
+import { DriverRouteLegRow } from '@/components/driver/DriverRouteLegRow';
+import { DriverDispatchShell } from '@/components/driver/DriverDispatchShell';
+import type { DriverEventLeg } from '@/utils/driverEventFavorites';
 import { scheduleToEventRoute, getEventRouteLegs } from '@/utils/driverEventFavorites';
 
 interface ScheduleCardProps {
   item: ScheduleItem;
   onNavigate: (item: ScheduleItem) => void;
   onPredict: (item: ScheduleItem) => void;
+  onNavigateLeg?: (leg: DriverEventLeg) => void;
+  onPredictLeg?: (leg: DriverEventLeg) => void;
   onSelectForCockpit?: (item: ScheduleItem) => void;
   onOpenFlight?: (flightId: string, type: 'arrival' | 'departure') => void;
   onEdit?: (item: ScheduleItem) => void;
@@ -23,6 +28,8 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
   item,
   onNavigate,
   onPredict,
+  onNavigateLeg,
+  onPredictLeg,
   onSelectForCockpit,
   onOpenFlight,
   onEdit,
@@ -32,9 +39,11 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
   const currentOpStatus = operationOverride?.id === item.id && operationOverride.sourceStatus === item.operation_status
     ? operationOverride.status : item.operation_status || 'ready';
   const [isUpdatingOp, setIsUpdatingOp] = React.useState(false);
+  const [operationError, setOperationError] = React.useState<string | null>(null);
 
   const handleUpdateOpStatus = async (nextStatus: 'ready' | 'arrived_pickup' | 'boarded' | 'in_transit' | 'completed') => {
     setIsUpdatingOp(true);
+    setOperationError(null);
     haptics.selection();
     try {
       const res = await fetch('/api/schedules/operation-status', {
@@ -47,12 +56,17 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
         }),
       });
       const data = await res.json();
-      if (data.ok) {
+      if (res.ok && data.ok) {
         setOperationOverride({ id: item.id, status: nextStatus, sourceStatus: item.operation_status });
         window.dispatchEvent(new CustomEvent('vip_hq_schedules_updated'));
         haptics.success();
+      } else {
+        setOperationError(data.error || '운행 상태 보고에 실패했습니다. 다시 시도해 주세요.');
+        haptics.errorAlert();
       }
     } catch (e) {
+      setOperationError('연결에 실패했습니다. 운행 상태를 다시 선택해 주세요.');
+      haptics.errorAlert();
       console.error(e);
     } finally {
       setIsUpdatingOp(false);
@@ -114,7 +128,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
 
   const pickupTimeValue = extractPickupTimeValue(item);
   const parsedNotes = parseNotesRow(item.notes);
-  const forecastLegs = item.routeWaypoints && item.routeWaypoints.length > 2
+  const forecastLegs = item.routeWaypoints && item.routeWaypoints.length >= 2
     ? getEventRouteLegs(scheduleToEventRoute(item))
     : [];
 
@@ -132,16 +146,10 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
   );
 
   return (
-    <div
-      className={`w-full rounded-3xl p-5 border transition-all space-y-4 relative overflow-hidden ${
-        isCancelled
-          ? 'bg-rose-50/30 border-rose-200/90 opacity-90 shadow-[0_4px_20px_rgba(15,23,42,0.03)]'
-          : hasHqReminder
-          ? 'bg-white border-rose-400 ring-2 ring-rose-200/80 shadow-[0_6px_24px_rgba(15,23,42,0.06)]'
-          : isStaleAck
-          ? 'bg-white border-amber-300 ring-1 ring-amber-200/60 shadow-[0_6px_24px_rgba(15,23,42,0.05)]'
-          : 'bg-white border-slate-100/90 shadow-[0_6px_24px_rgba(15,23,42,0.05)]'
-      }`}
+    <DriverDispatchShell
+      title={item.event_name || item.group_name || item.customer_name || '확정 의전 배차'}
+      meta={`${formatCardDateLabel(item)} · ${pickupTimeValue ? `픽업 ${pickupTimeValue}` : '시각 미정'}`}
+      subtitle={`${item.customer_name && item.customer_name !== item.event_name ? item.customer_name + ' · ' : ''}차량 ${item.vehicle_plate || item.vehicle_no || '미지정'}`}
     >
       {/* HQ Urgent Reminder Banner */}
       {hasHqReminder && (
@@ -153,187 +161,82 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
         </div>
       )}
 
-      {/* Top Header: Date, Status Pills, Soft Gray Pickup Time Pill & Edit Button */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0 flex-wrap">
-          <span
-            className={`text-lg font-extrabold tracking-tight truncate ${
-              isCancelled ? 'text-slate-500 line-through' : 'text-[#0F172A]'
-            }`}
-          >
-            {formatCardDateLabel(item)}
-          </span>
-
-          {/* Group Dispatch Vehicle Badge */}
-          {isGroupDispatch && (
-            <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 flex items-center gap-1">
-              <Users className="w-3 h-3" />
-              <span>그룹 {item.group_vehicle_index || 1}호차/{item.group_total_vehicles}대</span>
-            </span>
-          )}
-
-          {/* Cancelled Dispatch Alert */}
-          {isCancelled && (
-            <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800">
-              배차 취소됨
-            </span>
-          )}
-
-          {/* Stale Ack: Re-ack Needed on Version Bump */}
-          {isStaleAck && (
-            <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800">
-              배차 변경됨 (v{item.version})
-            </span>
-          )}
-
-          {/* Unresolved Place Warning (Soft Cool-Gray Pill per Reference UI) */}
-          {item.place_verified === false && (
-            <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#F2F4F7] text-slate-500 flex items-center gap-1">
-              <AlertTriangle className="w-3 h-3 text-slate-400 stroke-[2]" />
-              <span>위치 확인 필요</span>
-            </span>
-          )}
+      {/* Shared A-style heading above; keep lifecycle warnings and edit access visible. */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[#59708F]">
+          {isGroupDispatch && <span className="rounded-[9px] bg-[#F2F5F9] px-2 py-1">그룹 {item.group_vehicle_index || 1}/{item.group_total_vehicles}대</span>}
+          {isCancelled && <span className="rounded-[9px] bg-[#F9EFF0] px-2 py-1 text-[#A15A66]">배차 취소</span>}
+          {isStaleAck && <span className="rounded-[9px] bg-[#FCF4E9] px-2 py-1 text-[#9A6B30]">변경 배차 · 재확인 필요 (v{item.version})</span>}
+          {item.place_verified === false && <span className="rounded-[9px] bg-[#F2F5F9] px-2 py-1">위치 확인 필요</span>}
         </div>
-
-        <div className="flex items-center gap-1.5 shrink-0">
-          {/* Soft Cool-Gray Pickup Time Pill */}
-          <div
-            className={`px-3.5 py-1.5 rounded-full text-xs sm:text-[13px] tracking-tight flex items-center gap-1 ${
-              isCancelled ? 'bg-slate-200 text-slate-500 font-bold' : 'bg-[#F2F4F7] text-[#0F172A]'
-            }`}
-          >
-            <span className="font-semibold text-slate-600">픽업</span>
-            {pickupTimeValue && (
-              <span className="font-black text-[#0F172A] tabular-nums">{pickupTimeValue}</span>
-            )}
-          </div>
-
-          {/* Edit Button */}
-          {onEdit && !isCancelled && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                haptics.lightTap();
-                onEdit(item);
-              }}
-              className="w-7 h-7 rounded-full text-slate-400 hover:text-[#0055FF] hover:bg-slate-100 active:scale-90 flex items-center justify-center transition-all cursor-pointer"
-              title="스케줄 정보 수정"
-              aria-label="스케줄 수정"
-            >
-              <Pencil className="w-4 h-4 stroke-[1.9]" />
-            </button>
-          )}
-        </div>
+        {onEdit && !isCancelled && (
+          <button type="button" onClick={() => { haptics.lightTap(); onEdit(item); }}
+            className="inline-flex items-center gap-1.5 rounded-[11px] bg-[#F2F5F9] px-2.5 py-2 text-[11px] font-semibold text-[#59708F]"
+            aria-label="스케줄 수정"><Pencil className="h-3.5 w-3.5" /> 수정</button>
+        )}
       </div>
 
-      {/* One TMAP prediction per visible future leg; never merge long waiting gaps.
-          This remains separate from the detailed six-slot departure prediction action. */}
-      {!isCancelled && (
-        <div className="flex flex-col gap-1.5">
-          {forecastLegs.length > 0 ? (
-            forecastLegs.map((leg) => (
-              <div key={leg.id} className="flex flex-wrap items-center gap-1.5">
-                <span className="text-[11px] font-semibold text-[#8290A5]">{leg.index + 1}구간</span>
-                {leg.ready ? (
-                  <RouteForecastChip
-                    date={leg.date}
-                    time={leg.index === 0 ? item.pickup_time || leg.origin.time : leg.origin.time}
-                    origin={{ name: leg.origin.name, lat: leg.origin.lat, lng: leg.origin.lng }}
-                    destination={{ name: leg.destination.name, lat: leg.destination.lat, lng: leg.destination.lng }}
-                    confirmed={leg.ready}
-                    assumedDeparture={leg.index > 0 || !item.pickup_time}
-                  />
-                ) : (
-                  <span className="rounded-[10px] bg-[#F2F5F9] px-2.5 py-1.5 text-[11px] text-[#8290A5]">장소 확인 후 예측 가능</span>
-                )}
-              </div>
-            ))
-          ) : (
-            <RouteForecastChip
+      {/* Flight is a first-class driver action, not a hidden footer icon. */}
+      {item.flight && onOpenFlight && !isCancelled && (
+        <button type="button" onClick={() => {
+          haptics.mediumTap();
+          onOpenFlight(item.flight!.split('(')[0].trim().toUpperCase(), effectiveFlightType);
+        }} className="flex w-full items-center gap-3 rounded-[13px] bg-[#F6F8FC] px-3.5 py-3 text-left"
+          aria-label={`항공편 ${item.flight} 조회`}>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-white">
+            <Plane className="h-5 w-5 text-[#59708F]" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[11px] font-medium text-[#8290A5]">항공편 · {effectiveFlightType === 'arrival' ? '입국' : '출국'}</span>
+            <span className="block truncate text-[13px] font-bold text-[#25344D]">{item.flight}</span>
+          </span>
+          <span className="shrink-0 text-[12px] font-bold text-[#1E60F3]">실시간 조회</span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-[#8290A5]" />
+        </button>
+      )}
+
+      {/* All adjacent itinerary stops are separate drives; a single leg never
+          sends the whole day's intermediate stops to navigation. */}
+      <section className="space-y-2" aria-label="운행 구간">
+        <div className="flex items-center justify-between">
+          <h4 className="text-[13px] font-bold text-[#25344D]">이동 일정</h4>
+          <span className="text-[11px] text-[#8290A5]">{forecastLegs.length || 1}개 구간</span>
+        </div>
+        {forecastLegs.length > 0 ? (
+          forecastLegs.map((leg) => (
+            <DriverRouteLegRow
+              key={leg.id}
+              leg={leg}
+              pickupTime={item.pickup_time}
+              onNavigate={onNavigateLeg}
+              onPredict={onPredictLeg}
+              disabled={isCancelled}
+            />
+          ))
+        ) : (
+          <div className="rounded-[13px] bg-[#F6F8FC] px-3.5 py-3.5">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-bold text-[#25344D]">
+              <span className="break-words">{sanitizePlaceName(item.origin_name)}</span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-[#A8B5C8]" />
+              <span className="break-words">{sanitizePlaceName(item.destination_name)}</span>
+            </div>
+            {(item.origin_address || item.destination_address) && (
+              <p className="mt-1.5 break-words text-[11px] text-[#8290A5]">
+                {[item.origin_address, item.destination_address].filter(Boolean).join(' → ')}
+              </p>
+            )}
+            {!isCancelled && <div className="mt-2.5"><RouteForecastChip
               date={item.date}
               time={item.pickup_time}
               origin={{ name: item.origin_name, lat: item.origin_lat, lng: item.origin_lng }}
               destination={{ name: item.destination_name, lat: item.destination_lat, lng: item.destination_lng }}
               confirmed={item.place_verified === true && item.intake_source !== 'seed' &&
-                !(
-                  (item.origin_lat === 37.5042 && item.origin_lng === 127.0425) ||
-                  (item.destination_lat === 37.4495 && item.destination_lng === 126.4512)
-                )}
-            />
-          )}
-        </div>
-      )}
-
-      {/* Every verified HQ waypoint, not just the first and last stop. */}
-      {item.routeWaypoints && item.routeWaypoints.length > 2 ? (
-        <DispatchRouteTimeline
-          waypoints={item.routeWaypoints}
-          compact
-          className="rounded-2xl bg-slate-50/70 px-3.5 py-3"
-        />
-      ) : (
-        <>
-      <div className="relative pl-6 py-0.5 space-y-3">
-        {/* Left Vertical Route Connector Line */}
-        <div className="absolute left-[7px] top-3 bottom-3 w-[1.5px] bg-slate-200" />
-
-        {/* Row 1: Departure Origin */}
-        <div className="relative flex items-center gap-2.5 min-w-0">
-          <img
-            src="/images/icons/driver_ui/icon_origin.png"
-            alt="출발"
-            className="absolute -left-[24px] w-4 h-4 object-contain shrink-0"
-          />
-          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#F2F4F7] text-slate-600 flex items-center justify-center shrink-0">
-            출발
-          </span>
-          <span
-            className="text-sm sm:text-[15px] font-extrabold text-[#0F172A] tracking-tight min-w-0 truncate"
-            title={item.origin_name}
-          >
-            {sanitizePlaceName(item.origin_name)}
-          </span>
-          {item.origin_address && (
-            <span
-              className="text-xs text-slate-400 font-medium min-w-0 flex-1 truncate"
-              title={item.origin_address}
-            >
-              {item.origin_address}
-            </span>
-          )}
-        </div>
-
-        {/* Row 2: Arrival Destination */}
-        <div className="relative flex items-center gap-2.5 min-w-0">
-          <img
-            src="/images/icons/driver_ui/icon_destination.png"
-            alt="도착"
-            className="absolute -left-[24px] w-4 h-4 object-contain shrink-0"
-          />
-          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#0055FF] text-white flex items-center justify-center shrink-0">
-            도착
-          </span>
-          <span
-            className="text-sm sm:text-[15px] font-extrabold text-[#0F172A] tracking-tight min-w-0 truncate"
-            title={item.destination_name}
-          >
-            {sanitizePlaceName(item.destination_name)}
-          </span>
-          {item.destination_address && (
-            <span
-              className="text-xs text-slate-400 font-medium min-w-0 flex-1 truncate"
-              title={item.destination_address}
-            >
-              {item.destination_address}
-            </span>
-          )}
-        </div>
-      </div>
-
-        </>
-      )}
-
+                !((item.origin_lat === 37.5042 && item.origin_lng === 127.0425) ||
+                  (item.destination_lat === 37.4495 && item.destination_lng === 126.4512))}
+            /></div>}
+          </div>
+        )}
+      </section>
       {/* Details Box: Aligned 2-Column Info Table */}
       <div
         onClick={() => {
@@ -390,7 +293,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
             <a
               href={`tel:${item.passenger_phone}`}
               onClick={(e) => e.stopPropagation()}
-              className="font-extrabold text-[#0F172A] hover:text-[#0055FF] transition-colors tabular-nums truncate"
+              className="font-extrabold text-[#0F172A] hover:text-[#1E60F3] transition-colors tabular-nums truncate"
               title={`승객/담당자 통화 (${item.passenger_phone})`}
             >
               {item.passenger_phone}
@@ -444,7 +347,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
                 haptics.lightTap();
                 onSelectForCockpit(item);
               }}
-              className="text-xs sm:text-[13px] font-bold text-slate-600 hover:text-[#0055FF] flex items-center gap-0.5 cursor-pointer transition-colors py-1 px-1 rounded-lg min-w-0 shrink-0"
+              className="text-xs sm:text-[13px] font-bold text-slate-600 hover:text-[#1E60F3] flex items-center gap-0.5 cursor-pointer transition-colors py-1 px-1 rounded-lg min-w-0 shrink-0"
               title="관제 대시보드에 출발/도착지 설정"
             >
               <span className="truncate">경로 적용</span>
@@ -480,7 +383,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
                 className={`py-1.5 px-3.5 rounded-full active:scale-95 text-white font-extrabold text-xs shadow-sm flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
                   isStaleAck
                     ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-500/25'
-                    : 'bg-[#0055FF] hover:bg-[#0046D5] shadow-[0_4px_12px_rgba(0,85,255,0.25)]'
+                    : 'bg-[#1E60F3] hover:bg-[#1852D5] shadow-none'
                 }`}
                 title={isStaleAck ? '변경된 배차 내역 재확인' : '본사 배차 수신 확인'}
               >
@@ -493,30 +396,14 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
 
         {/* Right: Circular Volumetric Action Buttons (Flight + Clock + Navigation) */}
         <div className="flex items-center gap-2.5 ml-auto shrink-0">
-          {item.flight && onOpenFlight && !isCancelled && (
-            <button
-              type="button"
-              onClick={() => {
-                haptics.mediumTap();
-                const cleanId = item.flight!.split('(')[0].trim().toUpperCase();
-                onOpenFlight(cleanId, effectiveFlightType);
-              }}
-              className="w-11 h-11 rounded-full bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center border border-slate-100/90 shadow-[0_4px_14px_rgba(15,23,42,0.06)] transition-all active:scale-90 cursor-pointer shrink-0"
-              title={`항공편(${item.flight}) 실시간 운항 정보 조회 (${effectiveFlightType === 'departure' ? '출국' : '입국'})`}
-              aria-label="항공편 조회"
-            >
-              <Plane className="w-5 h-5 text-slate-700 stroke-[1.8]" />
-            </button>
-          )}
-
-          {!isCancelled && (
+          {!isCancelled && forecastLegs.length === 0 && (
             <button
               type="button"
               onClick={() => {
                 haptics.mediumTap();
                 onPredict(item);
               }}
-              className="w-11 h-11 rounded-full bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center border border-slate-100/90 shadow-[0_4px_14px_rgba(15,23,42,0.06)] transition-all active:scale-90 cursor-pointer shrink-0"
+              className="w-11 h-11 rounded-[12px] bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center border border-slate-100/90 shadow-[0_4px_14px_rgba(15,23,42,0.06)] transition-all active:scale-90 cursor-pointer shrink-0"
               title="출발 시간별 소요 시간 예측"
               aria-label="출발 시간 예측"
             >
@@ -524,7 +411,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
             </button>
           )}
 
-          <button
+          {forecastLegs.length === 0 && <button
             type="button"
             disabled={isCancelled}
             onClick={() => {
@@ -535,7 +422,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
             className={`w-11 h-11 rounded-full flex items-center justify-center transition-all ${
               isCancelled
                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                : 'bg-[#0055FF] hover:bg-[#0046D5] active:scale-90 text-white shadow-[0_6px_16px_rgba(0,85,255,0.3)] cursor-pointer'
+                : 'bg-[#1E60F3] hover:bg-[#1852D5] active:scale-90 text-white shadow-none cursor-pointer'
             }`}
             title={isCancelled ? '취소된 배차는 길안내를 실행할 수 없습니다' : '길안내 내비 즉시 실행'}
             aria-label="길안내 실행"
@@ -545,7 +432,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
                 isCancelled ? 'fill-slate-400 text-slate-400' : 'fill-white text-white'
               }`}
             />
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -554,7 +441,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
         <div className="pt-1 flex flex-col gap-2">
           <div className="flex items-center justify-between text-xs px-0.5">
             <span className="text-slate-500 font-semibold">실시간 운행 단계</span>
-            <span className="font-extrabold text-[#0055FF]">
+            <span className="font-extrabold text-[#1E60F3]">
               {currentOpStatus === 'ready' && '1단계: 운행 준비'}
               {currentOpStatus === 'arrived_pickup' && '2단계: 픽업지 도착'}
               {currentOpStatus === 'boarded' && '3단계: 승객 탑승'}
@@ -562,6 +449,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
               {currentOpStatus === 'completed' && '5단계: 운행 종료'}
             </span>
           </div>
+          {operationError && <p role="alert" className="rounded-[10px] bg-[#F9EFF0] px-3 py-2 text-[11px] font-medium text-[#A15A66]">{operationError}</p>}
           <div className="grid grid-cols-5 gap-1.5">
             {[
               { key: 'ready', label: '1.준비' },
@@ -582,7 +470,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
                   }}
                   className={`py-2.5 px-1 text-xs rounded-xl transition-all text-center cursor-pointer ${
                     isActive
-                      ? 'bg-[#0055FF] text-white font-extrabold shadow-[0_4px_12px_rgba(0,85,255,0.25)]'
+                      ? 'bg-[#1E60F3] text-white font-extrabold shadow-none'
                       : 'bg-white hover:bg-slate-50 text-slate-700 font-bold border border-slate-100/90 shadow-[0_2px_8px_rgba(15,23,42,0.04)]'
                   }`}
                 >
@@ -593,6 +481,6 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
           </div>
         </div>
       )}
-    </div>
+    </DriverDispatchShell>
   );
 };
