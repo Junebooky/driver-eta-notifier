@@ -121,7 +121,19 @@ export interface HqEmailExtractedDraft {
   sourceMessageId?: string;
   sourceSenderEmail?: string;
   sourceAttachments?: Array<{ filename: string; kind: 'excel' | 'pdf' | 'docx'; sha256: string }>;
-  documentAnalysis?: Array<{ filename: string; kind: 'excel' | 'pdf' | 'docx'; reviewedSheets: string[]; missingDates?: string[]; dateReviewAcknowledged?: boolean }>;
+  documentAnalysis?: Array<{
+    filename: string;
+    kind: 'excel' | 'pdf' | 'docx';
+    reviewedSheets: string[];
+    missingDates?: string[];
+    dateReviewAcknowledged?: boolean;
+    /** Every non-empty appointment in a calendar-style Excel sheet, in its original cell. */
+    calendarItems?: Array<{
+      date: string; time: string; title: string; originalText: string;
+      sheetName: string; cell: string; clientAddress?: string;
+      clockSource: 'text' | 'grid' | 'unknown';
+    }>;
+  }>;
   sourceInReplyTo?: string;
   sourceReferences?: string[];
   pickupDate: string; // YYYY-MM-DD

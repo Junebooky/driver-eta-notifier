@@ -9,6 +9,7 @@ import type { AnalyzedScheduleAttachment } from '@/services/emailAttachmentIntak
 import type { EmailFlightLeg } from '@/types/emailHq';
 import { enrichBookingDraftWithEmailEvidence } from '@/utils/emailBookingEvidence';
 import { attachmentManifest, verifyAttachmentCoverage } from '@/utils/emailAttachmentCoverage';
+import { datedExcelCalendarBlocks, reconcileSingleExcelCalendar } from '@/utils/emailCalendarGrid';
 
 export interface ExtractBookingParams {
   emailId: string;
@@ -539,13 +540,33 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
     // Document-based drafts already reconcile the conversation and current
     // schedule. Whole-body regex repair cannot distinguish superseded quotes.
     const evidenceDraft = enrichBookingDraftWithEmailEvidence(draft, attachments.length ? '' : cleanBody, parsedFlights);
-    // Validate the AI itinerary before body-only repairs can mask a missing
-    // attachment day by restoring an old quoted proposal on that date.
-    const coverage = verifyAttachmentCoverage(attachments, parsed.documentCoverage, draft, Number(todayKst.slice(0,4)));
-    evidenceDraft.documentAnalysis = manifest.map(source => ({
+    // A Gemini response can mention the correct date but silently drop four of
+    // five appointments. Reconcile every non-empty original Excel calendar cell
+    // before validating date coverage. POI/address verification is NEVER inferred.
+    const calendarBlocks = datedExcelCalendarBlocks(attachments, Number(todayKst.slice(0, 4)));
+    // A partial revision must not silently restore superseded appointments from
+    // an older attachment. Show all original cells for review, but leave the
+    // modification to the existing explicit revision-match workflow.
+    const completeDraft = parsed.tripType === 'modification' && parsed.revisionScope !== 'full'
+      ? {
+          ...evidenceDraft,
+          warnings: calendarBlocks.length
+            ? [...(evidenceDraft.warnings || []),
+                '부분 수정 요청: 엑셀 원본은 대조용으로 표시하며 변경 전 일정을 자동 복원하지 않았습니다.']
+            : evidenceDraft.warnings,
+        }
+      : reconcileSingleExcelCalendar(evidenceDraft, calendarBlocks);
+    const coverage = verifyAttachmentCoverage(
+      attachments, parsed.documentCoverage, completeDraft, Number(todayKst.slice(0,4))
+    );
+    completeDraft.documentAnalysis = manifest.map(source => ({
       filename: source.filename, kind: source.kind,
       reviewedSheets: coverage.find(item => item.sourceId === source.sourceId)?.reviewedSheets || [],
       missingDates: coverage.find(item => item.sourceId === source.sourceId)?.missingDates,
+      calendarItems: calendarBlocks.filter(block => block.sourceIndex === Number(source.sourceId.slice('attachment-'.length)) - 1)
+        .map(({ date, time, title, originalText, cell, sheetName, clientAddress, clockSource }) => ({
+          date, time, title, originalText, cell, sheetName, clientAddress, clockSource,
+        })),
     }));
 
     const usage = response.usageMetadata;
@@ -555,7 +576,7 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
 
     return {
       ok: true,
-      draft: evidenceDraft,
+      draft: completeDraft,
       rawJson: rawText,
       metrics: {
         totalMs,

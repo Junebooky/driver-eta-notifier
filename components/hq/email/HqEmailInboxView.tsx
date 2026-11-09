@@ -785,9 +785,19 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
 
       const metricsText = data.metrics?.totalMs ? ` (${(data.metrics.totalMs / 1000).toFixed(1)}초)` : '';
       const needsDateReview = extracted.documentAnalysis?.some(file => file.missingDates?.length);
+      const originalExcelCount = (extracted.documentAnalysis || []).reduce(
+        (count, file) => count + (file.calendarItems?.length || 0), 0
+      );
+      const restoredExcelCount = (extracted.waypoints || []).filter(
+        (point) => point.id.startsWith('excel-')
+      ).length;
       showToast(needsDateReview
         ? `예약 초안을 불러왔습니다${metricsText}. 첨부파일의 확인 필요 날짜를 검토해 주세요.`
-        : `Gemini AI가 이메일에서 예약 정보를 성공적으로 추출했습니다${metricsText}.`);
+        : originalExcelCount > 0 && restoredExcelCount === originalExcelCount
+          ? `엑셀 원본 ${originalExcelCount}개 일정을 AI 스케줄 목록에 모두 반영했습니다${metricsText}. 주소와 운행 조건을 확인해 주세요.`
+          : originalExcelCount > 0
+            ? `엑셀 원본 ${originalExcelCount}개 일정을 읽었습니다${metricsText}. 차량·시트별 원본 대조가 필요합니다.`
+            : `Gemini AI가 이메일에서 예약 정보를 성공적으로 추출했습니다${metricsText}.`);
     } catch (err: any) {
       showToast(`AI 추출 실패: ${err.message}`);
       haptics.errorAlert();

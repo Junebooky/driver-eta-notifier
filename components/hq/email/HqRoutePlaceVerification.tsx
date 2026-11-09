@@ -64,7 +64,12 @@ export const HqRoutePlaceVerification: React.FC<Props> = ({ draft, onUpdateDraft
                     <p className="mt-1 break-words text-[11px] font-medium leading-relaxed text-slate-400 pl-5">{stop.address}</p>
                   ) : (
                     <p className="mt-1 text-[11px] font-medium text-slate-400 pl-5">
-                      {verified ? '좌표 확인됨 · 상세 주소를 다시 선택할 수 있어요' : <HqBadge tone="warning">주소 미확정</HqBadge>}
+                      {verified ? 'TMAP 위치 확정' : <HqBadge tone="warning">TMAP 위치 미확정</HqBadge>}
+                    </p>
+                  )}
+                  {!stop.address && (
+                    <p className="mt-1 break-words text-[11px] font-medium leading-relaxed text-[#6E809B] pl-5">
+                      {stop.clientAddress ? `클라이언트 제공 주소: ${stop.clientAddress}` : '클라이언트측 주소 미지정'}
                     </p>
                   )}
                   <p className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-slate-500 pl-5">
