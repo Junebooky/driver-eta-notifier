@@ -931,6 +931,12 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
 
       {/* 4. Event Cards (우리만의 프리미엄 아코디언 카드) */}
       <div className="hq-operations-a space-y-5 sm:space-y-6">
+        {!isLoading && filteredGroups.length === 0 && (
+          <div className="rounded-[24px] bg-white px-6 py-14 text-center shadow-[0_6px_20px_rgba(35,49,78,0.055)]">
+            <p className="text-[14px] font-semibold text-[#17233B]">등록된 행사가 없습니다.</p>
+            <p className="mt-1 text-[12px] text-[#8492A4]">새 배차가 등록되면 이곳에 표시됩니다.</p>
+          </div>
+        )}
         {filteredGroups.map((group) => {
           const isExpanded = expandedEvents[group.id] !== false;
           const isShowingAll = showAllVehicles[group.id] === true;
