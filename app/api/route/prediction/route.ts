@@ -227,7 +227,7 @@ export async function POST(req: NextRequest) {
     const rawPredictionTime = body.predictionTime;
     if (singleSlot && (
       typeof rawPredictionTime !== 'string' ||
-      !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}[+-]\\d{2}:?\\d{2}$/.test(rawPredictionTime)
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:?\d{2}$/.test(rawPredictionTime)
     )) {
       return NextResponse.json({ isUnavailable: true, error: '일정 날짜와 KST 시각이 필요합니다.' }, { status: 400 });
     }
