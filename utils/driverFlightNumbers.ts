@@ -10,7 +10,14 @@ const FLIGHT_CODE = /\b(?:[A-Z][A-Z0-9]{1,2}|[0-9][A-Z])\s*-?\s*\d{1,4}[A-Z]?\b/
 
 export function parseDriverFlightEntries(raw?: string | null): DriverFlightEntry[] {
   if (!raw?.trim()) return [];
-  const parts = raw.split(/[,，;\n]+|\s+\/\s+/).map(s => s.trim()).filter(Boolean);
+  // Slash is a separator only when EVERY segment contains a flight code.
+  // This preserves dates and notes such as "KE2104 (11/09)".
+  const parts = raw.split(/[,，;\n]+/).flatMap(part => {
+    const candidate = part.split(/\s*\/\s*/).map(value => value.trim()).filter(Boolean);
+    return candidate.length > 1 && candidate.every(value => FLIGHT_CODE.test(value))
+      ? candidate
+      : [part.trim()];
+  }).filter(Boolean);
   const seen = new Set<string>();
   const result: DriverFlightEntry[] = [];
   for (const label of parts) {
