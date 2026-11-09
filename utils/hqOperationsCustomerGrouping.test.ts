@@ -31,6 +31,7 @@ test('missing/generic customer labels must not combine unrelated drivers into on
 
 test('operations keeps the user-approved exact deletion dialog copy and actions', () => {
   const file = readFileSync(new URL('../components/hq/operations/HqOperationsBoard.tsx', import.meta.url), 'utf8');
+  assert.match(file, /setEventToDelete\(eventGroups\.find\(item => item\.id === group\.id\) \|\| group\)/);
   for (const phrase of [
     '이 행사를 삭제할까요?',
     '배차된 일정과 기사·차량 배정이 모두 취소돼요.',
