@@ -23,3 +23,14 @@ test('unknown flight text is preserved for driver review but never used as a liv
   ]);
   assert.deepEqual(parseDriverFlightEntries(''), []);
 });
+
+test('slash-delimited flights are split but date slashes inside notes are preserved', () => {
+  assert.deepEqual(parseDriverFlightEntries('KE2104/NH867/OZ 104'), [
+    {label: 'KE2104', code: 'KE2104'},
+    {label: 'NH867', code: 'NH867'},
+    {label: 'OZ 104', code: 'OZ104'},
+  ]);
+  assert.deepEqual(parseDriverFlightEntries('KE2104 (11/09)'), [
+    {label: 'KE2104 (11/09)', code: 'KE2104'},
+  ]);
+});
