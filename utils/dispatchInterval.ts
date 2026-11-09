@@ -5,8 +5,12 @@ export function validateDispatchInterval(input: {
 }): string | null {
   const date = normalizeDateToIso(input.date);
   const start = normalizeTimeHHmm(input.pickupTime);
-  if (!date || !start) return '유효한 운행 날짜와 픽업 시간을 입력해 주세요.';
+  if (!date) return '유효한 운행 날짜를 입력해 주세요.';
   if (input.endDate && !normalizeDateToIso(input.endDate)) return '종료 날짜가 올바르지 않습니다.';
+  // An unassigned booking can have a genuinely unknown start and/or end.
+  // Publishing still needs a fully verified interval for conflict checking.
+  if (input.dispatchStatus !== 'published' && !start) return null;
+  if (!start) return '배차 확정 전 출발 시간을 지정해 주세요.';
   if (input.dispatchStatus !== 'published' && !input.endTime) return null;
   const endDate = input.endDate ? normalizeDateToIso(input.endDate) : date;
   const end = normalizeTimeHHmm(input.endTime);
