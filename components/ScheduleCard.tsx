@@ -52,7 +52,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
         body: JSON.stringify({
           scheduleId: item.id,
           status: nextStatus,
-          changedBy: item.driver_name || '윤태준',
+          changedBy: item.driver_name || '기사님',
         }),
       });
       const data = await res.json();
