@@ -6,5 +6,5 @@ ALTER TABLE cockpit.schedules
   ALTER COLUMN pickup_time DROP NOT NULL;
 ALTER TABLE cockpit.schedules
   ADD CONSTRAINT schedules_unknown_pickup_unassigned_only
-  CHECK (pickup_time IS NOT NULL OR dispatch_status IN ('unassigned', 'draft'));
+  CHECK (pickup_time IS NOT NULL OR COALESCE(dispatch_status, 'published') IN ('unassigned', 'draft', 'cancelled'));
 COMMIT;
