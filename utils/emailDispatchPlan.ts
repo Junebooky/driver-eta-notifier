@@ -100,7 +100,8 @@ export function buildEmailDispatchPlan(draft:HqEmailExtractedDraft,slots:Array<{
  if(draft.tripType==='group' && draft.groupTrips?.length)throw new Error('탑승객별 별도 일정은 각 예약에서 확인한 뒤 배차해 주세요. 첫 일정만 배차하지 않습니다.');
  if(!slots.length)throw new Error('요청 차량을 추가해 주세요.');
  return emailDispatchDays(draft).flatMap(day=>{
-  if(!normalizeDateToIso(day.date)||day.points.length<2||!normalizeTimeHHmm(day.start.time || '')||!day.start.location||!day.end.location)throw new Error(`${day.date}: 출발·도착지와 실제 시작 시간을 확인해 주세요.`);
+  if(!normalizeDateToIso(day.date)||day.points.length<2||!day.start.location||!day.end.location)throw new Error(`${day.date}: 출발·도착지를 확인해 주세요.`);
+  if(status==='published'&&!normalizeTimeHHmm(day.start.time||''))throw new Error(`${day.date}: 배차 확정 전 출발 시간을 지정해 주세요.`);
   if(status==='published' && (!normalizeTimeHHmm(day.endTime)||day.endTime<=day.start.time!))throw new Error(`${day.date}: 실제 종료 시간을 확인해 주세요.`);
   const dayFlights=emailAssignableFlights(draft).filter(f=>f.date===day.date);
   const splitByFlight=status==='published' && dayFlights.length>0 &&
