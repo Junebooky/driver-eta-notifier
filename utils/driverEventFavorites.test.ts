@@ -142,7 +142,7 @@ test('09:00 airport -> 10:00 hotel, 13:00 COEX produces two independent drives, 
   assert.equal('waypoints' in (eventLegToPresets(legs[1]) || {}), false);
 });
 
-test('unverified stop prevents only its adjacent drives; same-place visit never launches navigation', () => {
+test('unverified stop blocks adjacent drives and conflicting names on one coordinate block navigation', () => {
   const date = '2026-11-12';
   const base = schedule('four-stop', date);
   const more = [...base.routeWaypoints!, {
@@ -161,7 +161,8 @@ test('unverified stop prevents only its adjacent drives; same-place visit never 
     i === 1 ? { ...stop, lat: base.routeWaypoints![0].lat, lng: base.routeWaypoints![0].lng } : stop),
   });
   const duplicates = getEventRouteLegs(scheduleToEventRoute(samePlace));
-  assert.equal(duplicates[0].samePlace, true);
+  assert.equal(duplicates[0].samePlace, false, 'different named stops are not a confirmed dwell');
+  assert.equal(duplicates[0].coordinateConflict, true, 'identical building centroid requires HQ review');
   assert.equal(duplicates[0].ready, false);
   assert.equal(eventLegToPresets(duplicates[0]), null);
 });
