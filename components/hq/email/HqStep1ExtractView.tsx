@@ -600,6 +600,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
           <div className="space-y-2 bg-[#FAFBFD] px-4 pb-4" aria-live="polite">
             {attachmentEvidence.length > 0 ? (
               <div className="space-y-2 rounded-[14px] bg-white p-3 shadow-[0_3px_14px_rgba(35,49,78,0.05)]">
+                {attachmentEvidence.length > 1 && <p className="text-[11px] text-[#6E809B]">같은 값이 여러 일정에 있어요. 날짜·차량·원문 내용을 확인해 정확한 일정을 선택해 주세요.</p>}
                 <p className="text-[12px] font-semibold text-[#25344D]">첨부 일정표 원문 근거</p>
                 {attachmentEvidence.map(({ filename, entry }) => (
                   <div key={filename + entry.sheetName + entry.cell} className="rounded-[11px] bg-[#F6F8FC] p-3">
@@ -1261,7 +1262,13 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                       />
                       <div className="flex-1 min-w-0 pl-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs tabular-nums font-black text-slate-900">{pickupTime}</span>
+                          {pickupTime !== '시간 미지정' ? (
+                            <button type="button" onClick={() => locateSource(pickupTime)}
+                              className="text-xs tabular-nums font-black text-slate-900 underline decoration-[#B8C9E8] underline-offset-4 hover:text-[#1E60F3]"
+                              title="출발시간의 이메일·첨부 원문 근거 찾기" aria-label={`출발시간 ${pickupTime} 원문에서 찾기`}>
+                              {pickupTime}
+                            </button>
+                          ) : <span className="text-xs tabular-nums font-black text-slate-900">{pickupTime}</span>}
                           <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-100/80">
                             출발
                           </span>
