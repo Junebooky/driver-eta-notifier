@@ -501,7 +501,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       setPickupDate(initialBooking.pickupDate || getKstTodayDateStr());
       setPickupEndDate(initialBooking.endDate || initialBooking.pickupDate || getKstTodayDateStr());
       setPickupTimeOnly(initialBooking.pickupTime || '');
-      setTimeInputText(formatTimeKoreanAmPm(initialBooking.pickupTime || '09:00'));
+      setTimeInputText(initialBooking.pickupTime ? formatTimeKoreanAmPm(initialBooking.pickupTime) : '');
       setEndTime(initialBooking.endTime || '');
       setPickupLocation(initialBooking.pickupLocation || '');
       setDestination(initialBooking.destination || '');
