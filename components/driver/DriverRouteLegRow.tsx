@@ -62,6 +62,12 @@ export function DriverRouteLegRow({
         )}
       </div>
 
+      {leg.coordinateConflict && (
+        <p className="mt-2 inline-flex items-center gap-1.5 rounded-[9px] bg-[#FCF4E9] px-2.5 py-1.5 text-[11px] font-semibold text-[#9A6B30]">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          장소 이름이 다르지만 지도 좌표가 같습니다. 관리자 확인이 필요합니다.
+        </p>
+      )}
       {(!leg.origin.isPoiConfirmed || !leg.destination.isPoiConfirmed) && (
         <p className="mt-2 inline-flex items-center gap-1.5 rounded-[9px] bg-[#FCF4E9] px-2.5 py-1.5 text-[11px] font-semibold text-[#9A6B30]">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
