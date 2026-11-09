@@ -552,7 +552,7 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
       filename: source.filename, kind: source.kind,
       reviewedSheets: coverage.find(item => item.sourceId === source.sourceId)?.reviewedSheets || [],
       missingDates: coverage.find(item => item.sourceId === source.sourceId)?.missingDates,
-      calendarItems: calendarBlocks.filter(block => block.filename === source.filename)
+      calendarItems: calendarBlocks.filter(block => block.sourceSha256 === attachments[Number(source.sourceId.slice('attachment-'.length)) - 1]?.sha256)
         .map(({ date, time, title, originalText, cell, sheetName, clientAddress, clockSource }) => ({
           date, time, title, originalText, cell, sheetName, clientAddress, clockSource,
         })),
