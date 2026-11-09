@@ -168,7 +168,11 @@ export function reconcileSingleExcelCalendar(
       !consumed.has(point.id) && point.date === entry.date && point.time === entry.time
     ) : undefined);
     if (candidate) consumed.add(candidate.id);
-    const availableAddress = entry.clientAddress || candidate?.clientAddress;
+    // Never trust an AI-only address that is absent from the original cell.
+    const echoedAddress = candidate?.clientAddress &&
+      normalText(entry.originalText).toLowerCase().includes(normalText(candidate.clientAddress).toLowerCase())
+      ? candidate.clientAddress : undefined;
+    const availableAddress = entry.clientAddress || echoedAddress;
     const supportedLocation = candidate?.location &&
       (availableAddress || /(?:location|장소)\s*[:：]/i.test(entry.originalText)) &&
       normalText(entry.originalText).toLowerCase().includes(normalText(candidate.location).toLowerCase());
