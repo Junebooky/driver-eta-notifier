@@ -322,7 +322,17 @@ export function mapHydratedRowToScheduleItem(rawRow: Record<string, any>): Sched
     vehicle_plate: meta.vehiclePlate || undefined,
     dispatch_status: row.dispatch_status || 'published',
     version,
-    place_verified: row.place_verified ?? true,
+    // Never manufacture a verified state for legacy rows with no explicit HQ approval.
+    place_verified: typeof row.place_verified === 'boolean'
+      ? row.place_verified
+      : typeof meta.placeVerified === 'boolean'
+        ? meta.placeVerified
+        : Array.isArray(meta.routeWaypoints) && meta.routeWaypoints.length >= 2
+          ? meta.routeWaypoints.every((point) =>
+              point.isPoiConfirmed === true &&
+              typeof point.lat === 'number' && Number.isFinite(point.lat) &&
+              typeof point.lng === 'number' && Number.isFinite(point.lng))
+          : undefined,
     published_at: row.published_at || undefined,
     published_by: row.published_by || undefined,
     last_ack_version: lastAckVersion,
