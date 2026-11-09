@@ -2,15 +2,15 @@
 
 import React from 'react';
 import { ScheduleItem } from '@/data/ferrariSchedules';
-import { Navigation, Clock, User, Plane, FileText, ChevronRight, Pencil, Check, AlertTriangle, Building2, Phone, Users } from 'lucide-react';
+import { Navigation, Clock, User, Plane, FileText, ChevronRight, Pencil, Check, AlertTriangle, Phone } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import { sanitizePlaceName } from '@/utils/formatters';
-import { DispatchRouteTimeline } from '@/components/common/DispatchRouteTimeline';
 import { RouteForecastChip } from '@/components/driver/RouteForecastChip';
 import { DriverRouteLegRow } from '@/components/driver/DriverRouteLegRow';
 import { DriverDispatchShell } from '@/components/driver/DriverDispatchShell';
 import type { DriverEventLeg } from '@/utils/driverEventFavorites';
 import { scheduleToEventRoute, getEventRouteLegs } from '@/utils/driverEventFavorites';
+import { parseDriverFlightEntries } from '@/utils/driverFlightNumbers';
 
 interface ScheduleCardProps {
   item: ScheduleItem;
@@ -75,9 +75,9 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
 
   const isDeparture =
     item.flightType === 'departure' ||
-    (item.destination_name && (item.destination_name.includes('공항') || item.destination_name.toLowerCase().includes('airport'))) ||
+    (!item.flightType && ((item.destination_name && (item.destination_name.includes('공항') || item.destination_name.toLowerCase().includes('airport'))) ||
     (item.destination_address && (item.destination_address.includes('공항') || item.destination_address.toLowerCase().includes('airport'))) ||
-    (item.notes && /DEPARTURE|출국|샌딩|센딩/i.test(item.notes));
+    (item.notes && /DEPARTURE|출국|샌딩|센딩/i.test(item.notes))));
 
   const effectiveFlightType: 'arrival' | 'departure' = isDeparture ? 'departure' : 'arrival';
 
@@ -128,6 +128,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
 
   const pickupTimeValue = extractPickupTimeValue(item);
   const parsedNotes = parseNotesRow(item.notes);
+  const flightEntries = parseDriverFlightEntries(item.flight);
   const forecastLegs = item.routeWaypoints && item.routeWaypoints.length >= 2
     ? getEventRouteLegs(scheduleToEventRoute(item))
     : [];
@@ -141,9 +142,6 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
   );
   const hasHqReminder = Boolean(!isCancelled && !item.isAcknowledged && (item.reminder_count || 0) > 0);
   const isGroupDispatch = Boolean(item.group_total_vehicles && item.group_total_vehicles > 1);
-  const hasDistinctCustomerOrEvent = Boolean(
-    (item.customer_name && item.customer_name !== item.passenger) || item.event_name
-  );
 
   return (
     <DriverDispatchShell
@@ -167,7 +165,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
           {isGroupDispatch && <span className="rounded-[9px] bg-[#F2F5F9] px-2 py-1">그룹 {item.group_vehicle_index || 1}/{item.group_total_vehicles}대</span>}
           {isCancelled && <span className="rounded-[9px] bg-[#F9EFF0] px-2 py-1 text-[#A15A66]">배차 취소</span>}
           {isStaleAck && <span className="rounded-[9px] bg-[#FCF4E9] px-2 py-1 text-[#9A6B30]">변경 배차 · 재확인 필요 (v{item.version})</span>}
-          {item.place_verified === false && <span className="rounded-[9px] bg-[#F2F5F9] px-2 py-1">위치 확인 필요</span>}
+          {item.place_verified === false && <span className="inline-flex items-center gap-1 rounded-[9px] bg-[#FCF4E9] px-2 py-1 text-[#9A6B30]"><AlertTriangle className="h-3 w-3" />관리자 위치 확인 필요</span>}
         </div>
         {onEdit && !isCancelled && (
           <button type="button" onClick={() => { haptics.lightTap(); onEdit(item); }}
@@ -176,31 +174,41 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
         )}
       </div>
 
-      {/* Flight is a first-class driver action, not a hidden footer icon. */}
-      {item.flight && onOpenFlight && !isCancelled && (
-        <button type="button" onClick={() => {
-          haptics.mediumTap();
-          onOpenFlight(item.flight!.split('(')[0].trim().toUpperCase(), effectiveFlightType);
-        }} className="flex w-full items-center gap-3 rounded-[13px] bg-[#F6F8FC] px-3.5 py-3 text-left"
-          aria-label={`항공편 ${item.flight} 조회`}>
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-white">
-            <Plane className="h-5 w-5 text-[#59708F]" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[11px] font-medium text-[#8290A5]">항공편 · {effectiveFlightType === 'arrival' ? '입국' : '출국'}</span>
-            <span className="block truncate text-[13px] font-bold text-[#25344D]">{item.flight}</span>
-          </span>
-          <span className="shrink-0 text-[12px] font-bold text-[#1E60F3]">실시간 조회</span>
-          <ChevronRight className="h-4 w-4 shrink-0 text-[#8290A5]" />
-        </button>
+      {/* Each flight is a distinct lookup: never query the full comma-separated list. */}
+      {flightEntries.length > 0 && !isCancelled && (
+        <section className="rounded-[13px] bg-[#F6F8FC] px-3.5 py-3" aria-label="배정 항공편">
+          <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold text-[#8290A5]">
+            <Plane className="h-4 w-4" aria-hidden="true" />
+            <span>항공편 · {effectiveFlightType === 'arrival' ? '입국' : '출국'}{flightEntries.length > 1 ? ` · ${flightEntries.length}편` : ''}</span>
+          </div>
+          <div className="space-y-1.5">
+            {flightEntries.map((entry) => (
+              <div key={entry.code || entry.label} className="flex min-w-0 items-center justify-between gap-2">
+                <span className="min-w-0 break-words text-[13px] font-bold text-[#25344D]" title={entry.label}>{entry.label}</span>
+                {entry.code && onOpenFlight ? (
+                  <button type="button"
+                    onClick={() => { haptics.mediumTap(); onOpenFlight(entry.code!, effectiveFlightType); }}
+                    className="shrink-0 rounded-[10px] bg-white px-2.5 py-2 text-[11px] font-bold text-[#1E60F3]"
+                    aria-label={`항공편 ${entry.code} 실시간 조회`}>
+                    실시간 조회
+                  </button>
+                ) : !entry.code ? (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-[9px] bg-[#FCF4E9] px-2 py-1 text-[11px] font-semibold text-[#9A6B30]">
+                    <AlertTriangle className="h-3 w-3" />편명 확인 필요
+                  </span>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* All adjacent itinerary stops are separate drives; a single leg never
           sends the whole day's intermediate stops to navigation. */}
       <section className="space-y-2" aria-label="운행 구간">
         <div className="flex items-center justify-between">
-          <h4 className="text-[13px] font-bold text-[#25344D]">이동 일정</h4>
-          <span className="text-[11px] text-[#8290A5]">{forecastLegs.length || 1}개 구간</span>
+          <h4 className="text-[13px] font-bold text-[#25344D]">전체 운행 일정</h4>
+          <span className="text-[11px] text-[#8290A5]">{forecastLegs.length || 1}개 일정</span>
         </div>
         {forecastLegs.length > 0 ? (
           forecastLegs.map((leg) => (
@@ -250,25 +258,6 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
         }`}
         title={onEdit && !isCancelled ? '클릭하여 정보 수정' : undefined}
       >
-        {/* Customer / Event */}
-        {hasDistinctCustomerOrEvent && (
-          <div className="flex items-start gap-3 min-w-0">
-            <div className="w-20 sm:w-22 shrink-0 flex items-center gap-2 text-slate-500 font-medium">
-              <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0 stroke-[1.9]" />
-              <span>고객사</span>
-            </div>
-            <span
-              className="font-extrabold text-[#0F172A] min-w-0 flex-1 truncate"
-              title={`${item.customer_name || ''}${item.event_name ? ` · ${item.event_name}` : ''}`}
-            >
-              {item.customer_name || item.event_name}
-              {item.customer_name && item.event_name && item.event_name !== item.customer_name
-                ? ` · ${item.event_name}`
-                : ''}
-            </span>
-          </div>
-        )}
-
         {/* Passenger */}
         <div className="flex items-start gap-3 min-w-0">
           <div className="w-20 sm:w-22 shrink-0 flex items-center gap-2 text-slate-500 font-medium">
@@ -298,19 +287,6 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
             >
               {item.passenger_phone}
             </a>
-          </div>
-        )}
-
-        {/* Flight (Optional) */}
-        {item.flight && (
-          <div className="flex items-start gap-3 min-w-0">
-            <div className="w-20 sm:w-22 shrink-0 flex items-center gap-2 text-slate-500 font-medium">
-              <Plane className="w-3.5 h-3.5 text-slate-400 shrink-0 stroke-[1.9]" />
-              <span>항공편</span>
-            </div>
-            <span className="font-extrabold text-[#0F172A] min-w-0 flex-1 truncate">
-              {item.flight}
-            </span>
           </div>
         )}
 
