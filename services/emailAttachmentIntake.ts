@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { read, utils } from 'xlsx';
 import { unzipSync } from 'fflate';
+import { extractExcelCalendarBlocks, type ExcelCalendarBlock } from '@/utils/emailCalendarGrid';
 
 export const MAX_EMAIL_ATTACHMENT_BYTES = 8 * 1024 * 1024;
 export const MAX_EMAIL_ATTACHMENT_TOTAL_BYTES = 12 * 1024 * 1024;
@@ -20,6 +21,7 @@ export interface AnalyzedScheduleAttachment {
   text?: string;
   pdfBase64?: string;
   sheets?: Array<{ name: string; nonEmptyRows: number; dateLabels: string[] }>;
+  calendarBlocks?: ExcelCalendarBlock[];
 }
 export interface AttachmentAnalysis {
   analyzed: AnalyzedScheduleAttachment[];
@@ -113,11 +115,13 @@ export function analyzeScheduleAttachments(attachments: ScheduleAttachmentInput[
       let text = '';
       let nonEmptyCells = 0;
       const sheets: NonNullable<AnalyzedScheduleAttachment['sheets']> = [];
+      const calendarBlocks: ExcelCalendarBlock[] = [];
       for (const sheetName of book.SheetNames) {
         const sheet = book.Sheets[sheetName];
         const rows = utils.sheet_to_json<Array<string | number>>(sheet, { header: 1, raw: false, defval: '', blankrows: true });
         const firstRow = sheet['!ref'] ? utils.decode_range(sheet['!ref']).s.r : 0;
         const firstCol = sheet['!ref'] ? utils.decode_range(sheet['!ref']).s.c : 0;
+        calendarBlocks.push(...extractExcelCalendarBlocks(sheetName, rows, firstRow, firstCol));
         if (rows.length >= 1502) throw new Error('시트당 1500행을 초과합니다.');
         text += `\n[Excel ${name} / Sheet: ${sheetName}]\n`;
         const dateLabels: string[] = [];
@@ -149,7 +153,7 @@ export function analyzeScheduleAttachments(attachments: ScheduleAttachmentInput[
         sheets.push({ name: sheetName, nonEmptyRows, dateLabels: [...new Set(dateLabels)] });
       }
       if (!nonEmptyCells) throw new Error('읽을 수 있는 셀이 없습니다.');
-      analyzed.push({ filename: name, kind: 'excel', sha256: digest, size: bytes.length, text, sheets });
+      analyzed.push({ filename: name, kind: 'excel', sha256: digest, size: bytes.length, text, sheets, calendarBlocks });
     } catch (error) {
       throw new Error(`${name}: Excel 분석 실패 — ${error instanceof Error ? error.message : '문서 구조를 확인해 주세요.'}`);
     }
