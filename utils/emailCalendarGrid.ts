@@ -17,6 +17,7 @@ export interface ExcelCalendarBlock {
 export interface DatedExcelCalendarBlock extends ExcelCalendarBlock {
   filename: string;
   sourceSha256: string;
+  sourceIndex: number;
   date: string;
 }
 
@@ -118,17 +119,17 @@ export function datedExcelCalendarBlocks(
   referenceYear: number,
 ): DatedExcelCalendarBlock[] {
   const records: DatedExcelCalendarBlock[] = [];
-  for (const file of files) {
+  for (const [sourceIndex, file] of files.entries()) {
     for (const entry of file.calendarBlocks || []) {
       const date = scheduleHeaderDate(entry.dateLabel, referenceYear);
-      if (date) records.push({ ...entry, date, filename: file.filename, sourceSha256: file.sha256 });
+      if (date) records.push({ ...entry, date, filename: file.filename, sourceSha256: file.sha256, sourceIndex });
     }
   }
   return records;
 }
 
 function stableCalendarKey(record: DatedExcelCalendarBlock): string {
-  return [record.sourceSha256.slice(0, 16), record.sheetName, record.cell].join(':');
+  return [record.sourceIndex, record.sourceSha256.slice(0, 16), record.sheetName, record.cell].join(':');
 }
 
 /**
@@ -142,7 +143,7 @@ export function reconcileSingleExcelCalendar(
   records: DatedExcelCalendarBlock[],
 ): HqEmailExtractedDraft {
   if (!records.length) return draft;
-  const grouped = new Set(records.map(item => item.sourceSha256 + '/' + item.sheetName));
+  const grouped = new Set(records.map(item => item.sourceIndex + '/' + item.sheetName));
   if (grouped.size !== 1) {
     return {
       ...draft,
