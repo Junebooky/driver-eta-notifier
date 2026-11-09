@@ -740,9 +740,13 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                 <div className="flex items-center gap-2 min-w-0">
                   <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
                   <span className="text-xs text-slate-500 font-semibold shrink-0">고객사</span>
-                  <span className="text-sm font-black text-slate-900 truncate ml-1">
-                    {companyName || '미지정'}
-                  </span>
+                  {companyName ? (
+                    <button type="button" onClick={() => locateSource(companyName)}
+                      className="min-w-0 truncate ml-1 text-sm font-black text-slate-900 underline decoration-[#B8C9E8] underline-offset-4 hover:text-[#1E60F3]"
+                      title="고객사명의 이메일·첨부 원문 근거 찾기">
+                      {companyName}
+                    </button>
+                  ) : <span className="text-sm font-black text-slate-900 truncate ml-1">미지정</span>}
                 </div>
                 <button
                   type="button"
