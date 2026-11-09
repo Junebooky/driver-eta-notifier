@@ -544,7 +544,18 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
     // five appointments. Reconcile every non-empty original Excel calendar cell
     // before validating date coverage. POI/address verification is NEVER inferred.
     const calendarBlocks = datedExcelCalendarBlocks(attachments, Number(todayKst.slice(0, 4)));
-    const completeDraft = reconcileSingleExcelCalendar(evidenceDraft, calendarBlocks);
+    // A partial revision must not silently restore superseded appointments from
+    // an older attachment. Show all original cells for review, but leave the
+    // modification to the existing explicit revision-match workflow.
+    const completeDraft = parsed.tripType === 'modification' && parsed.revisionScope !== 'full'
+      ? {
+          ...evidenceDraft,
+          warnings: calendarBlocks.length
+            ? [...(evidenceDraft.warnings || []),
+                '부분 수정 요청: 엑셀 원본은 대조용으로 표시하며 변경 전 일정을 자동 복원하지 않았습니다.']
+            : evidenceDraft.warnings,
+        }
+      : reconcileSingleExcelCalendar(evidenceDraft, calendarBlocks);
     const coverage = verifyAttachmentCoverage(
       attachments, parsed.documentCoverage, completeDraft, Number(todayKst.slice(0,4))
     );
