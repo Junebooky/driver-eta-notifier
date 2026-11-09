@@ -22,7 +22,7 @@ export function emailAssignableFlights(draft:HqEmailExtractedDraft){
  }
  return [...groups.values()];
 }
-export type EmailFlightSlot={assignedFlightKeys?:string[]};
+export type EmailFlightSlot={assignedFlightKeys?:string[];sharedRouteConfirmed?:boolean};
 /** Returns manager-visible validation problems; publishing fails closed. */
 export function emailFlightAssignmentIssues(
  draft:HqEmailExtractedDraft,
@@ -76,6 +76,8 @@ export function emailFlightAssignmentIssues(
     problems.push(date+' '+(i+1)+'호차: 맡을 항공편이 없습니다. 운행하지 않는 차량은 별도 일정에서 제외해 주세요.');
   }
  }
+ if(slots.some(slot=>slot.sharedRouteConfirmed!==true))
+  problems.push('여러 차량이 같은 전체 경유지를 사용해도 되는지 확인해 주세요. 차량별 경로가 다르면 별도 예약으로 분리해야 합니다.');
  return [...new Set(problems)];
 }
 
@@ -157,7 +159,7 @@ export function buildEmailDispatchPlan(draft:HqEmailExtractedDraft,slots:Array<{
      return {...point,notes:safe||undefined};
    });
    return {scheduleId:draft.savedScheduleIds?.[`${day.date}:${index}`],date:day.date,endDate:day.date,pickupTime:day.start.time!,endTime:day.endTime||undefined,origin:day.start.location,originLat:day.start.lat,originLng:day.start.lng,destination:day.end.location,destinationLat:day.end.lat,destinationLng:day.end.lng,routeWaypoints,
-    customerName:draft.companyName,customerId:draft.clientId || undefined,passengerName:splitByFlight?selectedPassengers.join(', '):draft.passengerName,passengerPhone:splitByFlight?'':draft.passengerPhone,passengerCount:splitByFlight?selectedPassengers.length:draft.passengerCount,flightNumber:assignedFlights.map(f=>f.flightNumber).join(', ') || (!splitByFlight && day.date===draft.pickupDate ? draft.flightNumber : ''),notes:combinedNotes,
+    customerName:draft.companyName,customerId:draft.clientId || undefined,passengerName:selectedPassengers.length?selectedPassengers.join(', '):draft.passengerName,passengerPhone:splitByFlight?'':draft.passengerPhone,passengerCount:splitByFlight?selectedPassengers.length:Math.max(draft.passengerCount,selectedPassengers.length),flightNumber:assignedFlights.map(f=>f.flightNumber).join(', ') || (!splitByFlight && day.date===draft.pickupDate ? draft.flightNumber : ''),notes:combinedNotes,
     eventId:`email-${draft.emailId}`,eventName:draft.eventName?.trim() || draft.companyName || '',groupId:`email-${draft.emailId}-${day.date}`,groupVehicleIndex:index+1,groupTotalVehicles:slots.length,
     vehicleModel:status==='published'?(VIP_REAL_VEHICLES.find(vehicle=>vehicle.plate===slot.vehiclePlate)?.model || slot.vehicleModel):slot.vehicleModel,vehiclePlate:status==='published'?slot.vehiclePlate:undefined,driverId:status==='published'?slot.driver?.id:undefined,driverName:status==='published'?slot.driver?.name:undefined,driverPhone:status==='published'?slot.driver?.phone:undefined,
     dispatchStatus:status,intakeSource:'email' as const,requestedLanguage,placeVerified:confirmed,allowUnverified:status==='unassigned'};
