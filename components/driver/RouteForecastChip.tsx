@@ -38,7 +38,7 @@ function validCoordinate(point: ForecastLocation): boolean {
 
 /** Strict KST clock. Never infer a departure time from the viewing device's timezone. */
 export function scheduleForecastDate(date: string, time?: string | null): Date | null {
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date || '') || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(time || '')) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '') || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time || '')) return null;
   const instant = new Date(`${date}T${time}:00+09:00`);
   if (Number.isNaN(instant.getTime())) return null;
   // Prevent silently normalizing invalid calendar days such as Feb 30.
