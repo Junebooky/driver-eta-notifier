@@ -26,15 +26,20 @@ test('the dispatch delete action removes the saved booking rather than marking i
 test('real operations events are deletable and never replaced by fake fixtures after clearing',()=>{
   assert.match(ops,/useState<EventGroup\[\]>\(\[\]\)/);
   assert.match(ops,/setEventGroups\(newGroups\)/);
-  assert.match(ops,/hardDeleteHqSchedule\(target\.schedules\[0\]\.id, 'event'\)/);
+  assert.match(ops,/hardDeleteHqSchedule\(/);
+  assert.match(ops,/target\.customerScoped \? 'customer' : 'event'/);
+  assert.match(ops,/target\.schedules\.map\(item => item\.id\)/);
   assert.match(ops,/행사 완전 삭제/);
-  assert.match(ops,/item\.groupId \|\| item\.eventId \|\| item\.id/);
+  assert.match(ops,/groupOperationsByCustomer\(serverMapped\)/);
+  assert.match(ops,/sameEvent \? first\.eventName : '전체 배차 현황'/);
 });
 
 test('hard delete requires HQ role, explicit confirmation and protects work records',()=>{
   assert.match(api,/requireHqAdmin\(req\)/);
   assert.match(api,/payload\?\.confirm !== true/);
   assert.match(api,/scope === 'event' && anchor\.group_id/);
+  assert.match(api,/scope === 'customer'/);
+  assert.match(api,/normalizeOperationalCustomerName\(item\.customer_name\) === normalized/);
   for(const name of ['driving_logs','expenses','settlement_documents','driving_log_booking_link_audit','vehicle_custodies','vehicle_custody_requests']){
     assert.ok(api.includes(name),name);
   }
