@@ -182,7 +182,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
       </div>
 
       {/* Each flight is a distinct lookup: never query the full comma-separated list. */}
-      {flightEntries.length > 0 && !isCancelled && (
+      {flightEntries.length > 0 && (
         <section className="rounded-[13px] bg-[#F6F8FC] px-3.5 py-3" aria-label="배정 항공편">
           <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold text-[#8290A5]">
             <Plane className="h-4 w-4" aria-hidden="true" />
@@ -192,7 +192,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
             {flightEntries.map((entry) => (
               <div key={entry.code || entry.label} className="flex min-w-0 items-center justify-between gap-2">
                 <span className="min-w-0 break-words text-[13px] font-bold text-[#25344D]" title={entry.label}>{entry.label}</span>
-                {entry.code && onOpenFlight ? (
+                {entry.code && onOpenFlight && !isCancelled ? (
                   <button type="button"
                     onClick={() => { haptics.mediumTap(); onOpenFlight(entry.code!, effectiveFlightType); }}
                     className="shrink-0 rounded-[10px] bg-white px-2.5 py-2 text-[11px] font-bold text-[#1E60F3]"
