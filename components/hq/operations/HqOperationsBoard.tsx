@@ -1355,28 +1355,54 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
       </div>
 
       {eventToDelete && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-[#17233B]/30 p-4 backdrop-blur-[2px]"
-          onClick={() => { if (!deletingEvent) setEventToDelete(null); }}>
-          <div role="dialog" aria-modal="true" aria-label="행사 완전 삭제 확인"
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-[#17233B]/30 p-4 backdrop-blur-[2px] animate-in fade-in duration-200"
+          onClick={() => { if (!deletingEvent) setEventToDelete(null); }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="행사 완전 삭제 확인"
             onClick={event => event.stopPropagation()}
-            className="w-full max-w-md space-y-4 rounded-[24px] bg-white p-5 shadow-[0_24px_64px_rgba(27,45,77,0.16)] sm:p-6">
-            <h3 className="text-[16px] font-semibold text-[#17233B]">행사를 완전히 삭제할까요?</h3>
-            <p className="text-[13px] leading-relaxed text-[#61728A]">
-              <strong className="text-[#17233B]">{eventToDelete.eventName}</strong> 행사와 연결된 배차 전체가 달력·운영보드·기사 일정에서 사라집니다.
-              해당 행사에 배정됐던 차량·기사도 다시 배정 가능한 상태로 돌아갑니다.
-            </p>
-            <p className="text-[12px] leading-relaxed text-[#8492A4]">
-              이미 운행일지·경비·정산 또는 차량 인수 기록이 연결된 예약은 보호를 위해 삭제할 수 없습니다. 이 작업은 되돌릴 수 없습니다.
-            </p>
-            {deleteError && <p role="alert" className="rounded-xl bg-[#FFF4F2] p-3 text-[12px] text-[#A34E45]">{deleteError}</p>}
-            <div className="grid grid-cols-2 gap-2">
-              <button type="button" disabled={deletingEvent} onClick={() => { setEventToDelete(null); setDeleteError(null); }}
-                className="min-h-11 rounded-[14px] bg-[#F7F9FC] text-[12px] font-semibold text-[#52647A] hover:bg-[#EDF1F6] disabled:opacity-50">
-                돌아가기
+            className="w-full max-w-sm space-y-4 rounded-[24px] bg-white p-6 shadow-[0_24px_64px_rgba(27,45,77,0.16)]"
+          >
+            <div className="space-y-2">
+              <h3 className="text-[17px] font-bold text-[#17233B]">이 행사를 삭제할까요?</h3>
+              <p className="text-[13px] leading-relaxed text-[#61728A]">
+                배차된 일정과 기사·차량 배정이 모두 취소돼요.
+              </p>
+              <p className="text-[13px] font-medium leading-relaxed text-[#A34E45]">
+                한 번 삭제하면 다시 되돌릴 수 없어요.
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-[#F8FAFC] border border-slate-100 p-3 text-[12px] leading-relaxed text-[#64748B] flex items-start gap-1.5">
+              <span className="shrink-0 text-slate-400 font-semibold">ⓘ</span>
+              <span>운행일지나 정산 기록이 남아있는 예약은 안전하게 보관돼요.</span>
+            </div>
+
+            {deleteError && (
+              <p role="alert" className="rounded-xl bg-[#FFF4F2] p-3 text-[12px] text-[#A34E45]">
+                {deleteError}
+              </p>
+            )}
+
+            <div className="grid grid-cols-2 gap-2.5 pt-1">
+              <button
+                type="button"
+                disabled={deletingEvent}
+                onClick={() => { setEventToDelete(null); setDeleteError(null); }}
+                className="h-11 rounded-xl bg-[#F1F5F9] text-sm font-semibold text-slate-700 hover:bg-slate-200 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                취소
               </button>
-              <button type="button" disabled={deletingEvent} onClick={() => void confirmDeleteEvent()}
-                className="min-h-11 rounded-[14px] bg-[#FFF4F2] text-[12px] font-semibold text-[#A34E45] hover:bg-[#FFE9E5] disabled:opacity-50">
-                {deletingEvent ? '삭제 중…' : '행사 완전 삭제'}
+              <button
+                type="button"
+                disabled={deletingEvent}
+                onClick={() => void confirmDeleteEvent()}
+                className="h-11 rounded-xl bg-[#EF4444] text-sm font-semibold text-white hover:bg-red-600 transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
+              >
+                {deletingEvent ? '삭제 중…' : '삭제하기'}
               </button>
             </div>
           </div>
