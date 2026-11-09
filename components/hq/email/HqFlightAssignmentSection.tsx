@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { AlertTriangle, Plane } from 'lucide-react';
 import type { HqEmailExtractedDraft } from '@/types/emailHq';
 import { emailAssignableFlights, emailFlightAssignmentIssues, emailFlightKey } from '@/utils/emailDispatchPlan';
@@ -19,6 +19,7 @@ type Props<T extends Slot> = {
 export function HqFlightAssignmentSection<T extends Slot>({
   draft, slots, onUpdateSlots, onUpdateDraft, disabled = false,
 }: Props<T>) {
+  const [editingPassengers, setEditingPassengers] = useState<Record<string,string>>({});
   const flights = emailAssignableFlights(draft);
   if (!flights.length) return null;
   const split = slots.length > 1;
@@ -62,14 +63,21 @@ export function HqFlightAssignmentSection<T extends Slot>({
               </div>
               <label className="block space-y-1">
                 <span className="text-[11px] font-medium text-[#59708F]">이 항공편 승객</span>
-                <input type="text" value={passengers} disabled={disabled || !onUpdateDraft}
+                <input type="text" value={editingPassengers[key] ?? passengers} disabled={disabled || !onUpdateDraft}
                   onChange={event => {
-                    const names = event.target.value.split(/[,，;\n]+/).map(name => name.trim()).filter(Boolean);
+                    const value = event.target.value;
+                    setEditingPassengers(previous => ({ ...previous, [key]: value }));
+                    const names = value.split(/[,，;\n]+/).map(name => name.trim()).filter(Boolean);
                     onUpdateDraft?.({
                       ...draft, flights: (draft.flights || []).map(row =>
                         emailFlightKey(row) === key ? { ...row, passengers: names } : row),
                     });
                   }}
+                  onBlur={() => setEditingPassengers(previous => {
+                    const next = { ...previous };
+                    delete next[key];
+                    return next;
+                  })}
                   placeholder="승객 이름을 쉼표로 구분해 입력"
                   className="min-h-10 w-full rounded-[11px] bg-white px-3 text-[12px] text-[#25344D] outline-none focus:ring-2 focus:ring-[#1E60F3]/15 disabled:text-[#8290A5]"
                   aria-label={flight.flightNumber+' 탑승객 이름'}
