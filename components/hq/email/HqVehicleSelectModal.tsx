@@ -1,32 +1,25 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { ArrowRight, CarFront, Check, Loader2, Search, X } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowRight, CarFront, Check, Search } from 'lucide-react';
 import type { AvailableVehicleItem } from '@/utils/availabilityEngine';
 import { VIP_REAL_VEHICLES, getVehicleImage } from '@/utils/vehicleData';
+import { useHqFleetRegistry } from '@/hooks/useHqFleetRegistry';
+import { emailVehicleChoices } from '@/utils/emailWorkflowReview';
+import { HqButton, HqInput, HqSegmentedTabs } from '@/components/hq/ui';
+import { HqModal } from '@/components/hq/ui/HqModal';
+import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
 
-type Category = 'all' | AvailableVehicleItem['uiCategory'];
-
-const FILTERS: { key: Category; label: string }[] = [
-  { key: 'all', label: '전체' },
-  { key: 'sedan', label: '세단' },
-  { key: 'suv', label: 'SUV' },
-  { key: 'van', label: '밴' },
-  { key: 'sprinter', label: '스프린터' },
-];
-
-const normalized = (value?: string | null) =>
-  (value || '').normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase();
-
+const normalized = (value?: string | null) => (value || '').normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase();
 export const getVerifiedVehiclePhoto = (plate?: string): string => {
   const vehicle = VIP_REAL_VEHICLES.find((item) => normalized(item.plate) === normalized(plate));
-  // Never use old screenshot thumbnails or a different vehicle's image.
   return vehicle?.imageUrl && !/\/thumb_|\/car_phone_|\/car_g90|\/car_sprinter/i.test(vehicle.imageUrl)
-    ? getVehicleImage(vehicle)
-    : '/images/vehicle_photo_pending.svg';
+    ? getVehicleImage(vehicle) : '/images/vehicle_photo_pending.svg';
 };
-
+const FILTERS = [
+  { id: 'all', label: '전체' }, { id: 'sedan', label: '세단' }, { id: 'suv', label: 'SUV' },
+  { id: 'van', label: '밴' }, { id: 'sprinter', label: '스프린터' },
+];
 export interface HqVehicleSelectModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -39,232 +32,73 @@ export interface HqVehicleSelectModalProps {
   onSelect: (vehicle: AvailableVehicleItem) => void;
 }
 
-export const HqVehicleSelectModal: React.FC<HqVehicleSelectModalProps> = ({
+const VehiclePickerContent: React.FC<HqVehicleSelectModalProps> = ({
   isOpen, onClose, vehicles, loading, error, slotNumber, selectedPlate, excludedPlates = [], onSelect,
 }) => {
-  const [mounted, setMounted] = useState(false);
+  const registry = useHqFleetRegistry(isOpen);
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState<Category>('all');
-  const [availableOnly, setAvailableOnly] = useState(true);
-  const searchRef = useRef<HTMLInputElement>(null);
+  const [category, setCategory] = useState('all');
+  const [availableOnly, setAvailableOnly] = useState(false);
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+  const close = useCallback(() => onCloseRef.current(), []);
   useEffect(() => {
     if (!isOpen) return;
-    setQuery('');
-    setCategory('all');
-    setAvailableOnly(true);
     const oldOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCloseRef.current();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.body.style.overflow = oldOverflow;
-      window.removeEventListener('keydown', onKeyDown);
-    };
+    return () => { document.body.style.overflow = oldOverflow; };
   }, [isOpen]);
-
-  const filtered = useMemo(() => {
-    const needle = normalized(query);
-    return (vehicles || [])
-      .filter((vehicle) => {
-        const reserved = excludedPlates.some((plate) => normalized(plate) === normalized(vehicle.plate));
-        if (category !== 'all' && vehicle.uiCategory !== category) return false;
-        if (availableOnly && (!vehicle.isAvailable || reserved)) return false;
-        const known = VIP_REAL_VEHICLES.find((item) => normalized(item.plate) === normalized(vehicle.plate));
-        const words = [vehicle.model, vehicle.plate, vehicle.capacity, known?.modelShort, known?.plateShort, known?.categoryLabel];
-        return !needle || words.some((word) => normalized(word).includes(needle));
-      })
-      .sort((a, b) => Number(b.isAvailable) - Number(a.isAvailable) || a.model.localeCompare(b.model, 'ko') || a.plate.localeCompare(b.plate, 'ko'));
-  }, [vehicles, query, category, availableOnly, excludedPlates]);
-
-  if (!isOpen || !mounted) return null;
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[105] flex items-center justify-center p-4 sm:p-6 bg-[#17233B]/30 backdrop-blur-[2px] animate-in fade-in duration-200"
-      onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
-    >
-      <section role="dialog" aria-modal="true" aria-labelledby="hq-vehicle-picker-title"
-        className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-[26px] bg-[#FAFBFD] shadow-[0_24px_64px_rgba(27,45,77,0.16),0_4px_14px_rgba(27,45,77,0.04)] animate-in zoom-in-95 duration-200">
-        
-        {/* Header with Title and Close Button */}
-        <div className="shrink-0 p-5 pb-3 sm:p-6 sm:pb-3.5 space-y-3.5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h3 id="hq-vehicle-picker-title" className="text-[21px] font-bold tracking-[-0.035em] text-[#17233B]">
-                차량 선택
-              </h3>
-              <p className="mt-0.5 truncate text-xs text-[#73839D] font-medium">
-                {slotNumber}호차 배정 차량 선택
-              </p>
+  const pendingReason = error || (loading ? '일정별 가용성 확인 중' : '시작·종료 날짜와 시간을 먼저 확인해 주세요.');
+  const choices = useMemo(() => emailVehicleChoices(registry.vehicles, error || loading ? undefined : vehicles, pendingReason), [registry.vehicles, vehicles, error, loading, pendingReason]);
+  const filtered = useMemo(() => choices.filter(vehicle => {
+    const reserved = excludedPlates.some(plate => normalized(plate) === normalized(vehicle.plate));
+    if (category !== 'all' && vehicle.uiCategory !== category) return false;
+    if (availableOnly && (!vehicle.isAvailable || reserved)) return false;
+    const known = registry.vehicles.find(item => item.uuid === vehicle.uuid);
+    return !query || [vehicle.model, vehicle.plate, vehicle.capacity, known?.modelShort, known?.plateShort, known?.categoryLabel]
+      .some(word => normalized(word).includes(normalized(query)));
+  }), [choices, category, availableOnly, query, excludedPlates, registry.vehicles]);
+  return <HqModal isOpen={isOpen} onClose={close} title="차량 선택" subtitle={`${slotNumber}호차 · 차량관리 등록부`}
+    className="max-w-lg" footer={<p className="w-full text-center text-xs text-[#73839D]">등록된 실차만 표시 · 일정 확인 후 배정할 수 있습니다.</p>}>
+    <div className="space-y-4">
+      <div className="relative"><Search className="pointer-events-none absolute left-3.5 top-3.5 size-4 text-slate-400"/>
+        <HqInput type="search" value={query} onChange={event => setQuery(event.target.value)} aria-label="차량 검색" placeholder="차종, 차량번호 검색" className="w-full pl-10" />
+      </div>
+      <HqSegmentedTabs tabs={FILTERS} value={category} onValueChange={setCategory} aria-label="차종 필터" />
+      <div className="flex items-center justify-between gap-3 text-xs text-[#61728A]">
+        <label className="flex min-h-10 items-center gap-2"><input type="checkbox" checked={availableOnly} onChange={event => setAvailableOnly(event.target.checked)}/>예약 가능한 차량만</label>
+        <span aria-live="polite">{filtered.length}대</span>
+      </div>
+      <HqInlineFeedback message={registry.error || error || (!vehicles && !loading ? pendingReason : null)} tone={registry.error || error ? 'error' : 'info'}/>
+      {registry.loading && <p role="status" className="text-xs text-[#73839D]">차량 등록부를 불러오고 있습니다.</p>}
+      <div className="space-y-2" aria-label="차량 목록">
+        {filtered.map(vehicle => {
+          const selected = normalized(vehicle.plate) === normalized(selectedPlate);
+          const reserved = excludedPlates.some(plate => normalized(plate) === normalized(vehicle.plate));
+          const canChoose = vehicle.isAvailable && !reserved && !loading && !registry.loading && !registry.error && !error;
+          return <button key={vehicle.uuid || vehicle.plate} type="button" disabled={!canChoose} aria-pressed={selected}
+            onClick={() => { if (canChoose) onSelect(vehicle); }}
+            className={`flex w-full items-center justify-between gap-3 rounded-2xl p-3.5 text-left transition-colors disabled:cursor-not-allowed ${selected ? 'bg-[#EEF3FF]' : 'bg-white shadow-[var(--hq-shadow-control)] hover:bg-[#F7F9FC]'}`}>
+            <div className="flex min-w-0 items-center gap-3">
+              <img src={getVerifiedVehiclePhoto(vehicle.plate)} alt="" className="h-12 w-14 shrink-0 object-contain"/>
+              <div className="min-w-0"><p className="truncate text-sm font-bold text-[#17233B]">{vehicle.model}</p>
+                <p className="mt-0.5 text-xs text-[#73839D]">{vehicle.plate} · {vehicle.capacity}</p>
+                <p className="mt-1 text-[11px] text-[#73839D]">{reserved ? '다른 호차에 배정됨' : vehicle.isAvailable ? '예약 가능' : vehicle.unavailabilityReason || '가용성 확인 필요'}</p>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="차량 선택 닫기"
-              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#F7F9FC] text-[#73839D] transition-colors hover:bg-[#EDF1F6] hover:text-[#17233B] cursor-pointer"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Search Box */}
-          <div className="flex h-[52px] items-center gap-3 rounded-[16px] bg-white px-4 shadow-[0_5px_16px_rgba(35,49,78,0.045),0_2px_5px_rgba(35,49,78,0.02)] focus-within:ring-2 focus-within:ring-[#1E60F3]/20 transition-shadow">
-            <Search className="h-4 w-4 shrink-0 text-slate-400" />
-            <input
-              ref={searchRef}
-              type="search"
-              autoComplete="off"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="차종, 차량번호 검색"
-              aria-label="차량 검색"
-              className="min-w-0 w-full bg-transparent text-sm font-semibold text-slate-800 outline-none placeholder:text-slate-400"
-            />
-            {query && (
-              <button
-                type="button"
-                aria-label="검색어 지우기"
-                onClick={() => { setQuery(''); searchRef.current?.focus(); }}
-                className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Category Filter Pills */}
-          <div className="flex gap-2 overflow-x-auto pb-0.5 no-scrollbar" role="group" aria-label="차종 필터">
-            {FILTERS.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                aria-pressed={category === item.key}
-                onClick={() => setCategory(item.key)}
-                className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-bold transition-all cursor-pointer ${
-                  category === item.key
-                    ? 'bg-[#EEF3FF] text-[#1E60F3]'
-                    : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.04)] hover:bg-[#F7F9FC]'
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Availability Checkbox & Count */}
-          <div className="flex items-center justify-between gap-3 text-xs pt-1">
-            <button
-              type="button"
-              aria-pressed={availableOnly}
-              onClick={() => setAvailableOnly((value) => !value)}
-              className="flex items-center gap-2 font-bold text-slate-800 cursor-pointer select-none"
-            >
-              <span className={`flex h-4 w-4 items-center justify-center rounded transition-colors ${
-                availableOnly ? 'bg-[#1E60F3] text-white' : 'border border-slate-300 bg-white'
-              }`}>
-                {availableOnly && <Check className="h-3 w-3 stroke-[3]" />}
-              </span>
-              <span>예약 가능한 차량만</span>
-            </button>
-            <span className="tabular-nums text-xs font-bold text-slate-400">{filtered.length}대</span>
-          </div>
-        </div>
-
-        {/* Vehicle List */}
-        <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain px-4 pb-4 sm:px-6">
-          {loading && !vehicles?.length ? (
-            <div className="flex items-center justify-center gap-2 py-16 text-xs text-slate-500 font-medium">
-              <Loader2 className="h-4 w-4 animate-spin text-[#1E60F3]" /> 차량 가용성을 확인하고 있습니다.
-            </div>
-          ) : error && !vehicles?.length ? (
-            <div role="alert" className="py-16 text-center text-sm font-medium text-slate-500">{error}</div>
-          ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-14 text-center">
-              <CarFront className="h-10 w-10 text-slate-300" strokeWidth={1.4} />
-              <p className="text-sm font-bold text-slate-600">조건에 맞는 차량이 없습니다.</p>
-              <button
-                type="button"
-                onClick={() => { setQuery(''); setCategory('all'); setAvailableOnly(false); }}
-                className="rounded-xl px-4 py-2 text-xs font-bold text-[#1E60F3] bg-blue-50 hover:bg-blue-100 transition-colors cursor-pointer"
-              >
-                전체 차량 보기
-              </button>
-            </div>
-          ) : filtered.map((vehicle) => {
-            const known = VIP_REAL_VEHICLES.find((item) => normalized(item.plate) === normalized(vehicle.plate));
-            const selected = normalized(vehicle.plate) === normalized(selectedPlate);
-            const reserved = excludedPlates.some((plate) => normalized(plate) === normalized(vehicle.plate));
-            const canChoose = vehicle.isAvailable && !reserved && !loading;
-            const availabilityLabel = reserved ? '다른 호차에 배정됨'
-              : vehicle.isAvailable ? '예약 가능'
-              : vehicle.unavailabilityReason || (vehicle.requestedIntervalStatus === 'maintenance' ? '정비 중' : '예약 불가');
-
-            return (
-              <button
-                key={vehicle.uuid || vehicle.plate}
-                type="button"
-                disabled={!canChoose}
-                aria-pressed={selected}
-                onClick={() => onSelect(vehicle)}
-                className={`flex w-full items-center justify-between rounded-[17px] p-3.5 text-left transition-all cursor-pointer ${
-                  selected
-                    ? 'bg-[#EEF3FF] shadow-[0_5px_16px_rgba(35,49,78,0.07)]'
-                    : 'bg-white shadow-[0_4px_14px_rgba(35,49,78,0.045)] hover:bg-[#FAFBFD]'
-                } disabled:cursor-not-allowed disabled:opacity-50`}
-              >
-                <div className="flex items-center gap-3.5 min-w-0">
-                  {/* Vehicle Icon / Photo */}
-                  <div className="flex h-12 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-white">
-                    {selected ? (
-                      <CarFront className="h-6 w-6 text-[#1E60F3] stroke-[1.8]" />
-                    ) : (
-                      <img
-                        src={getVerifiedVehiclePhoto(vehicle.plate)}
-                        alt={known?.model || vehicle.model}
-                        className="h-full w-full object-contain"
-                        loading="lazy"
-                      />
-                    )}
-                  </div>
-
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-black text-slate-900">
-                      {known?.modelShort || vehicle.model}
-                    </p>
-                    <p className="mt-0.5 truncate text-xs font-medium text-slate-500">
-                      {vehicle.plate} · {known?.capacity || vehicle.capacity}
-                    </p>
-                    <p className={`mt-0.5 text-[11px] font-bold ${selected || vehicle.isAvailable ? 'text-[#73839D]' : 'text-[#95A3B9]'}`}>
-                      {availabilityLabel}
-                    </p>
-                  </div>
-                </div>
-
-                {selected ? (
-                  <Check className="h-5 w-5 shrink-0 text-[#1E60F3] stroke-[2.5]" aria-label="선택한 차량" />
-                ) : canChoose ? (
-                  <ArrowRight className="h-4 w-4 shrink-0 text-slate-300" />
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Footer info text */}
-        <div className="shrink-0 bg-white py-3.5 text-center text-xs font-medium text-[#73839D]">
-          실제 차량 가용성 기준 · 선택하면 배정 카드에 반영됩니다.
-        </div>
-      </section>
-    </div>,
-    document.body
-  );
+            {selected ? <Check className="size-4 shrink-0 text-[#1E60F3]" aria-label="선택한 차량"/> : canChoose ? <ArrowRight className="size-4 shrink-0 text-slate-400"/> : null}
+          </button>;
+        })}
+        {!registry.loading && !registry.error && filtered.length === 0 && <div className="space-y-3 py-8 text-center">
+          <CarFront className="mx-auto size-8 text-slate-300"/>
+          <p className="text-sm text-[#73839D]">{registry.vehicles.length ? '조건에 맞는 차량이 없습니다.' : '차량관리에 등록된 차량이 없습니다.'}</p>
+          {registry.vehicles.length > 0 && <HqButton size="sm" onClick={() => { setQuery(''); setCategory('all'); setAvailableOnly(false); }}>전체 차량 보기</HqButton>}
+        </div>}
+      </div>
+    </div>
+  </HqModal>;
 };
+
+/** Mount per opening so search resets intentionally; polling never resets a user's filters. */
+export const HqVehicleSelectModal: React.FC<HqVehicleSelectModalProps> = props =>
+  props.isOpen ? <VehiclePickerContent {...props} /> : null;

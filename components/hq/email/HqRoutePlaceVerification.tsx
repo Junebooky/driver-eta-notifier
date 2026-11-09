@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle2, ChevronDown, ChevronUp, Compass, MapPin, Search } from 'lucide-react';
 import type { HqEmailExtractedDraft } from '@/types/emailHq';
+import { HqBadge } from '@/components/hq/ui';
 import { HqPlaceSearchInput } from '@/components/hq/HqPlaceSearchInput';
 import {
   changeEmailRouteStopName, confirmEmailRouteStop, getEmailRouteStops, isVerifiedEmailRouteStop,
@@ -39,9 +40,9 @@ export const HqRoutePlaceVerification: React.FC<Props> = ({ draft, onUpdateDraft
             이메일에서 추출한 장소명은 주소가 아닙니다. TMAP 검색 결과를 선택해 위치를 확정해 주세요.
           </p>
         </div>
-        <span className="rounded-full bg-blue-50 text-[#1E60F3] border border-blue-100/80 px-2.5 py-1 text-xs font-bold shrink-0">
+        <HqBadge tone={missingCount ? 'warning' : 'neutral'} className="shrink-0">
           {missingCount === 0 ? `${confirmedCount}곳 확인 완료` : `${missingCount}곳 확인 필요`}
-        </span>
+        </HqBadge>
       </div>
 
       <div className="space-y-2.5">
@@ -63,7 +64,7 @@ export const HqRoutePlaceVerification: React.FC<Props> = ({ draft, onUpdateDraft
                     <p className="mt-1 break-words text-[11px] font-medium leading-relaxed text-slate-400 pl-5">{stop.address}</p>
                   ) : (
                     <p className="mt-1 text-[11px] font-medium text-slate-400 pl-5">
-                      {verified ? '좌표 확인됨 · 상세 주소를 다시 선택할 수 있어요' : '상세 주소 미확정'}
+                      {verified ? '좌표 확인됨 · 상세 주소를 다시 선택할 수 있어요' : <HqBadge tone="warning">주소 미확정</HqBadge>}
                     </p>
                   )}
                   <p className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-slate-500 pl-5">
