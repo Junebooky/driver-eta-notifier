@@ -1130,12 +1130,12 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                               </span>
                                               {isFirst && (
                                                 <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-100/80">
-                                                  출발
+                                                  {wp.id.startsWith('excel-') ? '첫 일정' : '출발'}
                                                 </span>
                                               )}
                                               {isLast && (
                                                 <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">
-                                                  종료
+                                                  {wp.id.startsWith('excel-') ? '마지막 일정' : '종료'}
                                                 </span>
                                               )}
                                             </div>
