@@ -88,7 +88,9 @@ export function HqDispatchTimeField({
     } else if (draft.trim()) {
       setInvalid(true);
     } else {
-      setDraft(value);
+      // Clearing the field means an explicitly unspecified time, never 00:00.
+      onChange('');
+      setDraft('');
       setInvalid(false);
     }
   };
@@ -114,7 +116,7 @@ export function HqDispatchTimeField({
             autoComplete="off"
             spellCheck={false}
             value={draft}
-            placeholder="예: 09:00"
+            placeholder="미지정"
             aria-label={`${label} 직접 입력`}
             aria-invalid={invalid || undefined}
             aria-required={required || undefined}
@@ -168,6 +170,14 @@ export function HqDispatchTimeField({
             직접 입력하거나 아래 시간을 선택해 주세요.
           </p>
           <div ref={listRef} className="flex max-h-56 flex-col gap-1 overflow-y-auto overscroll-contain pr-1">
+            <button type="button" aria-pressed={!value}
+              onMouseDown={event => event.preventDefault()}
+              onClick={() => choose('')}
+              className={`flex min-h-11 w-full shrink-0 items-center justify-between rounded-[12px] px-3.5 text-left text-[14px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 ${!value ? 'bg-[#EEF3FF] text-[#1E60F3]' : 'bg-white text-[#52647A] hover:bg-[#F0F3F8]'}`}
+            >
+              <span>미지정</span>
+              {!value && <Check aria-hidden="true" className="h-4 w-4 shrink-0" />}
+            </button>
             {options.map(option => (
               <button
                 key={option}
