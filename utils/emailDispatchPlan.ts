@@ -38,8 +38,21 @@ export function emailFlightAssignmentIssues(
    problems.push(index+1+'호차에 현재 이메일에 없는 항공편 배정이 남아 있습니다.');
  }
  const dates=[...new Set(flights.map(f=>f.date))];
+ // A flight roster cannot silently stand in for a second day's different
+ // vehicle/passenger plan. That day needs its own explicit source mapping.
+ try{
+  for(const day of emailDispatchDays(draft)){
+   if(!dates.includes(day.date))problems.push(day.date+': 이 날짜의 차량별 승객 정보가 없습니다. 날짜별 승객 배정을 별도로 확인해 주세요.');
+  }
+ }catch{/* Date/route validation reports its own actionable error. */}
  for(const date of dates){
   const dayFlights=flights.filter(f=>f.date===date);
+  const airports=[...new Set(dayFlights.map(f=>f.role==='arrival'?f.destinationAirport?.toUpperCase():
+    f.role==='departure'?f.originAirport?.toUpperCase():undefined).filter(Boolean))];
+  const serviceRoles=new Set(dayFlights.map(f=>f.role).filter(role=>role==='arrival'||role==='departure'));
+  if(airports.length>1 || serviceRoles.size>1)problems.push(
+    date+': 서로 다른 공항 또는 출국·입국 항공편의 차량별 경로는 따로 확정해 주세요.'
+  );
   const passengerOwners=new Map<string,number>();
   for(const flight of dayFlights){
    const key=emailFlightKey(flight);
