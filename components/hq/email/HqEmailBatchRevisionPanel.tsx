@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, ChevronDown, FileClock, GitCompareArrows, Info, Plus, Minus, ShieldCheck } from 'lucide-react';
 import type { HqEmailExtractedDraft } from '@/types/emailHq';
-import type { VehicleSlotAssignment } from './HqStep2BookingDetailView';
 import type { HqDriverSummary } from '@/types/driverHq';
 import type { ExistingEmailBookingCandidate } from '@/services/emailBookingMatchService';
 import { getVehicleImage } from '@/utils/vehicleData';
@@ -16,12 +15,13 @@ import {
   emailBatchRows,
   type EmailBatchDecisions,
   type EmailBatchAssignments,
+  type EmailBatchSlot,
 } from '@/utils/emailBatchRevision';
 
 interface Props {
   draft: HqEmailExtractedDraft;
-  slots: VehicleSlotAssignment[];
-  onUpdateSlots?: (slots: VehicleSlotAssignment[]) => void;
+  slots: EmailBatchSlot[];
+  onUpdateSlots?: (slots: EmailBatchSlot[]) => void;
   onUpdateDraft?: (draft: HqEmailExtractedDraft) => void;
   candidates: ExistingEmailBookingCandidate[];
   decisions: EmailBatchDecisions;
