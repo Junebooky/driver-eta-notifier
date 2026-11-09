@@ -165,7 +165,9 @@ export function getEventRouteLegs(route: DriverEventRoute): DriverEventLeg[] {
   if (!route.fullItinerary || route.stops.length < 2) return [];
   return route.stops.slice(1).map((destination, i) => {
     const origin = route.stops[i];
-    const samePlace = validCoordinate(origin.lat, origin.lng) &&
+    // Never label two places as the same based on unconfirmed coordinates.
+    const samePlace = origin.isPoiConfirmed && destination.isPoiConfirmed &&
+      validCoordinate(origin.lat, origin.lng) &&
       validCoordinate(destination.lat, destination.lng) &&
       Math.abs(origin.lat! - destination.lat!) < 0.00001 &&
       Math.abs(origin.lng! - destination.lng!) < 0.00001;
