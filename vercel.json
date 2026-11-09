@@ -8,5 +8,10 @@
       "path": "/api/internal/report-worker",
       "schedule": "0 23 * * *"
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "fix/email-workflow-review-assignment-20261109": false
+    }
+  }
 }

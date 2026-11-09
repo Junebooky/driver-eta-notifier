@@ -211,6 +211,9 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     return 'step1_extract';
   });
 
+  const confirmationVisits = useRef(new Set<string>());
+  const [confirmationRevealKey, setConfirmationRevealKey] = useState<string | null>(null);
+
   // 9. Vehicle Slot assignments (for Step 2 and Step 4) - Dynamically linked to AI draft!
   const [vehicleSlots, setVehicleSlots] = useState<VehicleSlotAssignment[]>(() => {
     // Check initial draft if demo or existing
@@ -895,6 +898,10 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       return;
     }
     haptics.success();
+    const confirmationKey = `${currentSummary.id}:${currentDraft.id}`;
+    const firstVisit = !confirmationVisits.current.has(confirmationKey) && !['saved', 'published'].includes(currentDraft.status);
+    confirmationVisits.current.add(confirmationKey);
+    setConfirmationRevealKey(firstVisit ? confirmationKey : null);
     const confirmedDraft: HqEmailExtractedDraft = {
       ...currentDraft,
       status: currentDraft.status === 'published' ? 'published' : 'saved',
@@ -913,11 +920,13 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   // Step 4 → 5: assigning a driver is a separate, intentional action.
   const handleProceedToAssignment = () => {
     if (!currentDraft || workflowStep !== 'step4_booking_confirmed') return;
+    setConfirmationRevealKey(null);
     haptics.selection();
     setWorkflowStep('step2_booking_detail');
   };
 
   const handleBackToReview = () => {
+    setConfirmationRevealKey(null);
     haptics.lightTap();
     if (currentDraft && currentDraft.status === 'saved' && !currentDraft.savedScheduleIds) {
       handleUpdateDraft({ ...currentDraft, status: 'draft' });
@@ -1270,7 +1279,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
               </p>
             </div>
           ) : (
-            <div key={workflowStep} className="animate-step-slide">
+            <div key={workflowStep} className={workflowStep === 'step4_booking_confirmed' ? undefined : 'animate-step-slide'}>
               {workflowStep === 'step1_extract' && currentDraft && (
                 emailBatchNeedsReview(currentDraft, vehicleSlots.length, (matchesByEmail[currentSummary.id] || []).length)
                   ? <HqEmailBatchRevisionPanel
@@ -1314,6 +1323,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
 
               {workflowStep === 'step4_booking_confirmed' && currentDraft && (
                 <HqStep4BookingConfirmedView
+                  animateEntrance={confirmationRevealKey === `${currentSummary.id}:${currentDraft.id}`}
                   emailSummary={currentSummary}
                   extractedDraft={currentDraft}
                   onProceedToAssignment={handleProceedToAssignment}

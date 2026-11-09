@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { HqButton } from '@/components/hq/ui';
 import type { PoiResult } from '@/components/hq/HqPlaceSearchInput';
 import { searchTmapPoisClient } from '@/lib/places/tmapSearchEngine';
 import { addressHintToTmapQuery } from '@/utils/emailBookingEvidence';
@@ -13,11 +14,15 @@ export function HqEmailAddressCandidate({
   placeName,
   isPoiConfirmed,
   onPick,
+  onLocateInSource,
+  className = 'pl-14',
 }: {
   sourceAddress: string;
   placeName: string;
   isPoiConfirmed: boolean;
   onPick: (poi: PoiResult) => void;
+  onLocateInSource?: (address: string) => void;
+  className?: string;
 }) {
   const [candidate, setCandidate] = useState<PoiResult | null>(null);
   const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'not-found'>('idle');
@@ -50,10 +55,11 @@ export function HqEmailAddressCandidate({
   }, [sourceAddress, placeName, isPoiConfirmed]);
 
   return (
-    <div className="pl-14 mt-1 space-y-1 text-[11px] leading-relaxed">
+    <div className={`${className} mt-1 space-y-1 text-[11px] leading-relaxed`}>
       <p className="text-slate-500 break-words" title={sourceAddress}>
         고객 제공 주소 · {sourceAddress}
       </p>
+      {onLocateInSource && <HqButton variant="ghost" size="sm" onClick={event => { event.stopPropagation(); onLocateInSource(sourceAddress); }} aria-label={`고객 제공 주소 원문 확인: ${sourceAddress}`}>원문에서 확인</HqButton>}
       {!isPoiConfirmed && state === 'loading' && <p className="text-slate-400">주소로 TMAP 후보 검색 중…</p>}
       {!isPoiConfirmed && state === 'not-found' && (
         <p className="text-slate-400">자동 주소 검색 결과 없음 · 장소를 눌러 직접 확인</p>

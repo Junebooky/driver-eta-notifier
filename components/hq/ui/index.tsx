@@ -81,11 +81,12 @@ export const HqTextarea = forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttr
 
 export interface HqBadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   tone?: 'neutral' | 'selected' | 'warning' | 'critical';
+  wrap?: boolean;
 }
 export const HqBadge = forwardRef<HTMLSpanElement, HqBadgeProps>(function HqBadge(
-  { tone = 'neutral', className, children, ...props }, ref
+  { tone = 'neutral', wrap = false, className, children, ...props }, ref
 ) {
-  return <span {...props} ref={ref} data-tone={tone} className={classes('hq-ui-badge', className)}>{children}</span>;
+  return <span {...props} ref={ref} data-tone={tone} data-wrap={wrap || undefined} className={classes('hq-ui-badge', className)}>{children}</span>;
 });
 
 export interface HqTabOption {

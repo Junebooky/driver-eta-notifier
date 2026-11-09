@@ -37,6 +37,10 @@ import {
 } from 'lucide-react';
 import { HqEmailSummary, HqEmailDetail, HqEmailExtractedDraft, RouteWaypointItem } from '@/types/emailHq';
 import { haptics } from '@/utils/haptics';
+import { HqBadge } from '@/components/hq/ui';
+import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
+import { HqSourceText } from '@/components/hq/ui/HqSourceText';
+import { findEmailSourceRanges } from '@/utils/emailWorkflowReview';
 import { HqPlaceSearchInput, PoiResult } from '@/components/hq/HqPlaceSearchInput';
 import { saveContactToCrm } from '@/utils/crmCustomerSync';
 import { HqEmailAddressCandidate } from './HqEmailAddressCandidate';
@@ -80,6 +84,18 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   const toList = emailDetail?.to || emailSummary.to;
   const bodyText = emailDetail?.bodyText || emailSummary.preview || '(본문 내용 없음)';
   const attachmentFiles = emailDetail?.attachments || (extractedDraft?.sourceAttachments || []).map(file => ({ filename: file.filename, contentType: file.kind === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', size: 0 }));
+
+  const [sourceEvidence, setSourceEvidence] = useState({ emailId: '', query: '', message: '', revision: 0 });
+  const locateSource = (address: string) => {
+    const fullBody = emailDetail?.bodyText || '';
+    const matches = !isLoadingDetail ? findEmailSourceRanges(fullBody, address) : [];
+    setSourceEvidence(previous => ({ emailId: emailSummary.id, query: matches.length ? address : '', revision: previous.revision + 1,
+      message: isLoadingDetail ? '이메일 원문을 불러온 뒤 다시 확인해 주세요.' : matches.length
+        ? `고객 제공 주소와 일치하는 원문 ${matches.length}곳을 표시했습니다. TMAP 위치 확정과는 별도입니다.`
+        : '이메일 본문에서 일치하는 주소를 찾지 못했습니다. 첨부 파일이나 다른 표현으로 제공됐는지 확인해 주세요.',
+    }));
+  };
+  const currentEvidence = sourceEvidence.emailId === emailSummary.id ? sourceEvidence : null;
 
   // Editing mode toggle
   const [isEditing, setIsEditing] = useState(false);
@@ -541,6 +557,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
           </div>
         </div>
 
+        <HqInlineFeedback message={currentEvidence?.message} tone="info" className="mx-5" />
         {/* Email Body */}
         <div className="flex-1 overflow-y-auto p-5 font-sans text-[13px] text-[#4D607C] leading-relaxed whitespace-pre-line selection:bg-blue-100">
           {isLoadingDetail ? (
@@ -549,7 +566,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
               <p className="text-xs font-medium">이메일 본문 안전 로드 중 (PEEK Read-Only)...</p>
             </div>
           ) : (
-            bodyText
+            <HqSourceText text={bodyText} query={currentEvidence?.query || ''} revision={currentEvidence?.revision} />
           )}
         </div>
 
@@ -828,7 +845,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
 
             {/* 블록 3: 상세 이동 경로 */}
             <div className="space-y-2.5">
-              <div className="flex items-center gap-2 min-w-0 pt-1 pb-0.5">
+              <div className="flex flex-wrap items-center gap-2 min-w-0 pt-1 pb-0.5">
                 <Compass className="w-4.5 h-4.5 text-slate-800 shrink-0" />
                 <span className="text-sm font-black text-slate-900 shrink-0">운행 경로 (상세 일정)</span>
                 <span className="text-xs font-normal text-slate-400 truncate">
@@ -836,9 +853,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                   {hasMultipleDates && ` · ${uniqueDates.length}일간`}
                 </span>
                 {unconfirmedPlaces > 0 && (
-                  <span className="ml-auto shrink-0 rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-amber-700 border border-amber-200">
-                    주소 {unconfirmedPlaces}곳 확인 필요
-                  </span>
+                  <HqBadge tone="warning" className="ml-auto shrink-0">주소 {unconfirmedPlaces}곳 확인 필요</HqBadge>
                 )}
               </div>
 
@@ -1065,20 +1080,12 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                                 </span>
                                               )}
                                             </div>
-                                            <p className="pl-14 text-[11px] font-medium leading-relaxed text-slate-500">
-                                              {wp.address ||
-                                                (isVerifiedEmailRouteStop({
-                                                  id: wp.id,
-                                                  date: wp.date || pickupDate,
-                                                  time: wp.time || '',
-                                                  location: wp.location,
-                                                  lat: wp.lat,
-                                                  lng: wp.lng,
-                                                  isPoiConfirmed: Boolean(wp.isPoiConfirmed),
-                                                })
-                                                  ? 'TMAP 좌표 확인됨 · 상세 주소 재검색 가능'
-                                                  : '주소 미확정 · 눌러서 TMAP 검색 결과 선택')}
-                                            </p>
+                                            <div className="pl-14 mt-1 space-y-1">
+                                              {wp.address && <p className="break-words text-[11px] text-slate-500">{wp.address}</p>}
+                                              {!isVerifiedEmailRouteStop({ ...wp, date: wp.date || pickupDate, time: wp.time || '', isPoiConfirmed: Boolean(wp.isPoiConfirmed) }) && (
+                                                <HqBadge tone="warning" wrap>주소 미확정 · 눌러서 TMAP 검색 결과 선택</HqBadge>
+                                              )}
+                                            </div>
                                             {wp.notes && (
                                               <p className="pl-14 mt-0.5 text-[11px] text-slate-400 break-words">{wp.notes}</p>
                                             )}
@@ -1114,6 +1121,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                       )}
                                       {!isEditingThis && wp.clientAddress && (
                                         <HqEmailAddressCandidate
+                                          onLocateInSource={locateSource}
                                           sourceAddress={wp.clientAddress}
                                           placeName={wp.location}
                                           isPoiConfirmed={Boolean(wp.isPoiConfirmed)}
@@ -1177,9 +1185,11 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                           placeholder="TMAP 출발지 검색 및 후보 선택"
                           heightClass="h-9"
                         />
-                        <p className="mt-1.5 break-words text-[11px] leading-relaxed text-slate-500">
-                          {extractedDraft?.pickupAddress || (extractedDraft?.pickupProvidedAddress ? '고객 제공 주소 · ' + extractedDraft.pickupProvidedAddress : '상세 주소 미확정 · TMAP 검색 결과를 선택해 주세요.')}
-                        </p>
+                        <div className="mt-1.5 space-y-1">
+                          {extractedDraft?.pickupAddress && <p className="break-words text-[11px] text-slate-500">{extractedDraft.pickupAddress}</p>}
+                          {!isPickupPoiConfirmed && <HqBadge tone="warning" wrap>주소 미확정 · TMAP 검색 결과 선택 필요</HqBadge>}
+                          {extractedDraft?.pickupProvidedAddress && <HqEmailAddressCandidate className="" sourceAddress={extractedDraft.pickupProvidedAddress} placeName={pickupLocation} isPoiConfirmed={isPickupPoiConfirmed} onPick={handleSelectPickupPoi} onLocateInSource={locateSource} />}
+                        </div>
                       </div>
                     </div>
 
@@ -1211,9 +1221,11 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                           placeholder="TMAP 도착지 검색 및 후보 선택"
                           heightClass="h-9"
                         />
-                        <p className="mt-1.5 break-words text-[11px] leading-relaxed text-slate-500">
-                          {extractedDraft?.dropoffAddress || (extractedDraft?.dropoffProvidedAddress ? '고객 제공 주소 · ' + extractedDraft.dropoffProvidedAddress : '상세 주소 미확정 · TMAP 검색 결과를 선택해 주세요.')}
-                        </p>
+                        <div className="mt-1.5 space-y-1">
+                          {extractedDraft?.dropoffAddress && <p className="break-words text-[11px] text-slate-500">{extractedDraft.dropoffAddress}</p>}
+                          {!isDropoffPoiConfirmed && <HqBadge tone="warning" wrap>주소 미확정 · TMAP 검색 결과 선택 필요</HqBadge>}
+                          {extractedDraft?.dropoffProvidedAddress && <HqEmailAddressCandidate className="" sourceAddress={extractedDraft.dropoffProvidedAddress} placeName={dropoffLocation} isPoiConfirmed={isDropoffPoiConfirmed} onPick={handleSelectDropoffPoi} onLocateInSource={locateSource} />}
+                        </div>
                       </div>
                     </div>
 

@@ -1,12 +1,17 @@
 'use client';
 import { useEffect, useState } from 'react';
 import type { FleetAvailabilityResult } from '@/utils/availabilityEngine';
+import { parseKstDateTimeToMs } from '@/utils/dispatchConflictDetector';
 import { combineFleetAvailability } from '@/utils/fleetVehicleStatus';
 
 export interface FleetWindow { startDate: string; startTime: string; endDate: string; endTime: string }
 
 export function useFleetAvailabilityWindows(windows: FleetWindow[], excludeScheduleId?: string) {
-  const valid = windows.length > 0 && windows.every(window => window.startDate && window.startTime && window.endDate && window.endTime);
+  const valid = windows.length > 0 && windows.every(window => {
+    const start = parseKstDateTimeToMs(window.startDate, window.startTime);
+    const end = parseKstDateTimeToMs(window.endDate, window.endTime);
+    return Number.isFinite(start) && Number.isFinite(end) && end > start;
+  });
   const key = JSON.stringify(valid ? windows.map(window => new URLSearchParams({ ...window, ...(excludeScheduleId ? { excludeScheduleId } : {}) }).toString()) : []);
   const [result, setResult] = useState<{ key: string; data?: ReturnType<typeof combineFleetAvailability>; error?: string } | null>(null);
   useEffect(() => {
@@ -46,7 +51,7 @@ export function useFleetAvailabilityWindows(windows: FleetWindow[], excludeSched
     };
   }, [key]);
   const current = result?.key === key ? result : null;
-  return { data: valid ? current?.data : undefined, error: current?.error, loading: valid && !current };
+  return { data: valid ? current?.data : undefined, error: valid ? current?.error : '실제 시작·종료 날짜와 시간을 확인해 주세요.', loading: valid && !current };
 }
 
 export function useFleetAvailability(startDate: string, startTime: string, endDate: string, endTime: string, excludeScheduleId?: string) {

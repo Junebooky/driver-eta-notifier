@@ -1,0 +1,25 @@
+name: Email workflow UI regression
+on:
+  push:
+    branches: [fix/email-workflow-review-assignment-20261109]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  email-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/qa-email-workflow-ui.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: synthetic-email-workflow-ui
+          path: .qa-artifacts/email-workflow/
