@@ -1367,7 +1367,7 @@ export default function DriverCockpit() {
     setIsAdminRoute(false);
     setActiveBookingId(leg.scheduleId);
     setReportMode('DEPARTURE');
-    setRouteEstimate(null); // Never show the preceding leg's ETA.
+    setRouteEstimate({ distanceKm: 0, durationMinutes: 0, etaFormatted: '--:--', isMock: false, isUnavailable: true }); // No previous-leg ETA.
     setNavigationReport(null);
     setPendingLegReportCopy(null);
     setLegCopyNotice(null);
