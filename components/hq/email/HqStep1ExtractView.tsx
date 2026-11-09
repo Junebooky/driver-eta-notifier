@@ -106,10 +106,23 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
       emailId: emailSummary.id, address, query: first ? address : '', excerpt, revision: previous.revision + 1,
       message: isLoadingDetail ? '이메일 원문을 불러온 뒤 다시 확인해 주세요.'
         : first ? `이메일 원문 ${matches.length}곳과 연결했습니다. 왼쪽 원문에서도 강조 표시합니다.`
-        : '이메일 본문에는 같은 주소가 없습니다. 첨부 파일에서 전달된 주소인지 원본을 확인해 주세요.',
+        : '이메일 본문에는 같은 문구가 없습니다. 아래 첨부 일정표의 원문 근거도 확인해 주세요.',
     }));
   };
   const currentEvidence = sourceEvidence.emailId === emailSummary.id ? sourceEvidence : null;
+  // Show only evidence actually retained from the original Excel schedule, never AI-invented coordinates.
+  const attachmentEvidence = currentEvidence?.address
+    ? (extractedDraft?.documentAnalysis || []).flatMap(document =>
+        (document.calendarItems || [])
+          .filter(entry => findEmailSourceRanges(
+            [entry.originalText, entry.clientAddress || '', entry.title, entry.date, entry.time].join(' '),
+            currentEvidence.address,
+          ).length > 0)
+          .map(entry => ({ filename: document.filename, entry }))
+      ).slice(0, 8)
+    : [];
+  const sourceHasBodyMatch = Boolean(currentEvidence?.query);
+
 
   // Editing mode toggle
   const [isEditing, setIsEditing] = useState(false);
@@ -583,6 +596,26 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
             <HqSourceText text={bodyText} query={currentEvidence?.query || ''} revision={currentEvidence?.revision} />
           )}
         </div>
+        {currentEvidence?.address && (
+          <div className="space-y-2 bg-[#FAFBFD] px-4 pb-4" aria-live="polite">
+            {attachmentEvidence.length > 0 ? (
+              <div className="space-y-2 rounded-[14px] bg-white p-3 shadow-[0_3px_14px_rgba(35,49,78,0.05)]">
+                <p className="text-[12px] font-semibold text-[#25344D]">첨부 일정표 원문 근거</p>
+                {attachmentEvidence.map(({ filename, entry }) => (
+                  <div key={filename + entry.sheetName + entry.cell} className="rounded-[11px] bg-[#F6F8FC] p-3">
+                    <p className="break-words text-[11px] font-semibold text-[#25344D]">{filename} · {entry.sheetName}!{entry.cell}</p>
+                    <p className="mt-1 text-[11px] text-[#6E809B]">{entry.date} · {entry.time || '시간 미지정'}</p>
+                    <p className="mt-1.5 whitespace-pre-wrap break-words text-[12px] leading-relaxed text-[#25344D]">
+                      <HqSourceText text={entry.originalText} query={currentEvidence.address} revision={currentEvidence.revision} />
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : !sourceHasBodyMatch ? (
+              <p className="text-[11px] text-[#6E809B]">이메일 본문과 보존된 첨부 일정 셀에서 일치하는 근거를 찾지 못했습니다. 원본 파일을 직접 확인해 주세요.</p>
+            ) : null}
+          </div>
+        )}
 
         {/* Real attachment metadata from read-only IMAP, never fictitious demo names. */}
         {(emailDetail?.hasAttachments || attachmentFiles.length > 0) && (
