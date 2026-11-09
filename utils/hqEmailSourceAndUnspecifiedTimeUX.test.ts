@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { findEmailSourceRanges } from './emailWorkflowReview';
 import { validateDispatchInterval } from './dispatchInterval';
 import { buildEmailDispatchPlan } from './emailDispatchPlan';
-import { createEmptyDraft } from './emailDraftStorage';
+import { createEmptyDraft } from '../services/emailBookingGeminiService';
 
 const read = (file: string) => readFileSync(new URL('../' + file, import.meta.url), 'utf8');
 
