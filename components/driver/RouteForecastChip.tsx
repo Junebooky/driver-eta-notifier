@@ -42,8 +42,11 @@ export function scheduleForecastDate(date: string, time?: string | null): Date |
   const instant = new Date(`${date}T${time}:00+09:00`);
   if (Number.isNaN(instant.getTime())) return null;
   // Prevent silently normalizing invalid calendar days such as Feb 30.
-  if (new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' })
-    .format(instant).replace(/\\s/g, '') !== date) return null;
+  const fields = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(instant);
+  const field = (part: string) => fields.find((p) => p.type === part)?.value;
+  if (`${field('year')}-${field('month')}-${field('day')}` !== date) return null;
   return instant;
 }
 
