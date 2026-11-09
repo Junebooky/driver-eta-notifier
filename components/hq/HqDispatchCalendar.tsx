@@ -260,9 +260,8 @@ export function HqDispatchCalendar({ bookings, onViewBooking, onOpenNewBooking }
                     if (window.innerWidth < 1024 && rows.length) showDayPeek(day.iso, event.currentTarget);
                     else setPeek(null);
                   }}
-                  aria-haspopup={rows.length > 0 ? 'dialog' : undefined}
                   aria-expanded={peek?.date === day.iso}
-                  aria-label={`${day.iso} 배차 ${rows.length}건 미리보기`}
+                  aria-label={`${day.iso} 배차 ${rows.length}건 날짜 선택`}
                   aria-pressed={selected}
                   aria-current={isToday ? 'date' : undefined}
                   className={`flex h-[66px] w-full flex-col items-center justify-start gap-1 rounded-lg pt-1.5 text-left transition-colors hover:bg-[#F7F9FC] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#1E60F3] sm:h-auto sm:min-h-8 sm:flex-row sm:justify-between sm:pt-0 sm:px-1.5 ${selected ? 'bg-[#EEF3FF]' : ''}`}
@@ -284,7 +283,6 @@ export function HqDispatchCalendar({ bookings, onViewBooking, onOpenNewBooking }
                 </button>
                 {continuation && (
                   <div
-                    title={`같은 차량의 연속 일정 ${continuation.days}일`}
                     aria-label={`연결된 배차 ${continuation.days}일, ${continuation.previous ? '이전 날짜에서 계속' : '첫 날짜'}`}
                     className={`mt-1 h-[3px] sm:mt-2 ${continuation.previous ? '-ml-1.5 sm:-ml-2.5' : 'ml-1.5 rounded-l-full'} ${continuation.next ? '-mr-1.5 sm:-mr-2.5' : 'mr-1.5 rounded-r-full'}`}
                     style={{ backgroundColor: getCustomerDotColor(continuation.colorBooking.customerId, continuation.colorBooking.customerName) }}
