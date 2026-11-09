@@ -122,7 +122,7 @@ export function DriverEventFavoritesSection({
                                             {stop.time && <span className="shrink-0 text-[11px] tabular-nums text-[#8290A5]">{stop.time}</span>}
                                           </div>
                                           <p className="mt-0.5 break-words text-[11px] leading-relaxed text-[#8290A5]">
-                                            {stop.address || '주소 확인 필요'}
+                                            {stop.address || (stop.isPoiConfirmed ? 'TMAP 위치 확정 · 상세 주소 미등록' : '주소 확인 필요')}
                                           </p>
                                           {stop.notes && <p className="mt-1 text-[11px] text-[#6E809B]">{stop.notes}</p>}
                                         </div>
