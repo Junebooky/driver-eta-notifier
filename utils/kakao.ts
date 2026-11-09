@@ -59,7 +59,7 @@ export function generateVipReportText({
     header,
     hasPassenger ? `• 담당승객: ${passenger}` : null,
     departureTimeText
-      ? `• 출발 예정: ${originName} (${departureTimeText})`
+      ? `• 출발 예정: ${originName} (${formatEtaWithAmPm(departureTimeText)})`
       : `• 이동: ${routePath}`,
     departureTimeText ? `• 목적지: ${destinationName}` : null,
     departureTimeText
