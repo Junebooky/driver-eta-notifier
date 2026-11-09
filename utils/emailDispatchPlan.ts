@@ -88,7 +88,8 @@ export function buildEmailDispatchPlan(draft:HqEmailExtractedDraft,slots:Array<{
   if(!normalizeDateToIso(day.date)||day.points.length<2||!normalizeTimeHHmm(day.start.time || '')||!day.start.location||!day.end.location)throw new Error(`${day.date}: 출발·도착지와 실제 시작 시간을 확인해 주세요.`);
   if(status==='published' && (!normalizeTimeHHmm(day.endTime)||day.endTime<=day.start.time!))throw new Error(`${day.date}: 실제 종료 시간을 확인해 주세요.`);
   const dayFlights=emailAssignableFlights(draft).filter(f=>f.date===day.date);
-  const splitByFlight=status==='published' && slots.length>1 && dayFlights.length>0;
+  const splitByFlight=status==='published' && dayFlights.length>0 &&
+    (slots.length>1 || slots.some(slot=>Array.isArray(slot.assignedFlightKeys)));
   // Flight assignments are scoped inside each vehicle row; no shared roster.
   const perSlotFlights=(slot:{assignedFlightKeys?:string[]})=>splitByFlight
     ?dayFlights.filter(f=>(slot.assignedFlightKeys || []).includes(emailFlightKey(f)))
