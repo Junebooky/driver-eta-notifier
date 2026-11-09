@@ -133,6 +133,13 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
     ? getEventRouteLegs(scheduleToEventRoute(item))
     : [];
 
+  // Legacy two-point routes must meet the same confirmed-location guard.
+  const canNavigateDirectRoute = item.place_verified === true && item.intake_source !== 'seed' &&
+    [item.origin_lat, item.origin_lng, item.destination_lat, item.destination_lng]
+      .every(value => typeof value === 'number' && Number.isFinite(value) && value !== 0) &&
+    !((item.origin_lat === 37.5042 && item.origin_lng === 127.0425) ||
+      (item.destination_lat === 37.4495 && item.destination_lng === 126.4512));
+
   const isCancelled = item.dispatch_status === 'cancelled' || item.status === 'cancelled';
   const isStaleAck = Boolean(
     !isCancelled &&
@@ -223,14 +230,32 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
           ))
         ) : (
           <div className="rounded-[13px] bg-[#F6F8FC] px-3.5 py-3.5">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-bold text-[#25344D]">
-              <span className="break-words">{sanitizePlaceName(item.origin_name)}</span>
-              <ChevronRight className="h-4 w-4 shrink-0 text-[#A8B5C8]" />
-              <span className="break-words">{sanitizePlaceName(item.destination_name)}</span>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-bold text-[#25344D]">
+                <span className="break-words">{sanitizePlaceName(item.origin_name)}</span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-[#A8B5C8]" />
+                <span className="break-words">{sanitizePlaceName(item.destination_name)}</span>
+              </div>
+              {!isCancelled && (
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <button type="button" onClick={() => onPredict(item)}
+                    className="inline-flex min-h-9 items-center gap-1 rounded-[10px] bg-white px-2.5 text-[11px] font-semibold text-[#59708F]"
+                    aria-label="출발 시간별 소요 시간 예측"><Clock className="h-3.5 w-3.5" />예측</button>
+                  <button type="button" disabled={!canNavigateDirectRoute}
+                    onClick={() => { haptics.heavyTap(); onNavigate(item); }}
+                    className="inline-flex min-h-9 items-center gap-1 rounded-[10px] bg-[#1E60F3] px-2.5 text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#E8EDF5] disabled:text-[#8290A5]"
+                    aria-label="길안내 실행"><Navigation className="h-3.5 w-3.5" />길안내</button>
+                </div>
+              )}
             </div>
             {(item.origin_address || item.destination_address) && (
               <p className="mt-1.5 break-words text-[11px] text-[#8290A5]">
                 {[item.origin_address, item.destination_address].filter(Boolean).join(' → ')}
+              </p>
+            )}
+            {!canNavigateDirectRoute && !isCancelled && (
+              <p className="mt-2 inline-flex items-center gap-1 rounded-[9px] bg-[#FCF4E9] px-2.5 py-1.5 text-[11px] font-semibold text-[#9A6B30]">
+                <AlertTriangle className="h-3 w-3" />관리자 위치 확인 후 길안내 가능
               </p>
             )}
             {!isCancelled && <div className="mt-2.5"><RouteForecastChip
@@ -238,9 +263,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
               time={item.pickup_time}
               origin={{ name: item.origin_name, lat: item.origin_lat, lng: item.origin_lng }}
               destination={{ name: item.destination_name, lat: item.destination_lat, lng: item.destination_lng }}
-              confirmed={item.place_verified === true && item.intake_source !== 'seed' &&
-                !((item.origin_lat === 37.5042 && item.origin_lng === 127.0425) ||
-                  (item.destination_lat === 37.4495 && item.destination_lng === 126.4512))}
+              confirmed={canNavigateDirectRoute}
             /></div>}
           </div>
         )}
@@ -370,46 +393,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
           )}
         </div>
 
-        {/* Right: Circular Volumetric Action Buttons (Flight + Clock + Navigation) */}
-        <div className="flex items-center gap-2.5 ml-auto shrink-0">
-          {!isCancelled && forecastLegs.length === 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                haptics.mediumTap();
-                onPredict(item);
-              }}
-              className="w-11 h-11 rounded-[12px] bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center border border-slate-100/90 shadow-[0_4px_14px_rgba(15,23,42,0.06)] transition-all active:scale-90 cursor-pointer shrink-0"
-              title="출발 시간별 소요 시간 예측"
-              aria-label="출발 시간 예측"
-            >
-              <Clock className="w-5 h-5 text-slate-700 stroke-[1.8]" />
-            </button>
-          )}
 
-          {forecastLegs.length === 0 && <button
-            type="button"
-            disabled={isCancelled}
-            onClick={() => {
-              if (isCancelled) return;
-              haptics.heavyTap();
-              onNavigate(item);
-            }}
-            className={`w-11 h-11 rounded-full flex items-center justify-center transition-all ${
-              isCancelled
-                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                : 'bg-[#1E60F3] hover:bg-[#1852D5] active:scale-90 text-white shadow-none cursor-pointer'
-            }`}
-            title={isCancelled ? '취소된 배차는 길안내를 실행할 수 없습니다' : '길안내 내비 즉시 실행'}
-            aria-label="길안내 실행"
-          >
-            <Navigation
-              className={`w-5 h-5 translate-x-px ${
-                isCancelled ? 'fill-slate-400 text-slate-400' : 'fill-white text-white'
-              }`}
-            />
-          </button>}
-        </div>
       </div>
 
       {/* 5-Stage Live Operation Status Control (Visible when dispatch is confirmed) */}
