@@ -15,7 +15,7 @@ type Props = {
 };
 
 const labels: Record<DriverLegAction, string> = {
-  load: '이 구간 불러오기',
+  load: '이 구간 길안내',
   navigate: '이 구간 길안내',
   predict: '이 구간 예상시간',
 };
