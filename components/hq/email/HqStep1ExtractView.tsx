@@ -845,7 +845,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
 
             {/* 블록 3: 상세 이동 경로 */}
             <div className="space-y-2.5">
-              <div className="flex items-center gap-2 min-w-0 pt-1 pb-0.5">
+              <div className="flex flex-wrap items-center gap-2 min-w-0 pt-1 pb-0.5">
                 <Compass className="w-4.5 h-4.5 text-slate-800 shrink-0" />
                 <span className="text-sm font-black text-slate-900 shrink-0">운행 경로 (상세 일정)</span>
                 <span className="text-xs font-normal text-slate-400 truncate">
@@ -1083,7 +1083,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                             <div className="pl-14 mt-1 space-y-1">
                                               {wp.address && <p className="break-words text-[11px] text-slate-500">{wp.address}</p>}
                                               {!isVerifiedEmailRouteStop({ ...wp, date: wp.date || pickupDate, time: wp.time || '', isPoiConfirmed: Boolean(wp.isPoiConfirmed) }) && (
-                                                <HqBadge tone="warning">주소 미확정 · 눌러서 TMAP 검색 결과 선택</HqBadge>
+                                                <HqBadge tone="warning" wrap>주소 미확정 · 눌러서 TMAP 검색 결과 선택</HqBadge>
                                               )}
                                             </div>
                                             {wp.notes && (
@@ -1187,7 +1187,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                         />
                         <div className="mt-1.5 space-y-1">
                           {extractedDraft?.pickupAddress && <p className="break-words text-[11px] text-slate-500">{extractedDraft.pickupAddress}</p>}
-                          {!isPickupPoiConfirmed && <HqBadge tone="warning">주소 미확정 · TMAP 검색 결과 선택 필요</HqBadge>}
+                          {!isPickupPoiConfirmed && <HqBadge tone="warning" wrap>주소 미확정 · TMAP 검색 결과 선택 필요</HqBadge>}
                           {extractedDraft?.pickupProvidedAddress && <HqEmailAddressCandidate className="" sourceAddress={extractedDraft.pickupProvidedAddress} placeName={pickupLocation} isPoiConfirmed={isPickupPoiConfirmed} onPick={handleSelectPickupPoi} onLocateInSource={locateSource} />}
                         </div>
                       </div>
@@ -1223,7 +1223,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                         />
                         <div className="mt-1.5 space-y-1">
                           {extractedDraft?.dropoffAddress && <p className="break-words text-[11px] text-slate-500">{extractedDraft.dropoffAddress}</p>}
-                          {!isDropoffPoiConfirmed && <HqBadge tone="warning">주소 미확정 · TMAP 검색 결과 선택 필요</HqBadge>}
+                          {!isDropoffPoiConfirmed && <HqBadge tone="warning" wrap>주소 미확정 · TMAP 검색 결과 선택 필요</HqBadge>}
                           {extractedDraft?.dropoffProvidedAddress && <HqEmailAddressCandidate className="" sourceAddress={extractedDraft.dropoffProvidedAddress} placeName={dropoffLocation} isPoiConfirmed={isDropoffPoiConfirmed} onPick={handleSelectDropoffPoi} onLocateInSource={locateSource} />}
                         </div>
                       </div>

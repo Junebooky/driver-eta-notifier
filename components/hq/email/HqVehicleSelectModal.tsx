@@ -62,7 +62,7 @@ const VehiclePickerContent: React.FC<HqVehicleSelectModalProps> = ({
     className="max-w-lg" footer={<p className="w-full text-center text-xs text-[#73839D]">등록된 실차만 표시 · 일정 확인 후 배정할 수 있습니다.</p>}>
     <div className="space-y-4">
       <div className="relative"><Search className="pointer-events-none absolute left-3.5 top-3.5 size-4 text-slate-400"/>
-        <HqInput type="search" value={query} onChange={event => setQuery(event.target.value)} aria-label="차량 검색" placeholder="차종, 차량번호 검색" className="w-full pl-10" />
+        <HqInput type="search" value={query} onChange={event => setQuery(event.target.value)} aria-label="차량 검색" placeholder="차종, 차량번호 검색" className="w-full" style={{ paddingLeft: 40 }} />
       </div>
       <HqSegmentedTabs tabs={FILTERS} value={category} onValueChange={setCategory} aria-label="차종 필터" />
       <div className="flex items-center justify-between gap-3 text-xs text-[#61728A]">

@@ -830,3 +830,5 @@ dialog::backdrop {
 @media (prefers-reduced-motion: reduce) {
   .hq-ui-reveal-item, .hq-ui-source-match { animation: none; }
 }
+
+.hq-ui-badge[data-wrap="true"] { white-space: normal; max-width: 100%; line-height: 1.45; }
