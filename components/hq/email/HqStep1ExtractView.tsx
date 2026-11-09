@@ -605,9 +605,9 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                   <div key={filename + entry.sheetName + entry.cell} className="rounded-[11px] bg-[#F6F8FC] p-3">
                     <p className="break-words text-[11px] font-semibold text-[#25344D]">{filename} · {entry.sheetName}!{entry.cell}</p>
                     <p className="mt-1 text-[11px] text-[#6E809B]">{entry.date} · {entry.time || '시간 미지정'}</p>
-                    <p className="mt-1.5 whitespace-pre-wrap break-words text-[12px] leading-relaxed text-[#25344D]">
+                    <div className="mt-1.5 whitespace-pre-wrap break-words text-[12px] leading-relaxed text-[#25344D]">
                       <HqSourceText text={entry.originalText} query={currentEvidence.address} revision={currentEvidence.revision} />
-                    </p>
+                    </div>
                   </div>
                 ))}
               </div>
