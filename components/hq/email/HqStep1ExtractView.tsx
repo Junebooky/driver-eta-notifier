@@ -714,51 +714,6 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
             {!!extractedDraft.documentAnalysis?.length && (
               <HqInlineFeedback tone="info" message={`본문과 첨부 ${extractedDraft.documentAnalysis.length}개를 함께 읽었습니다. ${extractedDraft.documentAnalysis.map(file => `${file.filename}${file.reviewedSheets.length ? ` · ${file.reviewedSheets.length}개 시트` : ''}`).join(' / ')}`} />
             )}
-            {/* Original Excel schedule cells are shown even when an AI extraction
-                returned only one meeting for a date or multiple cars cannot be merged. */}
-            {extractedDraft.documentAnalysis?.some(file => file.calendarItems?.length) && (
-              <div className="space-y-2 rounded-[16px] bg-white p-4 shadow-[0_3px_15px_rgba(35,49,78,0.04)]">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-[13px] font-bold text-[#25344D]">엑셀 원본 일정 대조</span>
-                  <span className="text-[11px] font-medium text-[#6E809B]">
-                    {extractedDraft.documentAnalysis.reduce((count, file) => count + (file.calendarItems?.length || 0), 0)}개 일정 셀 확인
-                  </span>
-                </div>
-                <p className="text-[11px] leading-relaxed text-[#6E809B]">
-                  원본의 날짜·시간·일정 문구를 그대로 보존했습니다. 아래에서 날짜별 운행 경로와 비교할 수 있습니다.
-                  고객이 주소를 주지 않은 일정도 삭제하지 않습니다.
-                </p>
-                {extractedDraft.documentAnalysis.filter(file => file.calendarItems?.length).map((file, index) => (
-                  <details key={file.filename + index} className="rounded-[12px] bg-[#F6F8FC] px-3 py-2.5">
-                    <summary className="cursor-pointer text-[12px] font-semibold text-[#25344D]">
-                      {file.filename} · 원본 {file.calendarItems!.length}개 일정
-                    </summary>
-                    <div className="mt-3 space-y-2">
-                      {file.calendarItems!.map((entry) => (
-                        <div key={entry.sheetName + entry.cell} className="rounded-[10px] bg-white px-3 py-2.5">
-                          <div className="flex flex-wrap items-start justify-between gap-2">
-                            <span className="min-w-0 flex-1 break-words text-[12px] font-semibold text-[#25344D]">
-                              {entry.title}
-                            </span>
-                            <span className="text-[11px] tabular-nums text-[#6E809B]">
-                              {entry.date} {entry.time || '시각 미정'}
-                            </span>
-                          </div>
-                          <p className="mt-1 text-[10px] text-[#8290A5]">
-                            {entry.sheetName}!{entry.cell}
-                            {entry.clockSource === 'grid' ? ' · 원본 시간표 행 기준' : ''}
-                          </p>
-                          <p className="mt-1.5 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-[#4D607C]">{entry.originalText}</p>
-                          <p className="mt-1.5 text-[11px] font-medium text-[#6E809B]">
-                            {entry.clientAddress ? `클라이언트 제공 주소: ${entry.clientAddress}` : '클라이언트측 주소 미지정'}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                ))}
-              </div>
-            )}
             {extractedDraft.documentAnalysis?.map((file, index) => file.missingDates?.length ? (
               <div key={`${file.filename}-${index}`} className="space-y-2">
                 <HqInlineFeedback tone={file.dateReviewAcknowledged ? 'info' : 'error'} message={`${file.filename} · 확인 필요: ${file.missingDates.join(', ')}. 이 날짜가 표에 있으나 경로에 반영되지 않았습니다. 원본에서 운행 여부를 확인하고, 필요한 경유지와 날짜를 추가해 주세요. 확인 전에는 예약을 확정할 수 없습니다.`} />
