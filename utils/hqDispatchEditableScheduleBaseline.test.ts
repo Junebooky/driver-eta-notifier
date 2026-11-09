@@ -23,7 +23,8 @@ test('existing dispatch departure and end times have visible editable controls',
 });
 
 test('A-style time fields show readable one-per-row options and allow both fields to stay open', () => {
-  assert.ok(timeField.includes('placeholder="예: 09:00"'));
+  assert.ok(timeField.includes('placeholder="미지정"'));
+  assert.ok(timeField.includes("<span>미지정</span>"));
   assert.ok(timeField.includes('flex max-h-56 flex-col'));
   assert.ok(timeField.includes('w-full shrink-0 items-center justify-between'));
   assert.ok(timeField.includes("!target?.closest('[data-hq-dispatch-time]')"));
