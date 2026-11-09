@@ -3,6 +3,69 @@ import { assertAttachmentDatesReviewed } from './emailAttachmentCoverage';
 import { VIP_REAL_VEHICLES } from './vehicleData';
 import { normalizeDateToIso,normalizeTimeHHmm } from './dispatchConflictDetector';
 import { buildAirportArrivalPickupGroups } from './emailBookingEvidence';
+/**
+ * HQ flight-to-vehicle assignment identity: a flight can only be identified
+ * within its service date. Never infer the assigned driver from the order of
+ * people listed in an email.
+ */
+export function emailFlightKey(flight:{date:string;flightNumber:string}):string{
+ return flight.date+':'+flight.flightNumber.replace(/[\s-]/g,'').toUpperCase();
+}
+export function emailAssignableFlights(draft:HqEmailExtractedDraft){
+ const groups=new Map<string,NonNullable<HqEmailExtractedDraft['flights']>[number]>();
+ for(const f of draft.flights || []){
+  if(!f.flightNumber?.trim() || f.role==='connection')continue;
+  const key=emailFlightKey(f);
+  const existing=groups.get(key);
+  if(!existing){groups.set(key,{...f,passengers:[...(f.passengers || [])]});continue;}
+  groups.set(key,{...existing,passengers:[...new Set([...(existing.passengers || []),...(f.passengers || [])].map(x=>x.trim()).filter(Boolean))]});
+ }
+ return [...groups.values()];
+}
+export type EmailFlightSlot={assignedFlightKeys?:string[]};
+/** Returns manager-visible validation problems; publishing fails closed. */
+export function emailFlightAssignmentIssues(
+ draft:HqEmailExtractedDraft,
+ slots:EmailFlightSlot[],
+):string[]{
+ if(slots.length<=1)return [];
+ const flights=emailAssignableFlights(draft);
+ if(!flights.length)return [];
+ const valid=new Set(flights.map(emailFlightKey));
+ const problems:string[]=[];
+ for(const [index,slot] of slots.entries()){
+  for(const key of slot.assignedFlightKeys || [])if(!valid.has(key))
+   problems.push(index+1+'호차에 현재 이메일에 없는 항공편 배정이 남아 있습니다.');
+ }
+ const dates=[...new Set(flights.map(f=>f.date))];
+ for(const date of dates){
+  const dayFlights=flights.filter(f=>f.date===date);
+  const passengerOwners=new Map<string,number>();
+  for(const flight of dayFlights){
+   const key=emailFlightKey(flight);
+   const selected=slots.flatMap((slot,i)=>(slot.assignedFlightKeys || []).includes(key)?[i]:[]);
+   if(selected.length!==1){
+    problems.push(date+' '+flight.flightNumber+': 담당 차량을 정확히 하나 선택해 주세요.');
+    continue;
+   }
+   const people=[...new Set((flight.passengers || []).map(n=>n.trim()).filter(Boolean))];
+   if(!people.length)problems.push(date+' '+flight.flightNumber+': 탑승객 이름을 확인해 주세요.');
+   for(const name of people){
+    const normalized=name.toLocaleLowerCase();
+    const owner=passengerOwners.get(normalized);
+    if(owner!==undefined&&owner!==selected[0])
+     problems.push(date+' '+name+': 여러 차량에 중복 배정된 승객입니다.');
+    passengerOwners.set(normalized,selected[0]);
+   }
+  }
+  for(const [i,slot] of slots.entries()){
+   if(!dayFlights.some(f=>(slot.assignedFlightKeys || []).includes(emailFlightKey(f))))
+    problems.push(date+' '+(i+1)+'호차: 맡을 항공편이 없습니다. 운행하지 않는 차량은 별도 일정에서 제외해 주세요.');
+  }
+ }
+ return [...new Set(problems)];
+}
+
 export function emailDispatchDays(draft:HqEmailExtractedDraft){
  const hasMultipleDates=(draft.waypoints || []).some(point=>point.date && point.date!==draft.pickupDate);
  const groups=new Map<string,RouteWaypointItem[]>();
@@ -14,8 +77,10 @@ export function emailDispatchDays(draft:HqEmailExtractedDraft){
  if(!groups.size){groups.set(draft.pickupDate,[{id:'pickup',order:1,date:draft.pickupDate,time:draft.pickupTime,location:draft.pickupLocation,lat:draft.pickupLat,lng:draft.pickupLng,isPoiConfirmed:draft.isPickupPoiConfirmed},{id:'dropoff',order:2,date:draft.pickupDate,location:draft.dropoffLocation,lat:draft.dropoffLat,lng:draft.dropoffLng,isPoiConfirmed:draft.isDropoffPoiConfirmed}]);}
  return [...groups.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([date,points])=>({date,points,start:points[0],end:points[points.length-1],endTime:draft.dayEndTimes?.[date] || points[points.length-1].time || ''}));
 }
-export function buildEmailDispatchPlan(draft:HqEmailExtractedDraft,slots:Array<{vehicleModel:string;vehiclePlate?:string;driver:{id:string;name:string;phone?:string;languages?:string[];englishAvailable?:boolean}|null}>,status:'published'|'unassigned'){
+export function buildEmailDispatchPlan(draft:HqEmailExtractedDraft,slots:Array<{vehicleModel:string;vehiclePlate?:string;driver:{id:string;name:string;phone?:string;languages?:string[];englishAvailable?:boolean}|null;assignedFlightKeys?:string[]}>,status:'published'|'unassigned'){
  assertAttachmentDatesReviewed(draft);
+ const assignmentIssues=status==='published'?emailFlightAssignmentIssues(draft,slots):[];
+ if(assignmentIssues.length)throw new Error(assignmentIssues[0]);
  const requestedLanguage = draft.requestedLanguage || (/영어|english|외국인/i.test(draft.specialRequests || '') ? 'en' : 'ko');
  if(draft.tripType==='group' && draft.groupTrips?.length)throw new Error('탑승객별 별도 일정은 각 예약에서 확인한 뒤 배차해 주세요. 첫 일정만 배차하지 않습니다.');
  if(!slots.length)throw new Error('요청 차량을 추가해 주세요.');
