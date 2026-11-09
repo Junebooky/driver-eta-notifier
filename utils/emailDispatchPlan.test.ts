@@ -95,7 +95,7 @@ test('each driver receives ONLY assigned flight numbers, riders and airport note
  const base=draft();
  const firstStop={...base.waypoints[0],
    notes:'픽업 장소 확인 · 입국 그룹별 픽업 · 1차 KE2104 09:00 (Guest A, Guest B) / 2차 NH867 09:05 (Guest C)'};
- const w=[firstStop,...base.waypoints.slice(1)];
+ const w=[firstStop,...base.waypoints.slice(1).filter(point=>point.date===day)];
  const d={...base,passengerName:'Guest A, Guest B, Guest C',passengerPhone:'010-1111-2222',
    passengerCount:3,specialRequests:'물 준비',waypoints:w,
    flights:[
@@ -121,7 +121,7 @@ test('each driver receives ONLY assigned flight numbers, riders and airport note
 });
 test('multi-driver flight assignment must be explicit, unique, and have verified riders',()=>{
  const day='2026-12-10';
- const source={...draft(),flights:[
+ const source={...draft(),waypoints:draft().waypoints.filter(point=>point.date===day),flights:[
   {date:day,flightNumber:'KE2104',role:'arrival' as const,passengers:['Guest A']},
   {date:day,flightNumber:'NH867',role:'arrival' as const,passengers:['Guest B']},
  ]};
@@ -133,6 +133,8 @@ test('multi-driver flight assignment must be explicit, unique, and have verified
  assert.throws(()=>buildEmailDispatchPlan(unknown,mapped,'published'),/탑승객 이름/);
  const duplicated={...source,flights:[source.flights[0],{...source.flights[1],passengers:['Guest A']}]};
  assert.throws(()=>buildEmailDispatchPlan(duplicated,mapped,'published'),/중복 배정/);
+ const multiDay={...source,waypoints:draft().waypoints};
+ assert.throws(()=>buildEmailDispatchPlan(multiDay,mapped,'published'),/날짜별 승객 배정/);
  const pending=buildEmailDispatchPlan(source,two,'unassigned');
  assert.ok(pending.every(x=>!x.driverId && !x.vehiclePlate));
 });
