@@ -1,9 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { RouteForecastChip } from '@/components/driver/RouteForecastChip';
-import { CalendarDays, ChevronDown, MapPin, ArrowRight, RefreshCw } from 'lucide-react';
-import { getEventRouteLegs, type DriverEventFavorite, type DriverEventLeg, type DriverEventStop } from '@/utils/driverEventFavorites';
+import { CalendarDays, ChevronDown, MapPin, RefreshCw } from 'lucide-react';
+import { DriverDispatchShell } from '@/components/driver/DriverDispatchShell';
+import { DriverRouteLegRow } from '@/components/driver/DriverRouteLegRow';
+import {
+  getEventRouteLegs, type DriverEventFavorite, type DriverEventLeg, type DriverEventStop,
+} from '@/utils/driverEventFavorites';
 
 type Props = {
   events: DriverEventFavorite[];
@@ -22,7 +25,11 @@ function formatDate(date: string): string {
   return `${month}월 ${day}일 (${['일', '월', '화', '수', '목', '금', '토'][d.getDay()]})`;
 }
 
-/** A-style read-only event navigation view shared by the driver schedule and favorites. */
+/**
+ * Event favorites are a compact read-only projection of the same HQ dispatch.
+ * Card shell, route rows, forecasts and navigation match the full schedule.
+ * A dispatched event is NOT rendered again in ScheduleTab's separate section.
+ */
 export function DriverEventFavoritesSection({
   events, onLoadLeg, onSelectStop, isLoading, error, onRefresh, compact = false,
 }: Props) {
@@ -35,7 +42,7 @@ export function DriverEventFavoritesSection({
         <div className="flex items-center justify-between px-0.5">
           <div>
             <h3 className="text-[16px] font-bold tracking-tight text-[#17233B]">배정 행사</h3>
-            <p className="mt-1 text-[12px] text-[#8290A5]">확정된 배차의 모든 장소를 날짜별로 확인하세요.</p>
+            <p className="mt-1 text-[12px] text-[#8290A5]">확정된 배차의 모든 이동 구간을 확인하세요.</p>
           </div>
           {onRefresh && (
             <button type="button" onClick={onRefresh} aria-label="배정 행사 새로고침"
@@ -60,7 +67,9 @@ export function DriverEventFavoritesSection({
         <div className="rounded-[16px] bg-white px-5 py-8 text-center shadow-[0_4px_18px_rgba(35,49,78,0.045)]">
           <CalendarDays className="mx-auto h-6 w-6 text-[#A8B5C8]" />
           <p className="mt-3 text-[14px] font-semibold text-[#17233B]">배정된 행사가 없습니다</p>
-          <p className="mt-1.5 text-[12px] leading-relaxed text-[#8290A5]">고객사 이메일 예약의 기사·차량 배차가 확정되면 자동으로 표시됩니다.</p>
+          <p className="mt-1.5 text-[12px] leading-relaxed text-[#8290A5]">
+            본사에서 확정한 배차는 스케줄 탭에도 동일한 디자인으로 표시됩니다.
+          </p>
         </div>
       ) : (
         <div className="space-y-2.5">
@@ -68,7 +77,7 @@ export function DriverEventFavoritesSection({
             const open = expandedEventId === event.id || (!expandedEventId && event.id === events[0].id);
             const routeCount = event.days.reduce((total, day) => total + day.routes.length, 0);
             return (
-              <article key={event.id} className="overflow-hidden rounded-[16px] bg-white shadow-[0_4px_18px_rgba(35,49,78,0.045)]">
+              <section key={event.id} className="overflow-hidden rounded-[16px] bg-white shadow-[0_4px_18px_rgba(35,49,78,0.045)]">
                 <button type="button" aria-expanded={open}
                   onClick={() => { setExpandedEventId(open ? '__closed__' : event.id); setExpandedDay(null); }}
                   className="flex w-full items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-[#FAFBFD]">
@@ -86,7 +95,7 @@ export function DriverEventFavoritesSection({
                 </button>
 
                 {open && (
-                  <div className="space-y-2 px-3 pb-3 sm:px-4 sm:pb-4">
+                  <div className="space-y-2 px-2.5 pb-3 sm:px-3">
                     {event.days.map((day, dayIndex) => {
                       const key = `${event.id}:${day.date}`;
                       const dayOpen = expandedDay === key || (!expandedDay && dayIndex === 0);
@@ -97,89 +106,70 @@ export function DriverEventFavoritesSection({
                             className="flex w-full items-center justify-between gap-2 px-3.5 py-3 text-left">
                             <span className="text-[13px] font-bold text-[#25344D]">{formatDate(day.date)}</span>
                             <span className="flex items-center gap-1.5 text-[11px] text-[#8290A5]">
-                              {day.routes.length > 1 ? `${day.routes.length}개 배차` : `${day.routes[0]?.stops.length || 0}개 장소`}
+                              {day.routes.length}개 배차
                               <ChevronDown className={`h-3.5 w-3.5 transition-transform ${dayOpen ? 'rotate-180' : ''}`} />
                             </span>
                           </button>
                           {dayOpen && (
-                            <div className="space-y-2 px-2.5 pb-2.5">
-                              {day.routes.map((route) => (
-                                <div key={route.scheduleId} className="rounded-[12px] bg-white px-3.5 py-3 shadow-[0_2px_10px_rgba(35,49,78,0.025)]">
-                                  <div className="flex items-center justify-between gap-2 pb-2.5">
-                                    <span className="text-[11px] font-semibold text-[#6E809B]">
-                                      {route.pickupTime ? `${route.pickupTime} 출발` : '시각 미정'}
-                                    </span>
-                                    {day.routes.length > 1 && <span className="text-[11px] text-[#8290A5]">{route.vehiclePlate}</span>}
-                                  </div>
-                                  <ol className="space-y-3" aria-label={`${formatDate(day.date)} 방문 장소`}>
-                                    {route.stops.map((stop, index) => (
-                                      <li key={stop.id + index} className="flex items-start gap-2.5">
-                                        <div className="mt-0.5 flex w-5 shrink-0 justify-center">
-                                          <MapPin className={`h-4 w-4 ${stop.isPoiConfirmed ? 'text-[#1E60F3]' : 'text-[#A8B5C8]'}`} />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                          <div className="flex items-baseline gap-2">
-                                            <span className="min-w-0 flex-1 break-words text-[13px] font-semibold text-[#25344D]">{stop.name || '장소 미지정'}</span>
-                                            {stop.time && <span className="shrink-0 text-[11px] tabular-nums text-[#8290A5]">{stop.time}</span>}
-                                          </div>
-                                          <p className="mt-0.5 break-words text-[11px] leading-relaxed text-[#8290A5]">
-                                            {stop.address || (stop.isPoiConfirmed ? 'TMAP 위치 확정 · 상세 주소 미등록' : '주소 확인 필요')}
-                                          </p>
-                                          {stop.notes && <p className="mt-1 text-[11px] text-[#6E809B]">{stop.notes}</p>}
-                                        </div>
-                                        {onSelectStop && stop.isPoiConfirmed && (
-                                          <button type="button" onClick={() => onSelectStop(stop)}
-                                            aria-label={`${stop.name} 선택`}
-                                            className="shrink-0 rounded-[10px] bg-[#EFF4FF] px-2.5 py-1.5 text-[11px] font-bold text-[#1E60F3]">
-                                            선택
-                                          </button>
-                                        )}
-                                      </li>
-                                    ))}
-                                  </ol>
-                                  <div className="mt-4 border-t border-[#EEF1F5] pt-3">
-                                    <p className="mb-2.5 text-[12px] font-bold text-[#25344D]">이동 구간 선택</p>
-                                    {getEventRouteLegs(route).length > 0 ? (
+                            <div className="space-y-2 px-2 pb-2">
+                              {day.routes.map((route) => {
+                                const legs = getEventRouteLegs(route);
+                                return (
+                                  <DriverDispatchShell
+                                    key={route.scheduleId}
+                                    compact
+                                    title={event.name}
+                                    meta={`${formatDate(route.date)} · ${route.pickupTime || '시간 미정'}`}
+                                    subtitle={route.vehiclePlate ? `차량 ${route.vehiclePlate}` : undefined}
+                                  >
+                                    {legs.length > 0 ? (
                                       <div className="space-y-2">
-                                        {getEventRouteLegs(route).map((leg) => (
-                                          <div key={leg.id} className="rounded-[12px] bg-[#F7F8FB] px-3 py-3">
-                                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                              <span className="shrink-0 text-[11px] font-semibold text-[#8290A5]">{leg.index + 1}구간</span>
-                                              <span className="min-w-0 break-words text-[12px] font-semibold text-[#25344D]">{leg.origin.name}</span>
-                                              <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[#A8B5C8]" />
-                                              <span className="min-w-0 break-words text-[12px] font-semibold text-[#25344D]">{leg.destination.name}</span>
-                                            </div>
-                                            {leg.ready && (
-                                              <div className="mt-2">
-                                                <RouteForecastChip
-                                                  date={leg.date}
-                                                  time={leg.index === 0 ? route.pickupTime || leg.origin.time : leg.origin.time}
-                                                  origin={{ name: leg.origin.name, lat: leg.origin.lat, lng: leg.origin.lng }}
-                                                  destination={{ name: leg.destination.name, lat: leg.destination.lat, lng: leg.destination.lng }}
-                                                  confirmed={leg.ready}
-                                                  assumedDeparture={leg.index > 0 || !route.pickupTime}
-                                                />
-                                              </div>
-                                            )}
-                                            <button type="button" disabled={!leg.ready} onClick={() => onLoadLeg(leg)}
-                                              aria-label={`${leg.index + 1}구간 ${leg.origin.name}에서 ${leg.destination.name}까지 불러오기`}
-                                              className="mt-2.5 flex min-h-10 w-full items-center justify-center rounded-[11px] bg-white px-3 text-[12px] font-bold text-[#1E60F3] shadow-[0_2px_8px_rgba(35,49,78,0.035)] transition-colors hover:bg-[#EFF4FF] disabled:cursor-not-allowed disabled:bg-[#E8EDF5] disabled:text-[#9BA9BA]">
-                                              {leg.samePlace ? '같은 장소 · 이동 불필요' : leg.ready ? '길안내 · 보고 자동 복사' : '장소 확인 필요'}
-                                            </button>
-                                          </div>
+                                        {legs.map((leg) => (
+                                          <DriverRouteLegRow key={leg.id} compact leg={leg}
+                                            pickupTime={route.pickupTime}
+                                            onNavigate={onLoadLeg}
+                                          />
                                         ))}
                                       </div>
                                     ) : (
-                                      <p className="text-[11px] leading-relaxed text-[#8290A5]">
-                                        이전 예약에는 전체 경유지가 저장되지 않아 이동 구간을 자동으로 만들 수 없습니다.
+                                      <p className="rounded-[12px] bg-[#F6F8FC] p-3 text-[11px] leading-relaxed text-[#8290A5]">
+                                        이전 예약에는 전체 경유지가 저장되지 않아 구간별 길안내를 만들 수 없습니다.
                                       </p>
                                     )}
-                                    <p className="mt-2.5 text-[11px] leading-relaxed text-[#8290A5]">
-                                      각 구간은 출발지와 목적지만 설정합니다. 표시된 시간은 원본 일정 기준이며, 다음 출발 시각을 임의로 추정하지 않습니다.
+                                    <details className="group rounded-[12px] bg-[#F6F8FC] px-3 py-2.5" open={!compact ? true : undefined}>
+                                      <summary className="cursor-pointer text-[12px] font-semibold text-[#4D607C]">
+                                        전체 방문지 {route.stops.length}곳 · 시간·주소 보기
+                                      </summary>
+                                      <ol className="mt-3 space-y-3">
+                                        {route.stops.map((stop, index) => (
+                                          <li key={stop.id + index} className="flex items-start gap-2.5">
+                                            <MapPin className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${stop.isPoiConfirmed ? 'text-[#1E60F3]' : 'text-[#A8B5C8]'}`} />
+                                            <div className="min-w-0 flex-1">
+                                              <div className="flex items-start justify-between gap-2">
+                                                <p className="break-words text-[12px] font-semibold text-[#25344D]">{stop.name || '장소 미지정'}</p>
+                                                {stop.time && <span className="shrink-0 text-[11px] tabular-nums text-[#8290A5]">{stop.time}</span>}
+                                              </div>
+                                              <p className="mt-1 break-words text-[11px] leading-relaxed text-[#8290A5]">
+                                                {stop.address || (stop.isPoiConfirmed ? 'TMAP 위치 확정 · 상세 주소 미등록' : '주소 확인 필요')}
+                                              </p>
+                                              {stop.notes && <p className="mt-1 text-[11px] text-[#6E809B]">{stop.notes}</p>}
+                                            </div>
+                                            {onSelectStop && stop.isPoiConfirmed && (
+                                              <button type="button" onClick={() => onSelectStop(stop)}
+                                                className="shrink-0 rounded-[10px] bg-white px-2.5 py-1.5 text-[11px] font-bold text-[#1E60F3]">
+                                                선택
+                                              </button>
+                                            )}
+                                          </li>
+                                        ))}
+                                      </ol>
+                                    </details>
+                                    <p className="text-[11px] leading-relaxed text-[#8290A5]">
+                                      중간 방문 시각은 출발 시각이 아닐 수 있습니다. 각 구간은 따로 안내합니다.
                                     </p>
-                                  </div>
-                                </div>
-                              ))}
+                                  </DriverDispatchShell>
+                                );
+                              })}
                             </div>
                           )}
                         </div>
@@ -187,7 +177,7 @@ export function DriverEventFavoritesSection({
                     })}
                   </div>
                 )}
-              </article>
+              </section>
             );
           })}
         </div>
