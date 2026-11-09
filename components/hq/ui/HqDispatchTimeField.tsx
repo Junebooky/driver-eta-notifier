@@ -36,7 +36,13 @@ export function HqDispatchTimeField({
   useEffect(() => {
     if (!opened) return;
     const closeOnOutsideClick = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpened(false);
+      const target = event.target as Element | null;
+      // Both HQ time lists can stay open together. Only clicks outside
+      // all time fields should dismiss an open list.
+      if (!rootRef.current?.contains(event.target as Node)
+        && !target?.closest('[data-hq-dispatch-time]')) {
+        setOpened(false);
+      }
     };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -108,7 +114,7 @@ export function HqDispatchTimeField({
             autoComplete="off"
             spellCheck={false}
             value={draft}
-            placeholder="09:00 또는 오후 2:30"
+            placeholder="예: 09:00"
             aria-label={`${label} 직접 입력`}
             aria-invalid={invalid || undefined}
             aria-required={required || undefined}
@@ -161,7 +167,7 @@ export function HqDispatchTimeField({
           <p className="px-2 pb-2 text-[11px] font-medium text-[#8492A4]">
             직접 입력하거나 아래 시간을 선택해 주세요.
           </p>
-          <div ref={listRef} className="grid max-h-48 grid-cols-3 gap-1.5 overflow-y-auto overscroll-contain sm:grid-cols-4">
+          <div ref={listRef} className="flex max-h-56 flex-col gap-1 overflow-y-auto overscroll-contain pr-1">
             {options.map(option => (
               <button
                 key={option}
@@ -169,12 +175,12 @@ export function HqDispatchTimeField({
                 aria-pressed={value === option}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => choose(option)}
-                className={`flex min-h-10 items-center justify-center gap-1 rounded-[12px] px-2 text-[12px] font-semibold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 ${value === option
+                className={`flex min-h-11 w-full shrink-0 items-center justify-between rounded-[12px] px-3.5 text-left text-[14px] font-semibold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 ${value === option
                   ? 'bg-[#EEF3FF] text-[#1E60F3]'
                   : 'bg-white text-[#52647A] hover:bg-[#F0F3F8]'}`}
               >
-                {option}
-                {value === option && <Check aria-hidden="true" className="h-3 w-3 shrink-0" />}
+                <span>{option}</span>
+                {value === option && <Check aria-hidden="true" className="h-4 w-4 shrink-0" />}
               </button>
             ))}
           </div>
