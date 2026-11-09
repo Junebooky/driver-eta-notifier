@@ -165,3 +165,20 @@ test('unverified stop prevents only its adjacent drives; same-place visit never 
   assert.equal(duplicates[0].ready, false);
   assert.equal(eventLegToPresets(duplicates[0]), null);
 });
+
+
+test('confirmed HQ POI without a formatted street address remains verified for navigation', () => {
+  const existing = schedule('confirmed-no-address', '2026-11-10');
+  const withoutAddresses = {
+    ...existing,
+    routeWaypoints: existing.routeWaypoints?.map((point) => ({ ...point, address: '' })),
+  };
+  const route = scheduleToEventRoute(withoutAddresses);
+  assert.equal(route.ready, true);
+  assert.equal(route.stops.length, 3);
+  assert.ok(route.stops.every((point) => point.isPoiConfirmed));
+  assert.ok(route.stops.every((point) => !point.address));
+  const legs = getEventRouteLegs(route);
+  assert.deepEqual(legs.map((leg) => leg.ready), [true, true]);
+  assert.equal(eventLegToPresets(legs[0])?.destination.name, '성수 행사장');
+});

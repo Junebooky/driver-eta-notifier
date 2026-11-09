@@ -88,3 +88,31 @@ test('single-leg legacy DB schedules remain compatible', () => {
   assert.equal(schedule.routeWaypoints, undefined);
   assert.equal(schedule.isAdminRoute, false);
 });
+
+
+test('HQ confirmed all route POIs remain verified even when optional address text is missing', () => {
+  const raw = persistedSchedule();
+  const noAddressStops = stops.map((point) => ({ ...point, address: '' }));
+  const item = mapHydratedRowToScheduleItem({
+    ...raw,
+    origin_address: null,
+    destination_address: null,
+    schedule_meta: {
+      ...raw.schedule_meta,
+      routeWaypoints: noAddressStops,
+      placeVerified: true,
+    },
+  });
+  assert.equal(item.place_verified, true);
+  assert.equal(item.routeWaypoints?.length, 4);
+  assert.equal(item.routeWaypoints?.every((point) => point.isPoiConfirmed), true);
+});
+
+test('legacy coordinates alone do not establish administrator POI verification', () => {
+  const raw = persistedSchedule();
+  const unverified = mapHydratedRowToScheduleItem({
+    ...raw,
+    schedule_meta: { version: 1, dispatchStatus: 'published' },
+  });
+  assert.equal(unverified.place_verified, undefined);
+});

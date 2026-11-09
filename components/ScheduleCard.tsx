@@ -6,6 +6,8 @@ import { Navigation, Clock, User, Plane, FileText, ChevronRight, Pencil, Check, 
 import { haptics } from '@/utils/haptics';
 import { sanitizePlaceName } from '@/utils/formatters';
 import { DispatchRouteTimeline } from '@/components/common/DispatchRouteTimeline';
+import { RouteForecastChip } from '@/components/driver/RouteForecastChip';
+import { scheduleToEventRoute, getEventRouteLegs } from '@/utils/driverEventFavorites';
 
 interface ScheduleCardProps {
   item: ScheduleItem;
@@ -112,6 +114,9 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
 
   const pickupTimeValue = extractPickupTimeValue(item);
   const parsedNotes = parseNotesRow(item.notes);
+  const forecastLegs = item.routeWaypoints && item.routeWaypoints.length > 2
+    ? getEventRouteLegs(scheduleToEventRoute(item))
+    : [];
 
   const isCancelled = item.dispatch_status === 'cancelled' || item.status === 'cancelled';
   const isStaleAck = Boolean(
@@ -221,6 +226,44 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
           )}
         </div>
       </div>
+
+      {/* One TMAP prediction per visible future leg; never merge long waiting gaps.
+          This remains separate from the detailed six-slot departure prediction action. */}
+      {!isCancelled && (
+        <div className="flex flex-col gap-1.5">
+          {forecastLegs.length > 0 ? (
+            forecastLegs.map((leg) => (
+              <div key={leg.id} className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] font-semibold text-[#8290A5]">{leg.index + 1}구간</span>
+                {leg.ready ? (
+                  <RouteForecastChip
+                    date={leg.date}
+                    time={leg.index === 0 ? item.pickup_time || leg.origin.time : leg.origin.time}
+                    origin={{ name: leg.origin.name, lat: leg.origin.lat, lng: leg.origin.lng }}
+                    destination={{ name: leg.destination.name, lat: leg.destination.lat, lng: leg.destination.lng }}
+                    confirmed={leg.ready}
+                    assumedDeparture={leg.index > 0 || !item.pickup_time}
+                  />
+                ) : (
+                  <span className="rounded-[10px] bg-[#F2F5F9] px-2.5 py-1.5 text-[11px] text-[#8290A5]">장소 확인 후 예측 가능</span>
+                )}
+              </div>
+            ))
+          ) : (
+            <RouteForecastChip
+              date={item.date}
+              time={item.pickup_time}
+              origin={{ name: item.origin_name, lat: item.origin_lat, lng: item.origin_lng }}
+              destination={{ name: item.destination_name, lat: item.destination_lat, lng: item.destination_lng }}
+              confirmed={item.place_verified === true && item.intake_source !== 'seed' &&
+                !(
+                  (item.origin_lat === 37.5042 && item.origin_lng === 127.0425) ||
+                  (item.destination_lat === 37.4495 && item.destination_lng === 126.4512)
+                )}
+            />
+          )}
+        </div>
+      )}
 
       {/* Every verified HQ waypoint, not just the first and last stop. */}
       {item.routeWaypoints && item.routeWaypoints.length > 2 ? (

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { RouteForecastChip } from '@/components/driver/RouteForecastChip';
 import { CalendarDays, ChevronDown, MapPin, ArrowRight, RefreshCw } from 'lucide-react';
 import { getEventRouteLegs, type DriverEventFavorite, type DriverEventLeg, type DriverEventStop } from '@/utils/driverEventFavorites';
 
@@ -148,6 +149,18 @@ export function DriverEventFavoritesSection({
                                               <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[#A8B5C8]" />
                                               <span className="min-w-0 break-words text-[12px] font-semibold text-[#25344D]">{leg.destination.name}</span>
                                             </div>
+                                            {leg.ready && (
+                                              <div className="mt-2">
+                                                <RouteForecastChip
+                                                  date={leg.date}
+                                                  time={leg.index === 0 ? route.pickupTime || leg.origin.time : leg.origin.time}
+                                                  origin={{ name: leg.origin.name, lat: leg.origin.lat, lng: leg.origin.lng }}
+                                                  destination={{ name: leg.destination.name, lat: leg.destination.lat, lng: leg.destination.lng }}
+                                                  confirmed={leg.ready}
+                                                  assumedDeparture={leg.index > 0 || !route.pickupTime}
+                                                />
+                                              </div>
+                                            )}
                                             <button type="button" disabled={!leg.ready} onClick={() => onLoadLeg(leg)}
                                               aria-label={`${leg.index + 1}구간 ${leg.origin.name}에서 ${leg.destination.name}까지 불러오기`}
                                               className="mt-2.5 flex min-h-10 w-full items-center justify-center rounded-[11px] bg-white px-3 text-[12px] font-bold text-[#1E60F3] shadow-[0_2px_8px_rgba(35,49,78,0.035)] transition-colors hover:bg-[#EFF4FF] disabled:cursor-not-allowed disabled:bg-[#E8EDF5] disabled:text-[#9BA9BA]">
