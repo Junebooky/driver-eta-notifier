@@ -28,6 +28,7 @@ test('calendar time is explicit text first, then the original time grid', () => 
   assert.equal(excelCalendarClock('Leave Hotel at 9:15 am'), '09:15');
   assert.equal(excelCalendarClock('Lunch from 12:00 pm to 1:00 pm'), '12:00');
   assert.equal(excelCalendarClock('Meeting at 2:00 pm'), '14:00');
+  assert.equal(excelCalendarClock('Meeting at 14:30'), '14:30');
   assert.equal(excelCalendarClock(String(0.75)), '18:00');
   assert.equal(excelCalendarClock('Meeting at Hotel'), undefined);
 });
