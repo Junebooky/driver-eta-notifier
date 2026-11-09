@@ -119,7 +119,7 @@ export function decodeScheduleMeta(
       return {
         dispatchStatus: parsed.dispatchStatus || 'published',
         version: typeof parsed.version === 'number' ? parsed.version : 1,
-        placeVerified: parsed.placeVerified ?? true,
+        placeVerified: parsed.placeVerified,
         lastAckVersion: typeof parsed.lastAckVersion === 'number' ? parsed.lastAckVersion : 0,
         ...parsed,
       };
@@ -150,7 +150,7 @@ export function decodeScheduleMeta(
     vehiclePlate: presetDriver?.carNumber || matchedVeh?.plate || (rowVehicleNo !== UNASSIGNED_VEHICLE_SENTINEL ? rowVehicleNo : null),
     vehicleModel: matchedVeh?.model || null,
     version: 1,
-    placeVerified: true,
+    placeVerified: undefined,
     lastAckVersion: isConfirmedAck ? 1 : 0,
     intakeSource: 'seed',
     rawPassengerNote: rawPassengerNote || null,
