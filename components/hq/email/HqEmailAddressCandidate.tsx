@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { HqButton } from '@/components/hq/ui';
 import type { PoiResult } from '@/components/hq/HqPlaceSearchInput';
 import { searchTmapPoisClient } from '@/lib/places/tmapSearchEngine';
 import { addressHintToTmapQuery } from '@/utils/emailBookingEvidence';
@@ -16,6 +15,7 @@ export function HqEmailAddressCandidate({
   onPick,
   onLocateInSource,
   className = 'pl-14',
+  sourceEvidence,
 }: {
   sourceAddress: string;
   placeName: string;
@@ -23,6 +23,7 @@ export function HqEmailAddressCandidate({
   onPick: (poi: PoiResult) => void;
   onLocateInSource?: (address: string) => void;
   className?: string;
+  sourceEvidence?: { message: string; excerpt: string };
 }) {
   const [candidate, setCandidate] = useState<PoiResult | null>(null);
   const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'not-found'>('idle');
@@ -56,10 +57,23 @@ export function HqEmailAddressCandidate({
 
   return (
     <div className={`${className} mt-1 space-y-1 text-[11px] leading-relaxed`}>
-      <p className="text-slate-500 break-words" title={sourceAddress}>
-        고객 제공 주소 · {sourceAddress}
-      </p>
-      {onLocateInSource && <HqButton variant="ghost" size="sm" onClick={event => { event.stopPropagation(); onLocateInSource(sourceAddress); }} aria-label={`고객 제공 주소 원문 확인: ${sourceAddress}`}>원문에서 확인</HqButton>}
+      {onLocateInSource ? (
+        <button type="button"
+          title="이메일 원문에서 고객 제공 주소 찾기"
+          aria-label={`고객 제공 주소 원문 확인: ${sourceAddress}`}
+          onClick={(event) => { event.stopPropagation(); onLocateInSource(sourceAddress); }}
+          className="w-full cursor-pointer break-words rounded-xl bg-[#F7F9FC] px-3 py-2.5 text-left text-[#52647A] transition-colors hover:bg-[#EEF3FF] hover:text-[#1E60F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25"
+        >
+          <span className="block text-[10px] text-[#8A97A7]">고객 제공 주소 · 눌러서 이메일 원문 확인</span>
+          <span className="mt-1 block select-text font-medium">{sourceAddress}</span>
+        </button>
+      ) : <p className="select-text break-words text-slate-500" title={sourceAddress}>고객 제공 주소 · {sourceAddress}</p>}
+      {sourceEvidence && (
+        <div role="status" className="rounded-xl bg-[#F7F9FC] px-3 py-2.5 text-[11px] leading-relaxed text-[#52647A]">
+          <p className="font-medium">{sourceEvidence.message}</p>
+          {sourceEvidence.excerpt && <p className="mt-1.5 select-text whitespace-pre-wrap break-words text-[#17233B]">{sourceEvidence.excerpt}</p>}
+        </div>
+      )
       {!isPoiConfirmed && state === 'loading' && <p className="text-slate-400">주소로 TMAP 후보 검색 중…</p>}
       {!isPoiConfirmed && state === 'not-found' && (
         <p className="text-slate-400">자동 주소 검색 결과 없음 · 장소를 눌러 직접 확인</p>
