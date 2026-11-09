@@ -17,9 +17,19 @@ test('existing dispatch departure and end times have visible editable controls',
   assert.ok(timeField.includes('aria-label={`${label} 직접 입력`}'));
   assert.ok(timeField.includes('aria-label={`${label} 목록 열기`}'));
   assert.ok(timeField.includes('onClick={() => choose(option)}'));
-  assert.ok(timeField.includes('max-h-48'));
+  assert.ok(timeField.includes('flex max-h-56 flex-col'));
   assert.ok(timeField.includes('relative z-20 mt-3'));
   assert.ok(!dispatch.includes("endTime ? formatTimeKoreanAmPm(endTime) : '오후 09:00'"));
+});
+
+test('A-style time fields show readable one-per-row options and allow both fields to stay open', () => {
+  assert.ok(timeField.includes('placeholder="예: 09:00"'));
+  assert.ok(timeField.includes('flex max-h-56 flex-col'));
+  assert.ok(timeField.includes('w-full shrink-0 items-center justify-between'));
+  assert.ok(timeField.includes("!target?.closest('[data-hq-dispatch-time]')"));
+  assert.ok(timeField.includes("if (event.key === 'Escape')"));
+  assert.ok(!timeField.includes('grid-cols-3'));
+  assert.ok(!timeField.includes('sm:grid-cols-4'));
 });
 
 test('schedule values are shown separately without replacing current dispatch inputs', () => {
