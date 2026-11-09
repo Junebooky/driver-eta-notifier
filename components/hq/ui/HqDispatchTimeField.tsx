@@ -97,8 +97,8 @@ export function HqDispatchTimeField({
     <div
       ref={rootRef}
       className={compact
-        ? 'relative min-w-0'
-        : 'min-w-0 rounded-[20px] bg-white p-4 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-5'}
+        ? 'relative min-w-0 self-start'
+        : 'min-w-0 self-start rounded-[20px] bg-white p-4 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-5'}
       data-hq-dispatch-time={label}
     >
       <div className={compact ? 'flex items-end gap-2' : 'flex items-center gap-3'}>
