@@ -40,7 +40,8 @@ export function excelCalendarClock(value: string): string | undefined {
   const input = value.trim();
   const m = input.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
   if (m) return asClock(Number(m[1]), Number(m[2] || 0), m[3]);
-  const h24 = input.match(/^(\d{1,2}):(\d{2})$/);
+  // Client prose often writes "meeting at 14:30" without AM/PM.
+  const h24 = input.match(/\b(\d{1,2}):(\d{2})\b/);
   if (h24) return asClock(Number(h24[1]), Number(h24[2]));
   const fraction = Number(input);
   if (input && Number.isFinite(fraction) && fraction >= 0 && fraction < 1) {
