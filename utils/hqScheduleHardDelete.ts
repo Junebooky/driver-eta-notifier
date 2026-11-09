@@ -1,15 +1,20 @@
 import { ensureClientAuth } from './cockpitClientAuth';
 
-export type HqHardDeleteScope = 'booking' | 'event';
+export type HqHardDeleteScope = 'booking' | 'event' | 'customer';
 
-export async function hardDeleteHqSchedule(scheduleId: string, scope: HqHardDeleteScope): Promise<number> {
+export async function hardDeleteHqSchedule(
+  scheduleId: string, scope: HqHardDeleteScope, scheduleIds?: readonly string[]
+): Promise<number> {
   if (!scheduleId) throw new Error('서버에 등록된 배차만 삭제할 수 있습니다.');
+  if (scope === 'customer' && (!scheduleIds?.length || !scheduleIds.includes(scheduleId))) {
+    throw new Error('삭제할 고객사의 배차 목록을 다시 확인해 주세요.');
+  }
   await ensureClientAuth('hq');
   const response = await fetch('/api/schedules/hard-delete', {
     method: 'DELETE',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ scheduleId, scope, confirm: true }),
+    body: JSON.stringify({ scheduleId, scope, scheduleIds: scope === 'customer' ? scheduleIds : undefined, confirm: true }),
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok || result.ok !== true) {

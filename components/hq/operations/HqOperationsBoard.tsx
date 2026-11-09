@@ -27,6 +27,7 @@ import { CustomerNotificationTrigger } from '@/types/hq';
 import { ensureClientAuth } from '@/utils/cockpitClientAuth';
 import { haptics } from '@/utils/haptics';
 import { hardDeleteHqSchedule } from '@/utils/hqScheduleHardDelete';
+import { groupOperationsByCustomer } from '@/utils/hqOperationsCustomerGroups';
 
 export interface HqOperationsBoardProps {
   onOpenCustomerMessageForSchedule?: (
@@ -68,6 +69,7 @@ export interface ScheduleOperationItem {
 
 export interface EventGroup {
   id: string;
+  customerScoped?: boolean;
   customerTag: string;
   eventName: string;
   dateDisplay: string;
@@ -516,25 +518,27 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
           groupVehicleIndex: s.group_vehicle_index || s.groupVehicleIndex || idx + 1,
         }));
 
-        // Group server schedules by event
-        const groupsMap: Record<string, ScheduleOperationItem[]> = {};
-        serverMapped.forEach((item) => {
-          // Group only by a stable saved identity, never by event name
-          // (two unrelated events can have exactly the same customer title).
-          const key = item.groupId || item.eventId || item.id;
-          if (!groupsMap[key]) groupsMap[key] = [];
-          groupsMap[key].push(item);
-        });
-
-        const newGroups: EventGroup[] = Object.entries(groupsMap).map(([key, items]) => {
+        // One customer = one main event card. Keep each driver's row unchanged,
+        // even if the customer has multiple booking group IDs.
+        const newGroups: EventGroup[] = groupOperationsByCustomer(serverMapped).map((group) => {
+          const items = [...group.schedules].sort((a, b) =>
+            a.startDate.localeCompare(b.startDate) || a.startTime.localeCompare(b.startTime));
           const first = items[0];
+          const last = items[items.length - 1];
+          const sameEvent = items.every(item => item.eventName === first.eventName);
+          const sameTimes = items.every(item => item.startTime === first.startTime && item.endTime === first.endTime);
+          const sameRoute = items.every(item =>
+            item.pickupLocation === first.pickupLocation && item.dropoffLocation === first.dropoffLocation);
           return {
-            id: key,
+            id: group.key,
+            customerScoped: group.customerScoped,
             customerTag: first.customerName || '고객사',
-            eventName: first.eventName,
-            dateDisplay: first.startDate,
-            timeDisplay: `${first.startTime} ~ ${first.endTime || '종료시'}`,
-            routeSummary: `${first.pickupLocation} ➔ ${first.dropoffLocation}`,
+            eventName: sameEvent ? first.eventName : '전체 배차 현황',
+            dateDisplay: first.startDate === last.startDate
+              ? first.startDate : `${first.startDate} ~ ${last.startDate}`,
+            timeDisplay: sameTimes ? `${first.startTime} ~ ${first.endTime || '종료시'}` : '기사별 시간 확인',
+            routeSummary: sameRoute
+              ? `${first.pickupLocation} ➔ ${first.dropoffLocation}` : '기사별 이동 경로 확인',
             schedules: items,
           };
         });
@@ -633,7 +637,13 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
     setDeletingEvent(true);
     setDeleteError(null);
     try {
-      await hardDeleteHqSchedule(target.schedules[0].id, 'event');
+      // Delete the entire visible customer card, not only the first driver's
+      // original group ID. The server revalidates every selected schedule.
+      await hardDeleteHqSchedule(
+        target.schedules[0].id,
+        target.customerScoped ? 'customer' : 'event',
+        target.schedules.map(item => item.id)
+      );
       setEventToDelete(null);
       setSelectedEventInfo(null);
       // Clear the old selection immediately, then refresh against the server.
@@ -980,9 +990,11 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                       onClick={() => {
                         haptics.lightTap();
                         setDeleteError(null);
-                        setEventToDelete(group);
+                        // Search may show only one matching driver; the action must
+                        // still target the complete unfiltered customer card.
+                        setEventToDelete(eventGroups.find(item => item.id === group.id) || group);
                       }}
-                      aria-label={`${group.eventName} 행사 삭제`}
+                      aria-label={`${group.customerTag} 행사 삭제`}
                       className="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[13px] bg-[#F7F9FC] px-3 text-[12px] font-medium text-[#73839D] transition-colors hover:bg-[#FFF4F2] hover:text-[#A34E45]"
                     >
                       <Trash2 className="h-3.5 w-3.5" strokeWidth={1.7} />
