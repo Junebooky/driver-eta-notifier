@@ -79,3 +79,67 @@ test('shared route rows never enable unverified or same-place navigation', () =>
   assert.match(html, /disabled/);
   assert.match(html, /관리자의 TMAP 위치 확정이 필요/);
 });
+
+test('one driver sees two assigned flights as separate inline lookup actions without duplicate detail rows', () => {
+  const html = renderToStaticMarkup(createElement(ScheduleCard, {
+    item: { ...dispatch(), passenger: 'Guest A, Guest B, Guest C', passenger_phone: '010-1234-5678',
+      flight: 'KE2104, NH867', flightType: 'arrival' },
+    onNavigate: () => {}, onPredict: () => {}, onOpenFlight: () => {},
+  }));
+  assert.match(html, /KE2104/);
+  assert.match(html, /NH867/);
+  assert.match(html, /2편/);
+  assert.match(html, /항공편 KE2104 실시간 조회/);
+  assert.match(html, /항공편 NH867 실시간 조회/);
+  assert.match(html, /Guest A, Guest B, Guest C/);
+  assert.match(html, /tel:010-1234-5678/);
+  assert.equal((html.match(/실시간 조회<\/button>/g) || []).length, 2);
+  assert.equal((html.match(/항공편 · 입국/g) || []).length, 1, 'flight information is not repeated in detail table');
+});
+
+test('same-place lunch is shown as a timed activity with no navigation or TMAP estimate', () => {
+  const schedule = dispatch();
+  const coex = schedule.routeWaypoints![2];
+  schedule.routeWaypoints!.push({
+    ...coex, id: 'lunch', order: 4, time: '14:00', notes: '점심 식사',
+  });
+  const html = renderToStaticMarkup(createElement(ScheduleCard, {
+    item: schedule, onNavigate: () => {}, onPredict: () => {},
+    onNavigateLeg: () => {}, onPredictLeg: () => {},
+  }));
+  assert.match(html, /체류 일정/);
+  assert.match(html, /14:00 일정/);
+  assert.match(html, /코엑스 · 이동 없음/);
+  assert.match(html, /점심 식사/);
+  assert.equal((html.match(/까지 길안내/g) || []).length, 2, 'the extra dwell must not create a third navigation route');
+});
+
+test('unconfirmed stops use an amber confirmation warning, while legacy direct navigation is disabled', () => {
+  const html = renderToStaticMarkup(createElement(ScheduleCard, {
+    item: { ...dispatch(), routeWaypoints: undefined, place_verified: false },
+    onNavigate: () => {}, onPredict: () => {},
+  }));
+  assert.match(html, /관리자 위치 확인 필요/);
+  assert.match(html, /관리자 위치 확인 후 길안내 가능/);
+  assert.match(html, /bg-\[#FCF4E9\]/);
+  assert.match(html, /disabled=""[^>]*aria-label="길안내 실행"/);
+});
+
+test('two confirmed names sharing one building centroid are NOT a confirmed same-place activity', () => {
+  const schedule = dispatch();
+  const last = schedule.routeWaypoints![2];
+  schedule.routeWaypoints!.push({
+    ...last, id: 'different-venue', order: 4, location: '코엑스 서문', time: '14:00',
+  });
+  const legs = getEventRouteLegs(scheduleToEventRoute(schedule));
+  const lastLeg = legs[legs.length - 1];
+  assert.equal(lastLeg.samePlace, false);
+  assert.equal(lastLeg.coordinateConflict, true);
+  assert.equal(lastLeg.ready, false);
+  const html = renderToStaticMarkup(createElement(DriverRouteLegRow, {
+    leg: lastLeg, onNavigate: () => {}, onPredict: () => {},
+  }));
+  assert.match(html, /장소 이름이 다르지만 지도 좌표가 같습니다/);
+  assert.match(html, /disabled/);
+  assert.doesNotMatch(html, /체류 일정/);
+});

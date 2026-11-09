@@ -9,6 +9,8 @@ import { getVehicleImage } from '@/utils/vehicleData';
 import { getDriverProfileImage } from '@/components/hq/HqQuickDispatch';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 import { useHqFleetRegistry } from '@/hooks/useHqFleetRegistry';
+import { HqFlightAssignmentSection } from './HqFlightAssignmentSection';
+import { emailFlightAssignmentIssues } from '@/utils/emailDispatchPlan';
 import {
   emailBatchRows,
   type EmailBatchDecisions,
@@ -19,6 +21,8 @@ import {
 interface Props {
   draft: HqEmailExtractedDraft;
   slots: EmailBatchSlot[];
+  onUpdateSlots?: (slots: EmailBatchSlot[]) => void;
+  onUpdateDraft?: (draft: HqEmailExtractedDraft) => void;
   candidates: ExistingEmailBookingCandidate[];
   decisions: EmailBatchDecisions;
   cancelIds: string[];
@@ -39,7 +43,7 @@ interface Props {
 
 /** Mirrors the White First / borderless HQ email design. No implicit matches or cancellations. */
 export function HqEmailBatchRevisionPanel({
-  draft, slots, candidates, decisions, cancelIds, cancelReasons, assignments,
+  draft, slots, onUpdateSlots, onUpdateDraft, candidates, decisions, cancelIds, cancelReasons, assignments,
   drivers = [], onSelect, onCancel, onCancelReason, onAssignment, onAddVehicle, onRemoveLastVehicle, showAssignments = false,
   isSubmitting = false, onApprove, onRequestUnassigned,
 }: Props) {
@@ -65,7 +69,8 @@ export function HqEmailBatchRevisionPanel({
   ].join('|');
   useEffect(() => { setCancelAcknowledged(false); }, [approvalSignature]);
 
-  const canSubmit = !pending && rows.length > 0 && rows.length <= 80 && rows.length > skipped &&
+  const flightIssues = showAssignments ? emailFlightAssignmentIssues(draft, slots) : [];
+  const canSubmit = flightIssues.length === 0 && !pending && rows.length > 0 && rows.length <= 80 && rows.length > skipped &&
     (!cancelIds.length || (cancelAcknowledged && cancelIds.every(id => (cancelReasons[id] || '').trim().length >= 2)));
 
   return (
@@ -106,6 +111,8 @@ export function HqEmailBatchRevisionPanel({
         {cancelIds.length > 0 && <span>취소 예정 <strong className="font-semibold text-[#243449]">{cancelIds.length}</strong></span>}
       </div>
 
+      {showAssignments && <HqFlightAssignmentSection draft={draft} slots={slots}
+        onUpdateSlots={onUpdateSlots} onUpdateDraft={onUpdateDraft} disabled={isSubmitting}/>}
       <div className="divide-y divide-[#F0F3F7]">
         {rows.map(row => {
           const previous = row.previous;

@@ -22,6 +22,7 @@ export interface DriverEventLeg {
   destination: DriverEventStop;
   ready: boolean;
   samePlace: boolean;
+  coordinateConflict?: boolean;
 }
 export interface DriverEventRoute {
   scheduleId: string;
@@ -165,10 +166,18 @@ export function getEventRouteLegs(route: DriverEventRoute): DriverEventLeg[] {
   if (!route.fullItinerary || route.stops.length < 2) return [];
   return route.stops.slice(1).map((destination, i) => {
     const origin = route.stops[i];
-    const samePlace = validCoordinate(origin.lat, origin.lng) &&
+    // Coordinates may identify a building center rather than a unique stop.
+    // Different POI names on the same coordinate must be checked by HQ, not
+    // silently rewritten as a no-travel lunch or routed as a zero-distance trip.
+    const sameCoordinates = origin.isPoiConfirmed && destination.isPoiConfirmed &&
+      validCoordinate(origin.lat, origin.lng) &&
       validCoordinate(destination.lat, destination.lng) &&
       Math.abs(origin.lat! - destination.lat!) < 0.00001 &&
       Math.abs(origin.lng! - destination.lng!) < 0.00001;
+    const sameName = Boolean(origin.name.trim()) &&
+      origin.name.trim().toLocaleLowerCase() === destination.name.trim().toLocaleLowerCase();
+    const samePlace = sameCoordinates && sameName;
+    const coordinateConflict = sameCoordinates && !sameName;
     return {
       id: route.scheduleId + ':leg:' + i,
       scheduleId: route.scheduleId,
@@ -176,7 +185,8 @@ export function getEventRouteLegs(route: DriverEventRoute): DriverEventLeg[] {
       index: i,
       origin, destination,
       samePlace,
-      ready: !samePlace &&
+      coordinateConflict,
+      ready: !samePlace && !coordinateConflict &&
         origin.isPoiConfirmed && destination.isPoiConfirmed &&
         validCoordinate(origin.lat, origin.lng) &&
         validCoordinate(destination.lat, destination.lng) &&

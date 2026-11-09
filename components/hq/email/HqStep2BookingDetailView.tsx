@@ -40,6 +40,9 @@ export interface VehicleSlotAssignment {
   vehiclePlate?: string;
   driver: AvailableDriverItem | null;
   status: 'unassigned' | 'assigned';
+  /** Explicit, date-scoped flight codes assigned to this vehicle. */
+  assignedFlightKeys?: string[];
+  sharedRouteConfirmed?: boolean;
 }
 
 function formatKoreanAmPmTime(time?: string | null): string {

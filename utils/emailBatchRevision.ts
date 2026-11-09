@@ -1,6 +1,6 @@
 import type { HqEmailExtractedDraft, RouteWaypointItem } from '@/types/emailHq';
 import type { ExistingEmailBookingCandidate } from '@/services/emailBookingMatchService';
-import { buildEmailDispatchPlan, emailDispatchDays } from './emailDispatchPlan';
+import { buildEmailDispatchPlan, emailDispatchDays, emailAssignableFlights, emailFlightKey, emailFlightAssignmentIssues } from './emailDispatchPlan';
 import { findVipVehicle } from './vehicleData';
 import { assertAttachmentDatesReviewed } from './emailAttachmentCoverage';
 
@@ -16,6 +16,8 @@ export interface EmailBatchSlot {
   vehicleModel: string;
   vehiclePlate?: string;
   driver: { id: string; name: string; phone?: string; languages?: string[]; englishAvailable?: boolean } | null;
+  assignedFlightKeys?: string[];
+  sharedRouteConfirmed?: boolean;
 }
 
 export interface EmailBatchReviewRow {
@@ -63,10 +65,15 @@ export function emailBatchRows(
         const serialize = (route: Array<{ location: string; time?: string }>) =>
           route.map(p => `${p.time || '--:--'} ${p.location}`).join(' → ');
         push('전체 경유지', serialize(original), serialize(day.points));
-        const count = draft.passengerCount || previous.passengerCount;
+        const scoped = emailAssignableFlights(draft).filter(f => f.date === day.date &&
+          (slots.length === 1 || (slot.assignedFlightKeys || []).includes(emailFlightKey(f))));
+        const scopedNames = [...new Set(scoped.flatMap(f => f.passengers || []).map(x => x.trim()).filter(Boolean))];
+        const count = scoped.length && slots.length > 1 ? scopedNames.length : draft.passengerCount || previous.passengerCount;
         if (previous.passengerCount !== count) push('탑승 인원', String(previous.passengerCount), String(count));
-        if (draft.passengerName) push('탑승객', previous.passengerName, draft.passengerName);
-        if (draft.flightNumber) push('편명', previous.flightNumber, draft.flightNumber);
+        const passenger = scoped.length && slots.length > 1 ? scopedNames.join(', ') : draft.passengerName;
+        if (passenger) push('탑승객', previous.passengerName, passenger);
+        const flights = scoped.map(f => f.flightNumber).join(', ') || (scoped.length ? '' : draft.flightNumber);
+        if (flights) push('편명', previous.flightNumber, flights);
         const assignment = assignments[key];
         if (assignment?.vehiclePlate) push('배정 차량', previous.vehiclePlate, assignment.vehiclePlate);
         if (assignment?.driver !== undefined) push('담당 기사', previous.driverName, assignment.driver?.name || '미배정');
@@ -200,6 +207,10 @@ export function buildEmailBatchRevisionApproval(
 ): EmailBatchApproval {
   assertAttachmentDatesReviewed(draft);
   if (!slots.length) throw new Error('비교할 차량 슬롯이 없습니다.');
+  if(status==='published'){
+    const issues=emailFlightAssignmentIssues(draft,slots);
+    if(issues.length)throw new Error(issues[0]);
+  }
   if (draft.tripType === 'cancellation') throw new Error('전체 취소 요청은 별도로 확인해 주세요.');
   if (draft.tripType === 'group' && draft.groupTrips?.length)
     throw new Error('승객별 개별 출발 경로가 있는 예약은 차량별 TMAP 경로를 먼저 확정해 주세요.');
@@ -250,6 +261,8 @@ export function buildEmailBatchRevisionApproval(
     const daySlot = {
       vehicleModel: findVipVehicle(plate)?.model || existing?.vehicleModel || slots[row.index].vehicleModel,
       vehiclePlate: plate || undefined, driver,
+      assignedFlightKeys: slots[row.index].assignedFlightKeys,
+      sharedRouteConfirmed: slots[row.index].sharedRouteConfirmed,
     };
     const base = buildEmailDispatchPlan(dailyDraft, [daySlot], status)[0];
     // Driver/vehicle may vary independently on different days. Keep each old
