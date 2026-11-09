@@ -959,7 +959,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm select-none overscroll-contain driver-modal-backdrop">
       <div
-        className="w-full max-w-lg bg-[#F6F8FC] rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[90dvh] h-[90dvh] sm:h-auto sm:max-h-[88vh] driver-modal-card"
+        className={`w-full max-w-lg bg-[#F6F8FC] rounded-[18px] shadow-[0_16px_56px_rgba(35,49,78,0.11)] overflow-hidden flex flex-col driver-modal-card ${isHomeMode ? 'h-auto max-h-[88dvh]' : 'h-[min(88dvh,760px)] max-h-[88dvh] min-h-0'}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* ========================================================= */}
@@ -1013,7 +1013,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
         {/* Modal Scrollable Body                                     */}
         {/* ========================================================= */}
         <div
-          className="px-5 pb-5 pt-1 space-y-5 overflow-y-auto overscroll-contain touch-pan-y flex-1"
+          className="px-5 pb-5 pt-1 space-y-5 overflow-y-auto overscroll-contain touch-pan-y flex-1 min-h-0"
           style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
         >
           {/* ========================================================= */}
