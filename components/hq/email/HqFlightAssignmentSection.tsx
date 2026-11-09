@@ -5,7 +5,7 @@ import { AlertTriangle, Plane } from 'lucide-react';
 import type { HqEmailExtractedDraft } from '@/types/emailHq';
 import { emailAssignableFlights, emailFlightAssignmentIssues, emailFlightKey } from '@/utils/emailDispatchPlan';
 
-type Slot = { assignedFlightKeys?: string[] };
+type Slot = { assignedFlightKeys?: string[]; sharedRouteConfirmed?: boolean };
 
 type Props<T extends Slot> = {
   draft: HqEmailExtractedDraft;
@@ -101,6 +101,18 @@ export function HqFlightAssignmentSection<T extends Slot>({
           );
         })}
       </div>
+      {split && <label className="flex cursor-pointer items-start gap-2.5 rounded-[12px] bg-[#F6F8FC] px-3 py-3">
+        <input type="checkbox" checked={slots.every(slot=>slot.sharedRouteConfirmed===true)}
+          disabled={disabled || !onUpdateSlots}
+          onChange={event => onUpdateSlots?.(slots.map(slot=>({
+            ...slot, sharedRouteConfirmed:event.target.checked,
+          })))}
+          className="mt-0.5 h-4 w-4 shrink-0 accent-[#1E60F3]"/>
+        <span className="text-[11px] leading-relaxed text-[#59708F]">
+          <strong className="block text-[12px] text-[#25344D]">모든 차량이 동일한 경로를 운행합니다</strong>
+          현재 날짜별 전체 경유지가 모든 차량에 공통으로 적용됩니다. 차량별 경로가 다르면 체크하지 않고 별도 예약으로 분리하세요.
+        </span>
+      </label>}
       {issues.length > 0 && (
         <div role="alert" className="flex items-start gap-2 rounded-[11px] bg-[#FCF4E9] px-3 py-2.5 text-[11px] leading-relaxed text-[#9A6B30]">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0"/>
