@@ -89,3 +89,50 @@ test('confirmed email event name survives all dates and cars without being repla
   assert.equal(new Set(rows.map(row => row.eventId)).size, 1, 'all event days must share one event ID');
   assert.equal(new Set(rows.map(row => row.groupId)).size, 2, 'different dates stay independent');
 });
+
+test('each driver receives ONLY assigned flight numbers, riders and airport notes',()=>{
+ const day='2026-12-10';
+ const base=draft();
+ const firstStop={...base.waypoints[0],
+   notes:'픽업 장소 확인 · 입국 그룹별 픽업 · 1차 KE2104 09:00 (Guest A, Guest B) / 2차 NH867 09:05 (Guest C)'};
+ const w=[firstStop,...base.waypoints.slice(1)];
+ const d={...base,passengerName:'Guest A, Guest B, Guest C',passengerPhone:'010-1111-2222',
+   passengerCount:3,specialRequests:'물 준비',waypoints:w,
+   flights:[
+     {date:day,flightNumber:'KE2104',role:'arrival' as const,destinationAirport:'GMP',
+      scheduledArrival:'09:00',passengers:['Guest A','Guest B']},
+     {date:day,flightNumber:'NH867',role:'arrival' as const,destinationAirport:'GMP',
+      scheduledArrival:'09:05',passengers:['Guest C']},
+   ]};
+ const vehicles=slots().map((s,i)=>({...s,assignedFlightKeys:[day+':'+(i===0?'KE2104':'NH867')]}));
+ const rows=buildEmailDispatchPlan(d,vehicles,'published').filter(x=>x.date===day);
+ assert.equal(rows.length,2);
+ assert.deepEqual(rows.map(r=>r.flightNumber),['KE2104','NH867']);
+ assert.deepEqual(rows.map(r=>r.passengerName),['Guest A, Guest B','Guest C']);
+ assert.deepEqual(rows.map(r=>r.passengerCount),[2,1]);
+ assert.deepEqual(rows.map(r=>r.passengerPhone),['','']);
+ assert.equal(rows[0].driverId,vehicles[0].driver.id);
+ assert.equal(rows[1].driverId,vehicles[1].driver.id);
+ const contentA=JSON.stringify(rows[0]);
+ const contentB=JSON.stringify(rows[1]);
+ assert.ok(contentA.includes('Guest A'));
+ assert.ok(!contentA.includes('NH867')&&!contentA.includes('Guest C'), 'no other driver passenger or flight may appear anywhere in saved row');
+ assert.ok(!contentB.includes('KE2104')&&!contentB.includes('Guest A'), 'no first vehicle passenger or flight may appear anywhere in saved row');
+});
+test('multi-driver flight assignment must be explicit, unique, and have verified riders',()=>{
+ const day='2026-12-10';
+ const source={...draft(),flights:[
+  {date:day,flightNumber:'KE2104',role:'arrival' as const,passengers:['Guest A']},
+  {date:day,flightNumber:'NH867',role:'arrival' as const,passengers:['Guest B']},
+ ]};
+ const two=slots();
+ assert.throws(()=>buildEmailDispatchPlan(source,two,'published'),/담당 차량/);
+ assert.throws(()=>buildEmailDispatchPlan(source,two.map(s=>({...s,assignedFlightKeys:[day+':KE2104',day+':NH867']})),'published'),/담당 차량/);
+ const mapped=two.map((s,i)=>({...s,assignedFlightKeys:[day+':'+(i===0?'KE2104':'NH867')]}));
+ const unknown={...source,flights:[source.flights[0],{...source.flights[1],passengers:[]}]};
+ assert.throws(()=>buildEmailDispatchPlan(unknown,mapped,'published'),/탑승객 이름/);
+ const duplicated={...source,flights:[source.flights[0],{...source.flights[1],passengers:['Guest A']}]};
+ assert.throws(()=>buildEmailDispatchPlan(duplicated,mapped,'published'),/중복 배정/);
+ const pending=buildEmailDispatchPlan(source,two,'unassigned');
+ assert.ok(pending.every(x=>!x.driverId && !x.vehiclePlate));
+});
