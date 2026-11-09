@@ -221,7 +221,16 @@ export async function POST(req: NextRequest) {
         lng: w.lng as number,
       }));
 
+    // Inline schedule chips need exactly ONE forecast for the chosen date/time,
+    // not the six time-slot calls used by the interactive prediction sheet.
+    const singleSlot = body.singleSlot === true;
     const rawPredictionTime = body.predictionTime;
+    if (singleSlot && (
+      typeof rawPredictionTime !== 'string' ||
+      !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}[+-]\\d{2}:?\\d{2}$/.test(rawPredictionTime)
+    )) {
+      return NextResponse.json({ isUnavailable: true, error: '일정 날짜와 KST 시각이 필요합니다.' }, { status: 400 });
+    }
     let targetDate: Date;
     if (rawPredictionTime) {
       targetDate = new Date(rawPredictionTime);
@@ -232,12 +241,31 @@ export async function POST(req: NextRequest) {
       targetDate = new Date();
     }
 
+    if (singleSlot) {
+      const validPoint = (p: LocationPoint) =>
+        Number.isFinite(p.lat) && Number.isFinite(p.lng) &&
+        p.lat >= -90 && p.lat <= 90 && p.lng >= -180 && p.lng <= 180 &&
+        !(p.lat === 0 && p.lng === 0);
+      if (!validPoint(departure) || !validPoint(destination)) {
+        return NextResponse.json({ isUnavailable: true, error: '출발지 또는 목적지 위치가 확정되지 않았습니다.' }, { status: 400 });
+      }
+      if (targetDate.getTime() <= Date.now()) {
+        return NextResponse.json({ isUnavailable: true, error: '지난 시각은 출발시간 예측 대상이 아닙니다.' }, { status: 422 });
+      }
+    }
+
     const apiKey = process.env.TMAP_API_KEY;
     const useMock = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
     const isMockMode = useMock || !apiKey || apiKey === 'your_tmap_api_key';
 
     // Quota Defense Cache Key
-    const cacheKey = `${departure.lat.toFixed(3)},${departure.lng.toFixed(3)}->${destination.lat.toFixed(3)},${destination.lng.toFixed(3)}_${formatTmapIsoTime(targetDate)}_${waypoints.length}`;
+    const cacheKey = JSON.stringify({
+      departure: [departure.lat, departure.lng],
+      destination: [destination.lat, destination.lng],
+      time: formatTmapIsoTime(targetDate),
+      waypoints: waypoints.map((p) => [p.lat, p.lng]),
+      singleSlot,
+    });
     const nowMs = Date.now();
 
     if (!isMockMode && predictionCache.has(cacheKey)) {
@@ -296,7 +324,7 @@ export async function POST(req: NextRequest) {
 
     // Call TMAP prediction API for every individual time slot:
     // [0 (선택 시각), 10분 후, 30분 후, 60분 후 (1시간), 90분 후 (1시간 30분), 120분 후 (2시간)]
-    const offsets = [0, 10, 30, 60, 90, 120];
+    const offsets = singleSlot ? [0] : [0, 10, 30, 60, 90, 120];
 
     const slotPromises = offsets.map(async (offset) => {
       const slotDate = new Date(targetDate.getTime() + offset * 60 * 1000);
@@ -393,7 +421,7 @@ export async function POST(req: NextRequest) {
     const fastestFutureSlot = timeline.find((t) => !t.isUnavailable && t.offsetMinutes > 0 && t.diffMinutes <= -3);
     const slowestFutureSlot = timeline.find((t) => !t.isUnavailable && t.offsetMinutes > 0 && t.diffMinutes >= 5);
 
-    let trafficSummary = 'TMAP 공식 타임머신 예측 반영';
+    let trafficSummary = singleSlot ? 'TMAP 지정 시각 출발 예측' : 'TMAP 공식 타임머신 예측 반영';
     if (fastestFutureSlot && fastestFutureSlot.durationMinutes) {
       trafficSummary = `${fastestFutureSlot.label} 출발 시 ${Math.abs(fastestFutureSlot.diffMinutes)}분 단축 예측`;
     } else if (slowestFutureSlot && slowestFutureSlot.durationMinutes) {
