@@ -58,7 +58,7 @@ export async function DELETE(req: NextRequest) {
     ] as const;
 
     for (const [table, foreignKey] of protectedRefs) {
-      const { data, error } = await supabaseAdmin.from(table).select('id').in(foreignKey, ids).limit(1);
+      const { data, error } = await supabaseAdmin.from(table).select(foreignKey).in(foreignKey, ids).limit(1);
       if (error) throw error;
       if (data?.length) {
         return NextResponse.json({
