@@ -25,11 +25,12 @@ test('existing booking details retain every working action and use requested sim
   assert.match(info, /setActiveCardDropdown\(\{ allocId: allocation\.id, type: 'driver' \}\)/);
   assert.match(info, /handleSubmit\('unassigned'\)/);
   assert.match(info, /handleSubmit\('published'\)/);
-  assert.match(info, /handleCancelDispatch/);
+  assert.match(info, /handleDeleteDispatch/);
+  assert.match(info, /hardDeleteHqSchedule\(targetId, 'booking'\)/);
   assert.match(info, /initialBooking \? '변경 내용 저장' : '예약만 등록'/);
   assert.match(info, /initialBooking \? '배차 확정' : '바로 배차'/);
-  assert.ok(info.includes('배차 취소'));
-  assert.ok(!info.includes('예약·배차 취소'));
+  assert.ok(info.includes('배차 삭제'));
+  assert.ok(info.includes('배차 완전 삭제'));
   assert.match(table, /placeholder="고객사, 승객, 목적지 검색"/);
 });
 
