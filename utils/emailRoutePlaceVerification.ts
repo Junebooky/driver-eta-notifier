@@ -11,6 +11,7 @@ export type EmailRouteStop = {
   time: string;
   location: string;
   address?: string;
+  clientAddress?: string;
   lat?: number;
   lng?: number;
   isPoiConfirmed: boolean;
@@ -29,6 +30,7 @@ export function getEmailRouteStops(draft: HqEmailExtractedDraft): EmailRouteStop
       time: point.time || '',
       location: point.location,
       address: point.address,
+      clientAddress: point.clientAddress,
       lat: point.lat,
       lng: point.lng,
       isPoiConfirmed: Boolean(point.isPoiConfirmed),
@@ -36,12 +38,12 @@ export function getEmailRouteStops(draft: HqEmailExtractedDraft): EmailRouteStop
   }
   return [
     { id: 'pickup', date: draft.pickupDate, time: draft.pickupTime,
-      location: draft.pickupLocation, address: draft.pickupAddress,
+      location: draft.pickupLocation, address: draft.pickupAddress, clientAddress: draft.pickupProvidedAddress,
       lat: draft.pickupLat, lng: draft.pickupLng,
       isPoiConfirmed: Boolean(draft.isPickupPoiConfirmed) },
     { id: 'dropoff', date: draft.pickupDate,
       time: draft.dayEndTimes?.[draft.pickupDate] || '',
-      location: draft.dropoffLocation, address: draft.dropoffAddress,
+      location: draft.dropoffLocation, address: draft.dropoffAddress, clientAddress: draft.dropoffProvidedAddress,
       lat: draft.dropoffLat, lng: draft.dropoffLng,
       isPoiConfirmed: Boolean(draft.isDropoffPoiConfirmed) },
   ];
