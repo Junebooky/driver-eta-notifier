@@ -25,6 +25,8 @@ interface ReportTemplateSelectorProps {
   etaFormatted?: string;
   // Real-time synchronization with ActionPanel / parent state
   onActiveReportTextChange?: (text: string, language: 'ko' | 'en') => void;
+  /** Latest text copied for one-tap event navigation. Must match the displayed route/language. */
+  navigationReport?: { originId: string; destinationId: string; language: 'ko' | 'en'; text: string } | null;
   onFreshEtaCalculated?: (freshEta: string) => void;
 }
 
@@ -43,6 +45,7 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
   waypoints = [],
   etaFormatted,
   onActiveReportTextChange,
+  navigationReport,
   onFreshEtaCalculated,
 }) => {
   const [copySuccess, setCopySuccess] = useState(false);
@@ -136,7 +139,13 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
   }, [buildEnglishText]);
 
   // Current active display text (Task 1: The Copy button always copies the exact text currently displayed)
-  const displayedReportText = language === 'en' ? englishReportText : reportPreviewText;
+  const displayedReportText =
+    currentMode === 'DEPARTURE' &&
+    navigationReport?.originId === currentOriginKey &&
+    navigationReport?.destinationId === currentDestKey &&
+    navigationReport?.language === language
+      ? navigationReport.text
+      : language === 'en' ? englishReportText : reportPreviewText;
 
   // Propagate active text change to parent when displayedReportText changes
   useEffect(() => {
