@@ -15,7 +15,6 @@ import { generateNameCandidates } from '@/utils/nameMatcher';
 import { parseVehicleDetails } from '@/components/ProfileModal';
 import { ensureClientAuth } from '@/utils/cockpitClientAuth';
 import type { DriverEventFavorite, DriverEventLeg } from '@/utils/driverEventFavorites';
-import { DriverEventFavoritesSection } from '@/components/driver/DriverEventFavoritesSection';
 import { DriverLegPickerModal, type DriverLegAction } from '@/components/driver/DriverLegPickerModal';
 
 const THINKING_STEPS = [
@@ -892,18 +891,8 @@ ${scheduleItemsFormatted}`.trim();
         className="hidden"
       />
 
-      {/* Server-synced event itinerary by name and service day. Regular schedule cards remain below. */}
-      {onLoadEventLeg && (eventFavorites.length > 0 || eventFavoritesLoading || eventFavoritesError) && (
-        <div className="mb-4">
-          <DriverEventFavoritesSection
-            events={eventFavorites}
-            isLoading={eventFavoritesLoading}
-            error={eventFavoritesError}
-            onRefresh={onRefreshEventFavorites}
-            onLoadLeg={onLoadEventLeg}
-          />
-        </div>
-      )}
+      {/* Single SSOT view: each published assignment appears ONCE in ScheduleCard.
+          Event favorites are the compact projection in favorites, not a second schedule list. */}
 
       {/* 1. Driver Profile Incomplete Guardrail Banner (Shown at top when profile is missing) */}
       {!hasProfile && (
@@ -1092,8 +1081,8 @@ ${scheduleItemsFormatted}`.trim();
           {/* Subheader & Actions */}
           <div className="flex items-center justify-between gap-2 pb-0.5 px-0.5">
             <div className="min-w-0">
-              <h3 className="text-[17px] sm:text-lg font-extrabold text-[#0F172A] tracking-tight leading-snug truncate">
-                {scheduleTitle}
+              <h3 className="text-[17px] sm:text-lg font-bold text-[#17233B] tracking-tight leading-snug">
+                확정 의전 배차
               </h3>
               <p className="text-xs text-slate-400 font-medium mt-0.5">
                 {selectedVehicleFilter === 'all'
@@ -1180,34 +1169,52 @@ ${scheduleItemsFormatted}`.trim();
 
           {/* Schedule Cards List */}
           <div className="space-y-3">
-            {filteredSchedules.map((item, itemIdx) => (
-              <ScheduleCard
-                key={`${item.id}-${itemIdx}`}
-                item={item}
-                onNavigate={(sch) => {
-                  if (needsLegSelection(sch)) setLegSelection({ schedule: sch, action: 'navigate' });
-                  else onNavigateForSchedule(sch);
-                }}
-                onPredict={(sch) => {
-                  if (needsLegSelection(sch)) setLegSelection({ schedule: sch, action: 'predict' });
-                  else onOpenPredictionForSchedule(sch);
-                }}
-                onSelectForCockpit={(sch) => {
-                  if (needsLegSelection(sch)) {
-                    setLegSelection({ schedule: sch, action: 'load' });
-                  } else {
-                    const { originPreset, destinationPreset } = scheduleToPresets(sch);
-                    onSelectRouteForCockpit(originPreset, destinationPreset, sch);
-                  }
-                }}
-                onOpenFlight={onOpenFlightModal}
-                onEdit={(sch) => {
-                  setEditingSchedule(sch);
-                  setIsEditModalOpen(true);
-                }}
-                onAcknowledge={handleAcknowledgeSchedule}
-              />
-            ))}
+            {filteredSchedules.map((item, itemIdx) => {
+              const previous = filteredSchedules[itemIdx - 1];
+              const eventKey = item.event_id || item.id;
+              const previousEventKey = previous?.event_id || previous?.id;
+              const showEventHeading = item.intake_source === 'email' &&
+                (itemIdx === 0 || previousEventKey !== eventKey || previous?.date !== item.date);
+              return (
+                <React.Fragment key={item.id}>
+                  {showEventHeading && (
+                    <div className="px-0.5 pt-2" aria-label="배정 행사 그룹">
+                      <p className="text-[11px] font-semibold text-[#8290A5]">배정 행사 · {formatFilterDateLabel(item.date)}</p>
+                      <h4 className="mt-1 break-words text-[14px] font-bold text-[#25344D]">
+                        {item.event_name || item.group_name || item.customer_name || '행사 일정'}
+                      </h4>
+                    </div>
+                  )}
+                  <ScheduleCard
+                    item={item}
+                    onNavigate={(sch) => {
+                      if (needsLegSelection(sch)) setLegSelection({ schedule: sch, action: 'navigate' });
+                      else onNavigateForSchedule(sch);
+                    }}
+                    onNavigateLeg={(leg) => onNavigateForSchedule(item, leg)}
+                    onPredict={(sch) => {
+                      if (needsLegSelection(sch)) setLegSelection({ schedule: sch, action: 'predict' });
+                      else onOpenPredictionForSchedule(sch);
+                    }}
+                    onPredictLeg={(leg) => onOpenPredictionForSchedule(item, leg)}
+                    onSelectForCockpit={(sch) => {
+                      if (needsLegSelection(sch)) {
+                        setLegSelection({ schedule: sch, action: 'load' });
+                      } else {
+                        const { originPreset, destinationPreset } = scheduleToPresets(sch);
+                        onSelectRouteForCockpit(originPreset, destinationPreset, sch);
+                      }
+                    }}
+                    onOpenFlight={onOpenFlightModal}
+                    onEdit={(sch) => {
+                      setEditingSchedule(sch);
+                      setIsEditModalOpen(true);
+                    }}
+                    onAcknowledge={handleAcknowledgeSchedule}
+                  />
+                </React.Fragment>
+              );
+            })}
           </div>
         </div>
       )}
