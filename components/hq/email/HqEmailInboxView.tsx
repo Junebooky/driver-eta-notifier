@@ -837,7 +837,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
         items = buildEmailDispatchPlan(currentDraft, vehicleSlots, status);
         if (matched) {
           if (items.length !== 1 || (matched.groupTotalVehicles || 1) > 1)
-            throw new Error('여러 날짜·차량은 일괄 비교에서 날짜별 예약을 연결해 주세요.');
+            throw new Error('여러 날짜·차량은 예약 검토 화면의 각 일정에서 기존 예약을 연결해 주세요.');
           if (matched.dispatchStatus === 'published' && status !== 'published')
             throw new Error('기사에게 배포된 기존 배차를 미배정으로 전환할 수 없습니다.');
           items = items.map(item => ({
