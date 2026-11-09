@@ -12,7 +12,8 @@
   "git": {
     "deploymentEnabled": {
       "fix/email-workflow-review-assignment-20261109": false,
-      "fix/email-attachment-completeness-20261109": false
+      "fix/email-attachment-completeness-20261109": false,
+      "fix/email-attachment-date-review-20261109": false
     }
   }
 }

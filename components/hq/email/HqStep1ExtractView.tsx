@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import { HqEmailSummary, HqEmailDetail, HqEmailExtractedDraft, RouteWaypointItem } from '@/types/emailHq';
 import { haptics } from '@/utils/haptics';
-import { HqBadge } from '@/components/hq/ui';
+import { HqBadge, HqButton } from '@/components/hq/ui';
 import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
 import { HqSourceText } from '@/components/hq/ui/HqSourceText';
 import { findEmailSourceRanges } from '@/utils/emailWorkflowReview';
@@ -665,8 +665,19 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
 
             {/* CRM Save Feedback Toast */}
             {!!extractedDraft.documentAnalysis?.length && (
-              <HqInlineFeedback tone="info" message={`본문과 첨부 ${extractedDraft.documentAnalysis.length}개를 함께 분석했습니다. ${extractedDraft.documentAnalysis.map(file => `${file.filename}${file.reviewedSheets.length ? ` · ${file.reviewedSheets.length}개 시트` : ''}`).join(' / ')}`} />
+              <HqInlineFeedback tone="info" message={`본문과 첨부 ${extractedDraft.documentAnalysis.length}개를 함께 읽었습니다. ${extractedDraft.documentAnalysis.map(file => `${file.filename}${file.reviewedSheets.length ? ` · ${file.reviewedSheets.length}개 시트` : ''}`).join(' / ')}`} />
             )}
+            {extractedDraft.documentAnalysis?.map((file, index) => file.missingDates?.length ? (
+              <div key={`${file.filename}-${index}`} className="space-y-2">
+                <HqInlineFeedback tone={file.dateReviewAcknowledged ? 'info' : 'error'} message={`${file.filename} · 확인 필요: ${file.missingDates.join(', ')}. 이 날짜가 표에 있으나 경로에 반영되지 않았습니다. 원본에서 운행 여부를 확인하고, 필요한 경유지와 날짜를 추가해 주세요. 확인 전에는 예약을 확정할 수 없습니다.`} />
+                <HqButton type="button" variant="ghost" aria-pressed={Boolean(file.dateReviewAcknowledged)} onClick={() => onUpdateDraft?.({
+                  ...extractedDraft,
+                  documentAnalysis: extractedDraft.documentAnalysis?.map((item, itemIndex) => itemIndex === index ? { ...item, dateReviewAcknowledged: !item.dateReviewAcknowledged } : item),
+                })}>
+                  {file.dateReviewAcknowledged ? '검토 완료 취소' : '원본·일정 검토 완료'}
+                </HqButton>
+              </div>
+            ) : null)}
             {crmSavedNotice && (
               <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-bold flex items-center gap-2 animate-in fade-in">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />

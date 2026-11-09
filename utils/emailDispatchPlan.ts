@@ -1,4 +1,5 @@
 import type { HqEmailExtractedDraft,RouteWaypointItem } from '@/types/emailHq';
+import { assertAttachmentDatesReviewed } from './emailAttachmentCoverage';
 import { VIP_REAL_VEHICLES } from './vehicleData';
 import { normalizeDateToIso,normalizeTimeHHmm } from './dispatchConflictDetector';
 import { buildAirportArrivalPickupGroups } from './emailBookingEvidence';
@@ -14,6 +15,7 @@ export function emailDispatchDays(draft:HqEmailExtractedDraft){
  return [...groups.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([date,points])=>({date,points,start:points[0],end:points[points.length-1],endTime:draft.dayEndTimes?.[date] || points[points.length-1].time || ''}));
 }
 export function buildEmailDispatchPlan(draft:HqEmailExtractedDraft,slots:Array<{vehicleModel:string;vehiclePlate?:string;driver:{id:string;name:string;phone?:string;languages?:string[];englishAvailable?:boolean}|null}>,status:'published'|'unassigned'){
+ assertAttachmentDatesReviewed(draft);
  const requestedLanguage = draft.requestedLanguage || (/영어|english|외국인/i.test(draft.specialRequests || '') ? 'en' : 'ko');
  if(draft.tripType==='group' && draft.groupTrips?.length)throw new Error('탑승객별 별도 일정은 각 예약에서 확인한 뒤 배차해 주세요. 첫 일정만 배차하지 않습니다.');
  if(!slots.length)throw new Error('요청 차량을 추가해 주세요.');

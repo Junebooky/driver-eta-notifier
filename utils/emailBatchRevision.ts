@@ -2,6 +2,7 @@ import type { HqEmailExtractedDraft, RouteWaypointItem } from '@/types/emailHq';
 import type { ExistingEmailBookingCandidate } from '@/services/emailBookingMatchService';
 import { buildEmailDispatchPlan, emailDispatchDays } from './emailDispatchPlan';
 import { findVipVehicle } from './vehicleData';
+import { assertAttachmentDatesReviewed } from './emailAttachmentCoverage';
 
 export type EmailBatchDecisions = Record<string, string>;
 export type EmailBatchAssignment = { vehiclePlate?: string; driver?: EmailBatchSlot['driver'] };
@@ -197,6 +198,7 @@ export function buildEmailBatchRevisionApproval(
   assignments: EmailBatchAssignments,
   status: 'published' | 'unassigned',
 ): EmailBatchApproval {
+  assertAttachmentDatesReviewed(draft);
   if (!slots.length) throw new Error('비교할 차량 슬롯이 없습니다.');
   if (draft.tripType === 'cancellation') throw new Error('전체 취소 요청은 별도로 확인해 주세요.');
   if (draft.tripType === 'group' && draft.groupTrips?.length)

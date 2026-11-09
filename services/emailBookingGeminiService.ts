@@ -545,6 +545,7 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
     evidenceDraft.documentAnalysis = manifest.map(source => ({
       filename: source.filename, kind: source.kind,
       reviewedSheets: coverage.find(item => item.sourceId === source.sourceId)?.reviewedSheets || [],
+      missingDates: coverage.find(item => item.sourceId === source.sourceId)?.missingDates,
     }));
 
     const usage = response.usageMetadata;
