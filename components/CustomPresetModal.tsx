@@ -959,7 +959,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm select-none overscroll-contain driver-modal-backdrop">
       <div
-        className="w-full max-w-lg bg-[#F6F8FC] rounded-[18px] shadow-[0_16px_56px_rgba(35,49,78,0.11)] overflow-hidden flex flex-col h-[min(88dvh,760px)] max-h-[88dvh] min-h-0 driver-modal-card"
+        className={`w-full max-w-lg bg-[#F6F8FC] rounded-[18px] shadow-[0_16px_56px_rgba(35,49,78,0.11)] overflow-hidden flex flex-col driver-modal-card ${isHomeMode ? 'h-auto max-h-[88dvh]' : 'h-[min(88dvh,760px)] max-h-[88dvh] min-h-0'}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* ========================================================= */}
