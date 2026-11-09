@@ -124,3 +124,22 @@ test('unconfirmed stops use an amber confirmation warning, while legacy direct n
   assert.match(html, /bg-\[#FCF4E9\]/);
   assert.match(html, /disabled=""[^>]*aria-label="길안내 실행"/);
 });
+
+test('two confirmed names sharing one building centroid are NOT a confirmed same-place activity', () => {
+  const schedule = dispatch();
+  const last = schedule.routeWaypoints![2];
+  schedule.routeWaypoints!.push({
+    ...last, id: 'different-venue', order: 4, location: '코엑스 서문', time: '14:00',
+  });
+  const legs = getEventRouteLegs(scheduleToEventRoute(schedule));
+  const lastLeg = legs[legs.length - 1];
+  assert.equal(lastLeg.samePlace, false);
+  assert.equal(lastLeg.coordinateConflict, true);
+  assert.equal(lastLeg.ready, false);
+  const html = renderToStaticMarkup(createElement(DriverRouteLegRow, {
+    leg: lastLeg, onNavigate: () => {}, onPredict: () => {},
+  }));
+  assert.match(html, /장소 이름이 다르지만 지도 좌표가 같습니다/);
+  assert.match(html, /disabled/);
+  assert.doesNotMatch(html, /체류 일정/);
+});
