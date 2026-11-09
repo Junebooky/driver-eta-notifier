@@ -1395,7 +1395,9 @@ export default function DriverCockpit() {
         durationMinutes: fresh.durationMinutes,
         etaFormatted: fresh.etaFormatted,
         trafficSummary: fresh.trafficSummary || '',
+        isMock: false,
         isFallback: !fresh.isFresh,
+        isUnavailable: fresh.isUnavailable,
       });
       const report = buildFreshReportText({
         snapshot,
@@ -1475,6 +1477,10 @@ export default function DriverCockpit() {
 
   const handleNavigateForSchedule = useCallback(
     async (schedule: ScheduleItem, leg?: DriverEventLeg) => {
+      if (leg) {
+        handleNavigateEventLeg(leg);
+        return;
+      }
       // Never send every stop to the navigator as a single continuous drive.
       if (!leg && ((schedule.routeWaypoints?.length || 0) > 2 ||
         (schedule.adminWaypoints?.length || 0) > 0 || (schedule.waypoints?.length || 0) > 0)) return;
