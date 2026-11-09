@@ -151,7 +151,7 @@ export function DriverEventFavoritesSection({
                                             <button type="button" disabled={!leg.ready} onClick={() => onLoadLeg(leg)}
                                               aria-label={`${leg.index + 1}구간 ${leg.origin.name}에서 ${leg.destination.name}까지 불러오기`}
                                               className="mt-2.5 flex min-h-10 w-full items-center justify-center rounded-[11px] bg-white px-3 text-[12px] font-bold text-[#1E60F3] shadow-[0_2px_8px_rgba(35,49,78,0.035)] transition-colors hover:bg-[#EFF4FF] disabled:cursor-not-allowed disabled:bg-[#E8EDF5] disabled:text-[#9BA9BA]">
-                                              {leg.samePlace ? '같은 장소 · 이동 불필요' : leg.ready ? '이 구간 불러오기' : '장소 확인 필요'}
+                                              {leg.samePlace ? '같은 장소 · 이동 불필요' : leg.ready ? '길안내 · 보고 자동 복사' : '장소 확인 필요'}
                                             </button>
                                           </div>
                                         ))}

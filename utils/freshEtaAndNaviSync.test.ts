@@ -144,8 +144,8 @@ test('1. Fresh ETA on Action Button Click (Cache Bypass vs Preview)', async () =
     });
 
     // Report text MUST contain 10:05 departure and 10:47 fresh ETA
-    assert.match(freshText, /출발 예정: 조선팰리스 \(10:05\)/);
-    assert.match(freshText, /예상 도착\(ETA\): 10:47/);
+    assert.match(freshText, /출발 예정: 조선팰리스 \(10:05 AM\)/);
+    assert.match(freshText, /예상 도착\(ETA\): 10:47 AM/);
     assert.doesNotMatch(freshText, /10:45/);
   } finally {
     (global as any).fetch = originalFetch;
@@ -170,8 +170,8 @@ test('2. Language (KR/EN) and Mode (Departure/Arrived) Consistency Across All Bu
     durationMinutes: 42,
   });
   assert.match(krDepText, /\[142호 7811 윤태준\]/);
-  assert.match(krDepText, /• 출발 예정: 조선팰리스 \(10:05\)/);
-  assert.match(krDepText, /• 예상 도착\(ETA\): 10:47/);
+  assert.match(krDepText, /• 출발 예정: 조선팰리스 \(10:05 AM\)/);
+  assert.match(krDepText, /• 예상 도착\(ETA\): 10:47 AM/);
 
   // Case B: Korean Arrived
   const krArrSnapshot = captureActionSnapshot({

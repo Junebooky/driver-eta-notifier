@@ -30,17 +30,23 @@ export function formatReportHeader(vehicleNo?: string, driverName?: string): str
   return '[의전 드라이버]';
 }
 
+/**
+ * Display clocks consistently in 12-hour time with AM/PM in both Korean and English reports.
+ * Never change an already-tagged AM/PM period, and do not fabricate a time for pending ETA.
+ */
 export function formatEtaWithAmPm(etaFormatted: string): string {
-  const explicitMatch = etaFormatted.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  const explicitMatch = etaFormatted.match(/\b(\d{1,2}):(\d{2})\s*(AM|PM)\b/i);
   if (explicitMatch) {
-    return `${explicitMatch[1].padStart(2, '0')}:${explicitMatch[2]} ${explicitMatch[3].toUpperCase()}`;
+    const hours = Number(explicitMatch[1]);
+    if (hours > 23) return etaFormatted.trim();
+    return `${hours % 12 || 12}:${explicitMatch[2]} ${explicitMatch[3].toUpperCase()}`;
   }
-  const timeMatch = etaFormatted.match(/(\d{1,2}):(\d{2})/);
+  const timeMatch = etaFormatted.match(/\b(\d{1,2}):(\d{2})\b/);
   if (timeMatch) {
-    const hours = parseInt(timeMatch[1], 10);
-    const minutes = timeMatch[2];
+    const hours = Number(timeMatch[1]);
+    if (hours > 23) return etaFormatted.trim();
     const period = hours >= 12 ? 'PM' : 'AM';
-    return `${String(hours).padStart(2, '0')}:${minutes} ${period}`;
+    return `${hours % 12 || 12}:${timeMatch[2]} ${period}`;
   }
   return etaFormatted.replace(/\s*\(.*?\)/, '').trim();
 }

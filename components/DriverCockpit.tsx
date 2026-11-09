@@ -42,6 +42,8 @@ import { NaviDrivingLogConfirmModal } from '@/components/NaviDrivingLogConfirmMo
 import {
   captureActionSnapshot,
   fetchFreshEtaRoute,
+  buildFreshReportText,
+  copyTextSafely,
   executeFreshEtaAction,
   syncNavigationRouteToDrivingLog,
   registerOutboxAutoSync,
@@ -783,6 +785,12 @@ export default function DriverCockpit() {
   const [reportMode, setReportMode] = useState<ReportMode>('DEPARTURE');
   const [activeLanguage, setActiveLanguage] = useState<'ko' | 'en'>('ko');
   const [activeDisplayedReportText, setActiveDisplayedReportText] = useState<string>('');
+  const [navigationReport, setNavigationReport] = useState<{
+    originId: string; destinationId: string; language: 'ko' | 'en'; text: string;
+  } | null>(null);
+  const [pendingLegReportCopy, setPendingLegReportCopy] = useState<string | null>(null);
+  const [legCopyNotice, setLegCopyNotice] = useState<string | null>(null);
+  const directLegActionSeqRef = useRef(0);
   const [isScheduleNaviConfirmOpen, setIsScheduleNaviConfirmOpen] = useState(false);
   const [scheduleNaviFreshResult, setScheduleNaviFreshResult] = useState<FreshEtaRouteResult | null>(null);
   const [isScheduleNaviLoading, setIsScheduleNaviLoading] = useState(false);
@@ -1328,21 +1336,108 @@ export default function DriverCockpit() {
     haptics.success();
   };
 
-  /** Each journey is just one origin → destination: never load the day's stops as via points. */
-  const handleLoadEventLeg = (leg: DriverEventLeg) => {
+  /**
+   * One-tap event leg: open the chosen navigation app immediately from the
+   * user's gesture, and separately prepare the customer-origin report.
+   * Clipboard is best-effort after fresh ETA (mobile browser permissions apply).
+   * Never reuse old leg ETA or announce a copy that has not succeeded.
+   */
+  const handleNavigateEventLeg = (leg: DriverEventLeg) => {
     const pair = eventLegToPresets(leg);
     if (!pair) return;
+    const actionSeq = ++directLegActionSeqRef.current;
+    const snapshot = captureActionSnapshot({
+      origin: pair.origin,
+      destination: pair.destination,
+      waypoints: [],
+      adminWaypoints: [],
+      isAdminRoute: false,
+      defaultNavi: profile.defaultNavi,
+      reportMode: 'DEPARTURE',
+      language: activeLanguage,
+      bookingId: leg.scheduleId,
+      driverProfile: profile,
+    });
+
+    // Only the chosen client-defined leg is visible in route/report/log state.
     setOrigin(pair.origin);
     setDestination(pair.destination);
     setAdminWaypoints([]);
     setWaypoints([]);
     setIsAdminRoute(false);
     setActiveBookingId(leg.scheduleId);
+    setReportMode('DEPARTURE');
+    setRouteEstimate({ distanceKm: 0, durationMinutes: 0, etaFormatted: '--:--', isMock: false, isUnavailable: true }); // No previous-leg ETA.
+    setNavigationReport(null);
+    setPendingLegReportCopy(null);
+    setLegCopyNotice(null);
     setIsAddModalOpen(false);
     setIsLocationSearchOpen(false);
     setSelectionTarget('destination');
     setActiveTab('drive');
-    fetchRouteEstimate(pair.origin, pair.destination, []);
+
+    // Kick off fresh ETA without blocking deep-link navigation.
+    const freshEtaPromise = fetchFreshEtaRoute(snapshot);
+
+    // Deep link MUST be invoked before awaiting the network/clipboard promises.
+    void launchNavigationApp(profile.defaultNavi, {
+      name: pair.destination.shortName || pair.destination.name,
+      lat: pair.destination.lat,
+      lng: pair.destination.lng,
+    }, undefined, []).catch((err) => {
+      console.warn('[EventLeg] Could not start navigation:', err);
+    });
+
+    void freshEtaPromise.then((fresh) => {
+      if (actionSeq !== directLegActionSeqRef.current) return;
+      setRouteEstimate({
+        distanceKm: fresh.distanceKm,
+        durationMinutes: fresh.durationMinutes,
+        etaFormatted: fresh.etaFormatted,
+        trafficSummary: fresh.trafficSummary || '',
+        isMock: false,
+        isFallback: !fresh.isFresh,
+        isUnavailable: fresh.isUnavailable,
+      });
+      const report = buildFreshReportText({
+        snapshot,
+        etaFormatted: fresh.etaFormatted,
+        durationMinutes: fresh.durationMinutes,
+        distanceKm: fresh.distanceKm,
+      });
+      setNavigationReport({
+        originId: pair.origin.id,
+        destinationId: pair.destination.id,
+        language: snapshot.language,
+        text: report,
+      });
+      // Browsers may reject clipboard writes after an app switch. Offer one-tap retry.
+      void copyTextSafely(report).then((copied) => {
+        if (actionSeq !== directLegActionSeqRef.current) return;
+        if (!copied) {
+          setPendingLegReportCopy(report);
+          setLegCopyNotice('자동 복사가 제한됐습니다. 아래 버튼으로 복사해 주세요.');
+        } else {
+          setPendingLegReportCopy(null);
+          setLegCopyNotice('단톡방 보고서가 자동 복사됐습니다.');
+        }
+      });
+    }).catch((err) => {
+      if (actionSeq !== directLegActionSeqRef.current) return;
+      console.warn('[EventLeg] Fresh ETA unavailable:', err);
+      const report = buildFreshReportText({
+        snapshot,
+        etaFormatted: '--:--',
+      });
+      setNavigationReport({
+        originId: pair.origin.id,
+        destinationId: pair.destination.id,
+        language: snapshot.language,
+        text: report,
+      });
+      setPendingLegReportCopy(report);
+      setLegCopyNotice('ETA 확인이 어려워 보고서에 도착 미정을 표시했습니다. 복사를 눌러 확인해 주세요.');
+    });
     haptics.success();
   };
 
@@ -1382,6 +1477,10 @@ export default function DriverCockpit() {
 
   const handleNavigateForSchedule = useCallback(
     async (schedule: ScheduleItem, leg?: DriverEventLeg) => {
+      if (leg) {
+        handleNavigateEventLeg(leg);
+        return;
+      }
       // Never send every stop to the navigator as a single continuous drive.
       if (!leg && ((schedule.routeWaypoints?.length || 0) > 2 ||
         (schedule.adminWaypoints?.length || 0) > 0 || (schedule.waypoints?.length || 0) > 0)) return;
@@ -1698,6 +1797,7 @@ export default function DriverCockpit() {
               currentMode={reportMode}
               onSelectMode={(mode) => setReportMode(mode)}
               reportPreviewText={reportPreviewText}
+              navigationReport={navigationReport}
               profile={profile}
               origin={origin}
               destination={destination}
@@ -1711,6 +1811,29 @@ export default function DriverCockpit() {
                 setRouteEstimate((prev) => ({ ...prev, etaFormatted: freshEta }));
               }}
             />
+
+            {/* Browser clipboard restrictions require an explicit retry, never a false success. */}
+            {legCopyNotice && (
+              <div role="status" className="flex items-center justify-between gap-2 rounded-[14px] bg-white px-3.5 py-3 text-[12px] font-semibold text-[#4D607C] shadow-[0_2px_12px_rgba(35,49,78,0.05)]">
+                <span className="min-w-0 flex-1">{legCopyNotice}</span>
+                {pendingLegReportCopy && (
+                  <button type="button" onClick={async () => {
+                    const copied = await copyTextSafely(pendingLegReportCopy);
+                    if (copied) {
+                      setPendingLegReportCopy(null);
+                      setLegCopyNotice('단톡방 보고서가 복사됐습니다.');
+                    } else {
+                      setLegCopyNotice('브라우저에서 복사가 차단됐습니다. 보고 미리보기에서 직접 복사해 주세요.');
+                    }
+                  }} className="shrink-0 rounded-[11px] bg-[#1E60F3] px-3 py-2 text-[12px] font-bold text-white">
+                    보고 복사
+                  </button>
+                )}
+                <button type="button" aria-label="알림 닫기" onClick={() => {
+                  setLegCopyNotice(null); setPendingLegReportCopy(null);
+                }} className="shrink-0 text-[#8290A5]">×</button>
+              </div>
+            )}
 
             {/* 5. 1-Sec Fast Pass & Kakao Share Action Panel */}
             <ActionPanel
@@ -1748,7 +1871,7 @@ export default function DriverCockpit() {
               eventFavoritesLoading={eventFavoritesLoading}
               eventFavoritesError={eventFavoritesError}
               onRefreshEventFavorites={() => void refreshDriverEvents()}
-              onLoadEventLeg={handleLoadEventLeg}
+              onLoadEventLeg={handleNavigateEventLeg}
               onOpenProfileModal={() => setIsProfileModalOpen(true)}
               onSelectRouteForCockpit={handleSelectRouteFromSchedule}
               onOpenPredictionForSchedule={handleOpenPredictionForSchedule}
@@ -1824,7 +1947,7 @@ export default function DriverCockpit() {
         eventFavoritesLoading={eventFavoritesLoading}
         eventFavoritesError={eventFavoritesError}
         onRefreshEventFavorites={() => void refreshDriverEvents()}
-        onLoadEventLeg={handleLoadEventLeg}
+        onLoadEventLeg={handleNavigateEventLeg}
         onSelectEventStop={handleSelectEventStop}
         onReorderPresets={handleReorderPresets}
         onDeletePreset={handleDeleteCustomPreset}
@@ -1927,7 +2050,7 @@ export default function DriverCockpit() {
         eventFavoritesLoading={eventFavoritesLoading}
         eventFavoritesError={eventFavoritesError}
         onRefreshEventFavorites={() => void refreshDriverEvents()}
-        onLoadEventLeg={handleLoadEventLeg}
+        onLoadEventLeg={handleNavigateEventLeg}
         homeLocation={profile.homeLocation}
         currentSelectedId={
           selectionTarget === 'origin'
