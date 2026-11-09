@@ -990,7 +990,9 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                       onClick={() => {
                         haptics.lightTap();
                         setDeleteError(null);
-                        setEventToDelete(group);
+                        // Search may show only one matching driver; the action must
+                        // still target the complete unfiltered customer card.
+                        setEventToDelete(eventGroups.find(item => item.id === group.id) || group);
                       }}
                       aria-label={`${group.customerTag} 행사 삭제`}
                       className="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[13px] bg-[#F7F9FC] px-3 text-[12px] font-medium text-[#73839D] transition-colors hover:bg-[#FFF4F2] hover:text-[#A34E45]"
