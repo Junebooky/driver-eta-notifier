@@ -73,7 +73,7 @@ export function HqEmailAddressCandidate({
           <p className="font-medium">{sourceEvidence.message}</p>
           {sourceEvidence.excerpt && <p className="mt-1.5 select-text whitespace-pre-wrap break-words text-[#17233B]">{sourceEvidence.excerpt}</p>}
         </div>
-      )
+      )}
       {!isPoiConfirmed && state === 'loading' && <p className="text-slate-400">주소로 TMAP 후보 검색 중…</p>}
       {!isPoiConfirmed && state === 'not-found' && (
         <p className="text-slate-400">자동 주소 검색 결과 없음 · 장소를 눌러 직접 확인</p>
