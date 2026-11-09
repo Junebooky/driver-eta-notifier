@@ -19,6 +19,7 @@ export interface AnalyzedScheduleAttachment {
   /** Excel cell text only; PDFs are passed to Gemini as PDF inline data. */
   text?: string;
   pdfBase64?: string;
+  sheets?: Array<{ name: string; nonEmptyRows: number; dateLabels: string[] }>;
 }
 export interface AttachmentAnalysis {
   analyzed: AnalyzedScheduleAttachment[];
@@ -110,21 +111,45 @@ export function analyzeScheduleAttachments(attachments: ScheduleAttachmentInput[
       const book = read(bytes, { type: 'buffer', sheetRows: 1502, cellDates: false, bookVBA: false });
       if (book.SheetNames.length > 12) throw new Error('시트가 12개를 초과합니다.');
       let text = '';
+      let nonEmptyCells = 0;
+      const sheets: NonNullable<AnalyzedScheduleAttachment['sheets']> = [];
       for (const sheetName of book.SheetNames) {
         const sheet = book.Sheets[sheetName];
         const rows = utils.sheet_to_json<Array<string | number>>(sheet, { header: 1, raw: false, defval: '', blankrows: true });
         const firstRow = sheet['!ref'] ? utils.decode_range(sheet['!ref']).s.r : 0;
+        const firstCol = sheet['!ref'] ? utils.decode_range(sheet['!ref']).s.c : 0;
         if (rows.length >= 1502) throw new Error('시트당 1500행을 초과합니다.');
         text += `\n[Excel ${name} / Sheet: ${sheetName}]\n`;
+        const dateLabels: string[] = [];
+        let dateColumn = -1;
+        let nonEmptyRows = 0;
         for (const [rowIndex, row] of rows.entries()) {
           if (row.length > 60) throw new Error('표가 60열을 초과합니다.');
-          const cells = row.map((val, col) => val === '' ? '' : `${col + 1}:${String(val).replace(/[\r\n\t]+/g, ' ').slice(0, 500)}`).filter(Boolean);
-          if (cells.length) text += `행 ${firstRow + rowIndex + 1} | ${cells.join(' | ')}\n`;
+          const headerIndex = row.findIndex(val => /^(date|날짜|일자|일시)$/i.test(String(val).trim()));
+          if (headerIndex >= 0) {
+            dateColumn = headerIndex;
+            dateLabels.push(...row.filter((_, col) => col !== headerIndex).map(String));
+          } else if (dateColumn >= 0 && row[dateColumn] !== '') dateLabels.push(String(row[dateColumn] || ''));
+          const cells = row.map((val, col) => {
+            if (val === '') return '';
+            const value = String(val);
+            if (value.length > 4000) throw new Error('셀 내용이 너무 깁니다.');
+            nonEmptyCells++;
+            return `${col + 1}:${value.replace(/[\r\n\t]+/g, ' ')} [${utils.encode_cell({ r: firstRow + rowIndex, c: firstCol + col })}]`;
+          }).filter(Boolean);
+          if (cells.length) { nonEmptyRows++; text += `행 ${firstRow + rowIndex + 1} | ${cells.join(' | ')}\n`; }
           if (text.length > 100_000) throw new Error('일정표 텍스트가 너무 깁니다.');
         }
+        // Calendar schedules put days across columns and time down rows. Retain
+        // the anchor/range instead of flattening a merged appointment into a list.
+        const merges = sheet['!merges'] || [];
+        if (merges.length > 1500) throw new Error('병합 셀이 너무 많습니다.');
+        if (merges.length) text += `병합 셀: ${merges.map(range => utils.encode_range(range)).join(', ')}\n`;
+        if (text.length > 100_000) throw new Error('일정표 텍스트가 너무 깁니다.');
+        sheets.push({ name: sheetName, nonEmptyRows, dateLabels: [...new Set(dateLabels)] });
       }
-      if (!text.trim()) throw new Error('읽을 수 있는 셀이 없습니다.');
-      analyzed.push({ filename: name, kind: 'excel', sha256: digest, size: bytes.length, text });
+      if (!nonEmptyCells) throw new Error('읽을 수 있는 셀이 없습니다.');
+      analyzed.push({ filename: name, kind: 'excel', sha256: digest, size: bytes.length, text, sheets });
     } catch (error) {
       throw new Error(`${name}: Excel 분석 실패 — ${error instanceof Error ? error.message : '문서 구조를 확인해 주세요.'}`);
     }

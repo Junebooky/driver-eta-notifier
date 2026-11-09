@@ -733,6 +733,11 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     try {
       // Invalidate any previous false-success or empty draft
       deleteEmailDraft(currentSummary.id);
+      setDraftsByEmailId(prev => {
+        const next = { ...prev };
+        delete next[currentSummary.id];
+        return next;
+      });
 
       const res = await fetch('/api/email/extract-booking', {
         method: 'POST',

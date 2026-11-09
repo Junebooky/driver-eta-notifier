@@ -664,6 +664,9 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
             </div>
 
             {/* CRM Save Feedback Toast */}
+            {!!extractedDraft.documentAnalysis?.length && (
+              <HqInlineFeedback tone="info" message={`본문과 첨부 ${extractedDraft.documentAnalysis.length}개를 함께 분석했습니다. ${extractedDraft.documentAnalysis.map(file => `${file.filename}${file.reviewedSheets.length ? ` · ${file.reviewedSheets.length}개 시트` : ''}`).join(' / ')}`} />
+            )}
             {crmSavedNotice && (
               <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-bold flex items-center gap-2 animate-in fade-in">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
