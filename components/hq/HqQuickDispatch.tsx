@@ -2620,27 +2620,50 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 배차 삭제
               </button>
             ) : (
-              <section aria-label="배차 완전 삭제 확인"
-                className="space-y-3 rounded-[20px] bg-white p-4 shadow-[0_6px_20px_rgba(35,49,78,0.055)] sm:p-5">
-                <h3 className="text-[13px] font-semibold text-[#17233B]">이 배차를 완전히 삭제할까요?</h3>
-                <p className="text-[12px] leading-relaxed text-[#61728A]">
-                  삭제하면 배차 달력과 기사 화면에서 해당 일정이 사라지고, 배정된 기사·차량의 일정도 해제됩니다.
-                  차량과 기사 프로필은 그대로 유지됩니다.
-                </p>
-                <p className="text-[11px] leading-relaxed text-[#8492A4]">
-                  운행일지·경비·정산·차량 인수 내역이 연결된 예약은 안전을 위해 삭제되지 않습니다. 이 작업은 되돌릴 수 없습니다.
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button type="button" disabled={isDeleting}
+              <section
+                aria-label="배차 완전 삭제 확인"
+                className="space-y-3.5 rounded-[22px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055)] border border-slate-100"
+              >
+                <div className="space-y-1.5">
+                  <h3 className="text-[15px] font-bold text-[#17233B]">
+                    이 배차를 삭제할까요?
+                  </h3>
+                  <p className="text-[13px] leading-relaxed text-[#61728A]">
+                    배차 달력과 기사님 화면에서 일정이 사라지고 배정이 해제돼요.
+                  </p>
+                  <p className="text-[13px] leading-relaxed text-[#61728A]">
+                    등록된 기사·차량 프로필은 그대로 유지돼요.
+                  </p>
+                </div>
+
+                <div className="space-y-1 rounded-xl bg-[#F8FAFC] border border-slate-100 p-3 text-[12px] leading-relaxed text-[#64748B]">
+                  <div className="flex items-start gap-1.5">
+                    <span className="shrink-0 text-slate-400 font-semibold">ⓘ</span>
+                    <span>운행일지나 정산 내역이 남아있는 배차는 안전하게 보관돼요.</span>
+                  </div>
+                  <div className="flex items-start gap-1.5 text-[#A34E45] font-medium">
+                    <span className="shrink-0 font-semibold">ⓘ</span>
+                    <span>한 번 삭제한 배차는 다시 되돌릴 수 없어요.</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5 pt-1">
+                  <button
+                    type="button"
+                    disabled={isDeleting}
                     onClick={() => { haptics.lightTap(); setIsDeleteConfirmOpen(false); }}
-                    className="min-h-11 rounded-[14px] bg-[#F7F9FC] text-[12px] font-semibold text-[#4D607C] hover:bg-[#EDF1F6] disabled:opacity-50">
-                    돌아가기
+                    className="h-11 rounded-xl bg-[#F1F5F9] text-sm font-semibold text-slate-700 hover:bg-slate-200 transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    취소
                   </button>
-                  <button type="button" disabled={isDeleting || isSubmitting}
+                  <button
+                    type="button"
+                    disabled={isDeleting || isSubmitting}
                     onClick={handleDeleteDispatch}
-                    className="flex min-h-11 items-center justify-center gap-2 rounded-[14px] bg-[#FFF4F2] px-3 text-[12px] font-semibold text-[#A34E45] hover:bg-[#FFE9E5] disabled:opacity-50">
+                    className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#EF4444] px-3 text-sm font-semibold text-white hover:bg-red-600 transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
+                  >
                     {isDeleting && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
-                    {isDeleting ? '삭제 중…' : '배차 완전 삭제'}
+                    {isDeleting ? '삭제 중…' : '삭제하기'}
                   </button>
                 </div>
               </section>
