@@ -17,6 +17,7 @@ export interface EmailBatchSlot {
   vehiclePlate?: string;
   driver: { id: string; name: string; phone?: string; languages?: string[]; englishAvailable?: boolean } | null;
   assignedFlightKeys?: string[];
+  sharedRouteConfirmed?: boolean;
 }
 
 export interface EmailBatchReviewRow {
@@ -261,6 +262,7 @@ export function buildEmailBatchRevisionApproval(
       vehicleModel: findVipVehicle(plate)?.model || existing?.vehicleModel || slots[row.index].vehicleModel,
       vehiclePlate: plate || undefined, driver,
       assignedFlightKeys: slots[row.index].assignedFlightKeys,
+      sharedRouteConfirmed: slots[row.index].sharedRouteConfirmed,
     };
     const base = buildEmailDispatchPlan(dailyDraft, [daySlot], status)[0];
     // Driver/vehicle may vary independently on different days. Keep each old
