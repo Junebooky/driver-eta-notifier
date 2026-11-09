@@ -1383,7 +1383,10 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                         onAssignment={handleBatchAssignment}
                         onAddVehicle={handleAddBatchVehicle}
                         onRemoveLastVehicle={handleRemoveBatchVehicle}
-                        onUpdateSlots={setVehicleSlots}
+                        onUpdateSlots={updated => setVehicleSlots(previous =>
+                          previous.map((slot, index) => ({
+                            ...slot, assignedFlightKeys: updated[index]?.assignedFlightKeys,
+                          })))}
                         onUpdateDraft={handleUpdateDraft}
                         showAssignments
                         isSubmitting={isDispatching}
