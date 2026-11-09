@@ -60,7 +60,7 @@ export interface HqScheduleMeta {
   serviceMode?: 'with_driver' | 'vehicle_only';
   appliedPricingSnapshot?: Record<string, unknown>;
   version: number;
-  placeVerified: boolean;
+  placeVerified?: boolean;
   publishedAt?: string | null;
   publishedBy?: string | null;
   lastAckVersion: number;
