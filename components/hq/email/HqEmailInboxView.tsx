@@ -784,7 +784,10 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       setVehicleSlots(newSlots);
 
       const metricsText = data.metrics?.totalMs ? ` (${(data.metrics.totalMs / 1000).toFixed(1)}초)` : '';
-      showToast(`Gemini AI가 이메일에서 예약 정보를 성공적으로 추출했습니다${metricsText}.`);
+      const needsDateReview = extracted.documentAnalysis?.some(file => file.missingDates?.length);
+      showToast(needsDateReview
+        ? `예약 초안을 불러왔습니다${metricsText}. 첨부파일의 확인 필요 날짜를 검토해 주세요.`
+        : `Gemini AI가 이메일에서 예약 정보를 성공적으로 추출했습니다${metricsText}.`);
     } catch (err: any) {
       showToast(`AI 추출 실패: ${err.message}`);
       haptics.errorAlert();
@@ -884,6 +887,10 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   // Step 3 → 4: confirm the reviewed draft, without prematurely submitting a dispatch.
   const handleProceedToBooking = () => {
     if (!currentSummary || !currentDraft) return;
+    if (currentDraft.documentAnalysis?.some(file => file.missingDates?.length && !file.dateReviewAcknowledged)) {
+      showToast('첨부파일의 확인 필요 날짜를 원본과 비교한 뒤 검토 완료를 눌러 주세요.');
+      return;
+    }
     const decision = matchDecisionByEmail[currentSummary.id] || '';
     if (currentDraft.tripType === 'cancellation') {
       showToast('취소 요청은 배차관리에서 기존 예약을 확인하고 직접 처리해 주세요.');

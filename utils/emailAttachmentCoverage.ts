@@ -5,6 +5,7 @@ export interface EmailDocumentCoverage {
   sourceId: string;
   reviewedSheets: string[];
   scheduleDates: string[];
+  missingDates?: string[];
 }
 
 /** Only explicit date labels from a Date row/column, never title date ranges. */
@@ -54,10 +55,17 @@ export function verifyAttachmentCoverage(
     if (missingSheets.length) throw new Error(`${source.filename}: ${missingSheets.map(sheet => sheet.name).join(', ')} 시트 분석이 누락됐습니다. 다시 분석해 주세요.`);
     const headerDates = source.sheets.flatMap(sheet => sheet.datesToReview);
     const missingDates = [...new Set([...headerDates, ...item.scheduleDates])].filter(date => !resultDates.has(date));
-    if (missingDates.length) {
-      throw new Error(`${source.filename}: ${missingDates.join(', ')} 날짜가 일정 결과에서 빠졌습니다. 전체 첨부 일정으로 다시 분석하거나 관리자 확인이 필요합니다.`);
-    }
-    verified.push({ sourceId: source.sourceId, reviewedSheets: [...item.reviewedSheets], scheduleDates: [...item.scheduleDates] });
+    verified.push({ sourceId: source.sourceId, reviewedSheets: [...item.reviewedSheets], scheduleDates: [...item.scheduleDates], ...(missingDates.length ? { missingDates } : {}) });
   }
   return verified;
+}
+
+/** Date headers can be empty, cancelled or travel-only days. Retain the draft
+ * for human review; absence is not proof that a ground trip must be invented. */
+export function pendingAttachmentDateReviews(draft: Pick<HqEmailExtractedDraft, 'documentAnalysis'>) {
+  return (draft.documentAnalysis || []).filter(file => file.missingDates?.length && !file.dateReviewAcknowledged);
+}
+
+export function assertAttachmentDatesReviewed(draft: Pick<HqEmailExtractedDraft, 'documentAnalysis'>) {
+  if (pendingAttachmentDateReviews(draft).length) throw new Error('첨부파일의 확인 필요 날짜를 원본과 비교한 뒤 검토 완료를 눌러 주세요.');
 }

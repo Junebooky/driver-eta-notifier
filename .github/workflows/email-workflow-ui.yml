@@ -1,7 +1,7 @@
 name: Email workflow UI regression
 on:
   push:
-    branches: [fix/email-workflow-review-assignment-20261109, fix/email-attachment-completeness-20261109]
+    branches: [fix/email-workflow-review-assignment-20261109, fix/email-attachment-completeness-20261109, fix/email-attachment-date-review-20261109]
   workflow_dispatch:
 permissions:
   contents: read
