@@ -18,28 +18,41 @@ export function emailVehicleChoices(inventory: VipRealVehicle[], availability: A
 }
 
 export interface SourceTextRange { start: number; end: number }
-/** Match text only, retaining original UTF-16 offsets; allow case, Unicode width and whitespace differences. */
+/** Locate the exact sender text without trusting/rendering HTML.
+ * Original UTF-16 ranges remain stable for highlighting and copy.
+ * If case/width/spacing matching fails, tolerate punctuation around a
+ * sufficiently long address (e.g. "123, Teheran-ro" vs "123 Teheran ro").
+ */
 export function findEmailSourceRanges(text: string, address: string): SourceTextRange[] {
-  function normalized(value: string) {
+  function normalized(value: string, loosePunctuation: boolean) {
     let result = '';
     const offsets: SourceTextRange[] = [];
     let offset = 0;
     for (const point of value) {
-      const part = point.normalize('NFKC').toLowerCase().replace(/[\s\u200b-\u200d\ufeff]/gu, '');
+      const part = point.normalize('NFKC').toLowerCase()
+        .replace(/[\s\u200b-\u200d\ufeff]/gu, '')
+        .replace(loosePunctuation ? /[.,\-#/()[\]:]/gu : /(?!)a/gu, '');
       for (let i = 0; i < part.length; i++) offsets.push({ start: offset, end: offset + point.length });
       result += part; offset += point.length;
     }
     return { result, offsets };
   }
-  const needle = normalized(address).result;
-  if (!needle) return [];
-  const haystack = normalized(text);
-  const ranges: SourceTextRange[] = [];
-  for (let from = 0; from < haystack.result.length;) {
-    const at = haystack.result.indexOf(needle, from);
-    if (at < 0) break;
-    ranges.push({ start: haystack.offsets[at].start, end: haystack.offsets[at + needle.length - 1].end });
-    from = at + needle.length;
+  function find(loose: boolean): SourceTextRange[] {
+    const needle = normalized(address, loose).result;
+    if (!needle) return [];
+    const haystack = normalized(text, loose);
+    const ranges: SourceTextRange[] = [];
+    for (let from = 0; from < haystack.result.length;) {
+      const at = haystack.result.indexOf(needle, from);
+      if (at < 0) break;
+      ranges.push({ start: haystack.offsets[at].start, end: haystack.offsets[at + needle.length - 1].end });
+      from = at + needle.length;
+    }
+    return ranges;
   }
-  return ranges;
+  const exact = find(false);
+  if (exact.length) return exact;
+  // Short names could appear elsewhere in the email; don't fuzzy-match them.
+  if (normalized(address, true).result.length < 10) return [];
+  return find(true);
 }

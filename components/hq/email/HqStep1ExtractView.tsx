@@ -44,6 +44,8 @@ import { findEmailSourceRanges } from '@/utils/emailWorkflowReview';
 import { HqPlaceSearchInput, PoiResult } from '@/components/hq/HqPlaceSearchInput';
 import { saveContactToCrm } from '@/utils/crmCustomerSync';
 import { HqEmailAddressCandidate } from './HqEmailAddressCandidate';
+import type { EmailBatchReviewRow } from '@/utils/emailBatchRevision';
+import type { ExistingEmailBookingCandidate } from '@/services/emailBookingMatchService';
 import { buildAirportArrivalPickupGroups } from '@/utils/emailBookingEvidence';
 import { confirmEmailRouteStop, changeEmailRouteStopName, getUnconfirmedEmailRouteStops, isVerifiedEmailRouteStop } from '@/utils/emailRoutePlaceVerification';
 
@@ -57,6 +59,10 @@ interface HqStep1ExtractViewProps {
   onProceedToBooking: () => void;
   onSaveModifiedDraft?: () => void;
   onUpdateDraft?: (updated: HqEmailExtractedDraft) => void;
+  /** Inline choices, integrated with the existing itinerary instead of a separate comparison card. */
+  batchReviewRows?: EmailBatchReviewRow[];
+  batchReviewCandidates?: ExistingEmailBookingCandidate[];
+  onChooseBatchTarget?: (rowKey: string, selection: string) => void;
 }
 
 type WaypointEditDraft = {
@@ -77,6 +83,9 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   onProceedToBooking,
   onSaveModifiedDraft,
   onUpdateDraft,
+  batchReviewRows,
+  batchReviewCandidates = [],
+  onChooseBatchTarget,
 }) => {
   const subject = emailDetail?.subject || emailSummary.subject;
   const fromName = emailDetail?.from?.name || emailSummary.from.name;
@@ -85,14 +94,19 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   const bodyText = emailDetail?.bodyText || emailSummary.preview || '(본문 내용 없음)';
   const attachmentFiles = emailDetail?.attachments || (extractedDraft?.sourceAttachments || []).map(file => ({ filename: file.filename, contentType: file.kind === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', size: 0 }));
 
-  const [sourceEvidence, setSourceEvidence] = useState({ emailId: '', query: '', message: '', revision: 0 });
+  const [sourceEvidence, setSourceEvidence] = useState({ emailId: '', query: '', address: '', excerpt: '', message: '', revision: 0 });
   const locateSource = (address: string) => {
     const fullBody = emailDetail?.bodyText || '';
     const matches = !isLoadingDetail ? findEmailSourceRanges(fullBody, address) : [];
-    setSourceEvidence(previous => ({ emailId: emailSummary.id, query: matches.length ? address : '', revision: previous.revision + 1,
-      message: isLoadingDetail ? '이메일 원문을 불러온 뒤 다시 확인해 주세요.' : matches.length
-        ? `고객 제공 주소와 일치하는 원문 ${matches.length}곳을 표시했습니다. TMAP 위치 확정과는 별도입니다.`
-        : '이메일 본문에서 일치하는 주소를 찾지 못했습니다. 첨부 파일이나 다른 표현으로 제공됐는지 확인해 주세요.',
+    const first = matches[0];
+    const rowStart = first ? fullBody.lastIndexOf('\n', first.start - 1) + 1 : 0;
+    const rowEnd = first ? (fullBody.indexOf('\n', first.end) < 0 ? fullBody.length : fullBody.indexOf('\n', first.end)) : 0;
+    const excerpt = first ? fullBody.slice(rowStart, rowEnd).trim().slice(0, 500) : '';
+    setSourceEvidence(previous => ({
+      emailId: emailSummary.id, address, query: first ? address : '', excerpt, revision: previous.revision + 1,
+      message: isLoadingDetail ? '이메일 원문을 불러온 뒤 다시 확인해 주세요.'
+        : first ? `이메일 원문 ${matches.length}곳과 연결했습니다. 왼쪽 원문에서도 강조 표시합니다.`
+        : '이메일 본문에는 같은 주소가 없습니다. 첨부 파일에서 전달된 주소인지 원본을 확인해 주세요.',
     }));
   };
   const currentEvidence = sourceEvidence.emailId === emailSummary.id ? sourceEvidence : null;
@@ -559,7 +573,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
 
         <HqInlineFeedback message={currentEvidence?.message} tone="info" className="mx-5" />
         {/* Email Body */}
-        <div className="flex-1 overflow-y-auto p-5 font-sans text-[13px] text-[#4D607C] leading-relaxed whitespace-pre-line selection:bg-blue-100">
+        <div className="flex-1 overflow-y-auto select-text p-5 font-sans text-[13px] text-[#4D607C] leading-relaxed whitespace-pre-line selection:bg-blue-100">
           {isLoadingDetail ? (
             <div className="h-64 flex flex-col items-center justify-center gap-2 text-slate-400">
               <RefreshCw className="w-6 h-6 animate-spin text-[#1E60F3]" />
@@ -922,6 +936,36 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                 </p>
               )}
 
+              {Boolean(batchReviewRows?.length) && (
+                <div role="group" aria-label="기존 예약 연결" className="space-y-2">
+                  <p className="text-[11px] leading-relaxed text-[#73839D]">
+                    변경될 기존 예약이 있다면 아래에서 연결해 주세요. 기존 예약을 임의로 덮어쓰거나 취소하지 않습니다.
+                  </p>
+                  {batchReviewRows!.map(row => (
+                    <label key={row.key} className="flex flex-wrap items-center gap-2 rounded-[14px] bg-[#F7F9FC] px-3 py-2.5">
+                      <span className="min-w-[125px] text-[12px] font-semibold tabular-nums text-[#52647A]">
+                        {row.date} · {row.index + 1}호차
+                      </span>
+                      <select
+                        value={row.selection}
+                        onChange={event => onChooseBatchTarget?.(row.key, event.target.value)}
+                        aria-label={`${row.date} ${row.index + 1}호차 기존 예약 연결`}
+                        className="min-h-10 min-w-0 flex-1 rounded-[12px] bg-white px-3 text-[12px] font-medium text-[#17233B] shadow-[0_2px_7px_rgba(35,49,78,0.04)] outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25"
+                      >
+                        <option value="">등록 방법 선택</option>
+                        <option value="new">신규 예약 등록</option>
+                        <option value="skip">해당 날짜 운행 없음</option>
+                        {batchReviewCandidates.map(candidate => (
+                          <option key={candidate.scheduleId} value={candidate.scheduleId}>
+                            {candidate.pickupDate} {candidate.pickupTime} · {candidate.vehiclePlate || '미배정'} · {candidate.pickupLocation}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                </div>
+              )}
+
               {/* Multi-destination Timeline Accordion */}
               {hasMultipleWaypoints ? (
                 <div className="space-y-3">
@@ -1117,8 +1161,8 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                         </div>
                                       ) : (
                                         <div
-                                          onClick={() => beginWaypointEdit(wp)}
-                                          className="flex items-start justify-between p-2.5 rounded-2xl hover:bg-slate-50/80 transition-colors cursor-pointer select-none group/item"
+                                          onClick={() => { if (!window.getSelection()?.toString()) beginWaypointEdit(wp); }}
+                                          className="flex items-start justify-between p-2.5 rounded-2xl hover:bg-slate-50/80 transition-colors cursor-pointer select-text group/item"
                                         >
                                           <div className="flex min-w-0 flex-col gap-0.5">
                                             <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-0.5">
@@ -1184,6 +1228,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                       {!isEditingThis && wp.clientAddress && (
                                         <HqEmailAddressCandidate
                                           onLocateInSource={locateSource}
+                                          sourceEvidence={currentEvidence?.address === wp.clientAddress ? currentEvidence : undefined}
                                           sourceAddress={wp.clientAddress}
                                           placeName={wp.location}
                                           isPoiConfirmed={Boolean(wp.isPoiConfirmed)}
@@ -1250,7 +1295,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                         <div className="mt-1.5 space-y-1">
                           {extractedDraft?.pickupAddress && <p className="break-words text-[11px] text-slate-500">{extractedDraft.pickupAddress}</p>}
                           {!isPickupPoiConfirmed && <HqBadge tone="warning" wrap>주소 미확정 · TMAP 검색 결과 선택 필요</HqBadge>}
-                          {extractedDraft?.pickupProvidedAddress && <HqEmailAddressCandidate className="" sourceAddress={extractedDraft.pickupProvidedAddress} placeName={pickupLocation} isPoiConfirmed={isPickupPoiConfirmed} onPick={handleSelectPickupPoi} onLocateInSource={locateSource} />}
+                          {extractedDraft?.pickupProvidedAddress && <HqEmailAddressCandidate className="" sourceAddress={extractedDraft.pickupProvidedAddress} sourceEvidence={currentEvidence?.address === extractedDraft.pickupProvidedAddress ? currentEvidence : undefined} placeName={pickupLocation} isPoiConfirmed={isPickupPoiConfirmed} onPick={handleSelectPickupPoi} onLocateInSource={locateSource} />}
                         </div>
                       </div>
                     </div>
@@ -1286,7 +1331,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                         <div className="mt-1.5 space-y-1">
                           {extractedDraft?.dropoffAddress && <p className="break-words text-[11px] text-slate-500">{extractedDraft.dropoffAddress}</p>}
                           {!isDropoffPoiConfirmed && <HqBadge tone="warning" wrap>주소 미확정 · TMAP 검색 결과 선택 필요</HqBadge>}
-                          {extractedDraft?.dropoffProvidedAddress && <HqEmailAddressCandidate className="" sourceAddress={extractedDraft.dropoffProvidedAddress} placeName={dropoffLocation} isPoiConfirmed={isDropoffPoiConfirmed} onPick={handleSelectDropoffPoi} onLocateInSource={locateSource} />}
+                          {extractedDraft?.dropoffProvidedAddress && <HqEmailAddressCandidate className="" sourceAddress={extractedDraft.dropoffProvidedAddress} sourceEvidence={currentEvidence?.address === extractedDraft.dropoffProvidedAddress ? currentEvidence : undefined} placeName={dropoffLocation} isPoiConfirmed={isDropoffPoiConfirmed} onPick={handleSelectDropoffPoi} onLocateInSource={locateSource} />}
                         </div>
                       </div>
                     </div>

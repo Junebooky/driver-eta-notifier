@@ -52,7 +52,6 @@ function DesktopEvent({ booking, onClick }: { booking: HqBooking; onClick: () =>
     <button
       type="button"
       onClick={onClick}
-      title={`${booking.customerName} · ${vehiclePlate(booking)} · ${chauffeur(booking)}`}
       aria-label={`${booking.customerName}, 차량 ${vehiclePlate(booking)}, 기사 ${chauffeur(booking)} 상세 보기`}
       className="w-full min-w-0 rounded-lg bg-[#F7F9FC] px-2 py-2 text-left transition-colors hover:bg-[#EDF1F6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#1E60F3]"
     >
@@ -125,9 +124,11 @@ export function HqDispatchCalendar({ bookings, onViewBooking, onOpenNewBooking }
   const [monthKey, setMonthKey] = useState(() => today.slice(0, 7));
   const [selectedDate, setSelectedDate] = useState(today);
   const [peek, setPeek] = useState<{date:string;top:number;left:number} | null>(null);
+  const visibleBookings = useMemo(() => bookings.filter(booking => booking.dispatchStatus !== '취소'), [bookings]);
 
-  const showDayPeek = (iso: string, element: HTMLElement, fromHover = false) => {
-    if (fromHover && !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+  // The mobile click-only peek remains useful; desktop no longer creates
+  // floating tooltips that obscure the wide calendar grid.
+  const showDayPeek = (iso: string, element: HTMLElement) => {
     const bounds = element.getBoundingClientRect();
     const width = Math.min(352, window.innerWidth - 24);
     setPeek({
@@ -165,18 +166,18 @@ export function HqDispatchCalendar({ bookings, onViewBooking, onOpenNewBooking }
   const dayBookings = useMemo(() => {
     const result = new Map<string, HqBooking[]>();
     for (const day of days) {
-      const rows = bookings.filter((booking) => isHqBookingScheduledOn(booking, day.iso));
+      const rows = visibleBookings.filter((booking) => isHqBookingScheduledOn(booking, day.iso));
       result.set(day.iso, sortHqCalendarBookings(rows));
     }
     return result;
-  }, [days, bookings]);
+  }, [days, visibleBookings]);
 
   const selectedBookings = dayBookings.get(selectedDate) || [];
   const peekBookings = peek ? dayBookings.get(peek.date) || [] : [];
   const continuityByDate = useMemo(() => new Map(days.map(day =>
-    [day.iso, getHqCalendarContinuity(bookings, day.iso)]
-  )), [days, bookings]);
-  const monthlyBookings = bookings.filter((booking) =>
+    [day.iso, getHqCalendarContinuity(visibleBookings, day.iso)]
+  )), [days, visibleBookings]);
+  const monthlyBookings = visibleBookings.filter((booking) =>
     days.some((day) => day.inMonth && isHqBookingScheduledOn(booking, day.iso))
   );
   const openDay = (iso: string) => {
@@ -254,11 +255,13 @@ export function HqDispatchCalendar({ bookings, onViewBooking, onOpenNewBooking }
                 <button
                   type="button"
                   data-calendar-peek-trigger
-                  onClick={(event) => { openDay(day.iso); showDayPeek(day.iso, event.currentTarget); }}
-                  onMouseEnter={(event) => { if (rows.length) showDayPeek(day.iso, event.currentTarget, true); }}
-                  aria-haspopup={rows.length ? 'dialog' : undefined}
+                  onClick={(event) => {
+                    openDay(day.iso);
+                    if (window.innerWidth < 1024 && rows.length) showDayPeek(day.iso, event.currentTarget);
+                    else setPeek(null);
+                  }}
                   aria-expanded={peek?.date === day.iso}
-                  aria-label={`${day.iso} 배차 ${rows.length}건 미리보기`}
+                  aria-label={`${day.iso} 배차 ${rows.length}건 날짜 선택`}
                   aria-pressed={selected}
                   aria-current={isToday ? 'date' : undefined}
                   className={`flex h-[66px] w-full flex-col items-center justify-start gap-1 rounded-lg pt-1.5 text-left transition-colors hover:bg-[#F7F9FC] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#1E60F3] sm:h-auto sm:min-h-8 sm:flex-row sm:justify-between sm:pt-0 sm:px-1.5 ${selected ? 'bg-[#EEF3FF]' : ''}`}
@@ -280,7 +283,6 @@ export function HqDispatchCalendar({ bookings, onViewBooking, onOpenNewBooking }
                 </button>
                 {continuation && (
                   <div
-                    title={`같은 차량의 연속 일정 ${continuation.days}일`}
                     aria-label={`연결된 배차 ${continuation.days}일, ${continuation.previous ? '이전 날짜에서 계속' : '첫 날짜'}`}
                     className={`mt-1 h-[3px] sm:mt-2 ${continuation.previous ? '-ml-1.5 sm:-ml-2.5' : 'ml-1.5 rounded-l-full'} ${continuation.next ? '-mr-1.5 sm:-mr-2.5' : 'mr-1.5 rounded-r-full'}`}
                     style={{ backgroundColor: getCustomerDotColor(continuation.colorBooking.customerId, continuation.colorBooking.customerName) }}
@@ -357,7 +359,7 @@ export function HqDispatchCalendar({ bookings, onViewBooking, onOpenNewBooking }
           </div>
           <div className="max-h-[min(56dvh,340px)] space-y-2 overflow-y-auto overscroll-contain">
             {peekBookings.map(booking => {
-              const run = getHqCalendarContinuity(bookings, peek.date);
+              const run = getHqCalendarContinuity(visibleBookings, peek.date);
               const sameRun = run && run.colorBooking.id === booking.id ? run : null;
               return (
                 <button key={booking.id} type="button" onClick={() => { setPeek(null); onViewBooking(booking); }}

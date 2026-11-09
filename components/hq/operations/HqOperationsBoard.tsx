@@ -20,11 +20,13 @@ import {
   ExternalLink,
   Filter,
   Search,
+  Trash2,
 } from 'lucide-react';
 import { OperationStatus } from '@/app/api/schedules/operation-status/route';
 import { CustomerNotificationTrigger } from '@/types/hq';
 import { ensureClientAuth } from '@/utils/cockpitClientAuth';
 import { haptics } from '@/utils/haptics';
+import { hardDeleteHqSchedule } from '@/utils/hqScheduleHardDelete';
 
 export interface HqOperationsBoardProps {
   onOpenCustomerMessageForSchedule?: (
@@ -35,6 +37,7 @@ export interface HqOperationsBoardProps {
 
 export interface ScheduleOperationItem {
   id: string;
+  eventId?: string;
   eventName: string;
   customerName: string;
   driverName?: string;
@@ -457,10 +460,14 @@ const DEFAULT_OPERATIONAL_EVENTS: EventGroup[] = [
 export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
   onOpenCustomerMessageForSchedule,
 }) => {
-  const [eventGroups, setEventGroups] = useState<EventGroup[]>(DEFAULT_OPERATIONAL_EVENTS);
+  // Only actual server schedules are shown; demo events must not reappear after deletion.
+  const [eventGroups, setEventGroups] = useState<EventGroup[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<ScheduleOperationItem | null>(null);
   const [selectedEventInfo, setSelectedEventInfo] = useState<EventGroup | null>(null);
+  const [eventToDelete, setEventToDelete] = useState<EventGroup | null>(null);
+  const [deletingEvent, setDeletingEvent] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Filter & Search states
   const [activeTab, setActiveTab] = useState<'all' | 'running' | 'closed'>('all');
@@ -482,10 +489,11 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
       const res = await fetch('/api/schedules/dispatch?onlyDispatched=true');
       const data = await res.json();
 
-      if (data.ok && Array.isArray(data.schedules) && data.schedules.length > 0) {
+      if (data.ok && Array.isArray(data.schedules)) {
         // Map server schedules to ScheduleOperationItem
         const serverMapped: ScheduleOperationItem[] = data.schedules.map((s: any, idx: number) => ({
           id: s.id,
+          eventId: s.event_id || s.eventId || undefined,
           eventName: s.event_name || s.eventName || 'VIP 의전 행사',
           customerName: s.customer_name || s.customerName || '고객사',
           driverName: s.driver_name || s.driverName || '미지정',
@@ -511,7 +519,9 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
         // Group server schedules by event
         const groupsMap: Record<string, ScheduleOperationItem[]> = {};
         serverMapped.forEach((item) => {
-          const key = item.groupId || item.eventName || '기타 행사';
+          // Group only by a stable saved identity, never by event name
+          // (two unrelated events can have exactly the same customer title).
+          const key = item.groupId || item.eventId || item.id;
           if (!groupsMap[key]) groupsMap[key] = [];
           groupsMap[key].push(item);
         });
@@ -529,9 +539,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
           };
         });
 
-        if (newGroups.length > 0) {
-          setEventGroups(newGroups);
-        }
+        setEventGroups(newGroups);
       }
     } catch (err) {
       console.warn('[HqOperationsBoard] Live sync notice:', err);
@@ -617,6 +625,27 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
       ...prev,
       [eventId]: prev[eventId] === undefined ? false : !prev[eventId],
     }));
+  };
+
+  const confirmDeleteEvent = async () => {
+    const target = eventToDelete;
+    if (!target || deletingEvent || !target.schedules.length) return;
+    setDeletingEvent(true);
+    setDeleteError(null);
+    try {
+      await hardDeleteHqSchedule(target.schedules[0].id, 'event');
+      setEventToDelete(null);
+      setSelectedEventInfo(null);
+      // Clear the old selection immediately, then refresh against the server.
+      setEventGroups(previous => previous.filter(group => group.id !== target.id));
+      await fetchOperations();
+      haptics.success();
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : '행사 삭제에 실패했습니다.');
+      haptics.errorAlert();
+    } finally {
+      setDeletingEvent(false);
+    }
   };
 
   const handleSendArrivalNotice = (e: React.MouseEvent, item: ScheduleOperationItem) => {
@@ -902,6 +931,12 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
 
       {/* 4. Event Cards (우리만의 프리미엄 아코디언 카드) */}
       <div className="hq-operations-a space-y-5 sm:space-y-6">
+        {!isLoading && filteredGroups.length === 0 && (
+          <div className="rounded-[24px] bg-white px-6 py-14 text-center shadow-[0_6px_20px_rgba(35,49,78,0.055)]">
+            <p className="text-[14px] font-semibold text-[#17233B]">등록된 행사가 없습니다.</p>
+            <p className="mt-1 text-[12px] text-[#8492A4]">새 배차가 등록되면 이곳에 표시됩니다.</p>
+          </div>
+        )}
         {filteredGroups.map((group) => {
           const isExpanded = expandedEvents[group.id] !== false;
           const isShowingAll = showAllVehicles[group.id] === true;
@@ -940,6 +975,19 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
 
                   {/* Right Actions: Event Info & Accordion Toggle */}
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptics.lightTap();
+                        setDeleteError(null);
+                        setEventToDelete(group);
+                      }}
+                      aria-label={`${group.eventName} 행사 삭제`}
+                      className="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[13px] bg-[#F7F9FC] px-3 text-[12px] font-medium text-[#73839D] transition-colors hover:bg-[#FFF4F2] hover:text-[#A34E45]"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" strokeWidth={1.7} />
+                      <span>행사 삭제</span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => {
@@ -1305,6 +1353,35 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
           </div>
         )}
       </div>
+
+      {eventToDelete && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-[#17233B]/30 p-4 backdrop-blur-[2px]"
+          onClick={() => { if (!deletingEvent) setEventToDelete(null); }}>
+          <div role="dialog" aria-modal="true" aria-label="행사 완전 삭제 확인"
+            onClick={event => event.stopPropagation()}
+            className="w-full max-w-md space-y-4 rounded-[24px] bg-white p-5 shadow-[0_24px_64px_rgba(27,45,77,0.16)] sm:p-6">
+            <h3 className="text-[16px] font-semibold text-[#17233B]">행사를 완전히 삭제할까요?</h3>
+            <p className="text-[13px] leading-relaxed text-[#61728A]">
+              <strong className="text-[#17233B]">{eventToDelete.eventName}</strong> 행사와 연결된 배차 전체가 달력·운영보드·기사 일정에서 사라집니다.
+              해당 행사에 배정됐던 차량·기사도 다시 배정 가능한 상태로 돌아갑니다.
+            </p>
+            <p className="text-[12px] leading-relaxed text-[#8492A4]">
+              이미 운행일지·경비·정산 또는 차량 인수 기록이 연결된 예약은 보호를 위해 삭제할 수 없습니다. 이 작업은 되돌릴 수 없습니다.
+            </p>
+            {deleteError && <p role="alert" className="rounded-xl bg-[#FFF4F2] p-3 text-[12px] text-[#A34E45]">{deleteError}</p>}
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" disabled={deletingEvent} onClick={() => { setEventToDelete(null); setDeleteError(null); }}
+                className="min-h-11 rounded-[14px] bg-[#F7F9FC] text-[12px] font-semibold text-[#52647A] hover:bg-[#EDF1F6] disabled:opacity-50">
+                돌아가기
+              </button>
+              <button type="button" disabled={deletingEvent} onClick={() => void confirmDeleteEvent()}
+                className="min-h-11 rounded-[14px] bg-[#FFF4F2] text-[12px] font-semibold text-[#A34E45] hover:bg-[#FFE9E5] disabled:opacity-50">
+                {deletingEvent ? '삭제 중…' : '행사 완전 삭제'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 5. Event Info Modal (우리만의 팝업 애니메이션 & 스타일) */}
       {selectedEventInfo && (

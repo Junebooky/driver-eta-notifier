@@ -67,7 +67,7 @@ export default function RootLayout({
           `}
         </Script>
       </head>
-      <body className={`${inter.className} ${playfair.variable} min-h-dvh flex flex-col bg-inherit antialiased select-none overflow-x-hidden`}>
+      <body className={`${inter.className} ${playfair.variable} min-h-dvh flex flex-col bg-inherit antialiased select-text overflow-x-hidden`}>
         <SessionGate>{children}</SessionGate>
       </body>
     </html>

@@ -891,7 +891,7 @@ async function prepareServerDispatchSchedule(
   const isoDate = normalizeDateToIso(input.date);
   const hhmm = normalizeTimeHHmm(input.pickupTime);
 
-  if (!isoDate || !hhmm || !input.origin?.trim() || !input.destination?.trim()) {
+  if (!isoDate || ((input.dispatchStatus || 'published') === 'published' && !hhmm) || !input.origin?.trim() || !input.destination?.trim()) {
     return {
       error: '운행 일자, 픽업 시간, 출발지, 목적지는 필수 입력 항목입니다.',
       statusCode: 400,
@@ -998,8 +998,10 @@ async function prepareServerDispatchSchedule(
   }
 
   const nowIso = new Date().toISOString();
-  const formattedPickupTime = `${hhmm}:00`;
-  const resolvedTimeDisplay = input.timeDisplay || `픽업 ${hhmm}`;
+  // Never write a fabricated 00:00 when the client did not specify a time.
+  // Database pickup_time is nullable only for unassigned/draft rows.
+  const formattedPickupTime = hhmm ? `${hhmm}:00` : null;
+  const resolvedTimeDisplay = hhmm ? (input.timeDisplay || `픽업 ${hhmm}`) : '픽업 미지정';
 
   let nextVersion = 1;
   let lastAckVersion = 0;

@@ -92,11 +92,12 @@ test('contiguous multi-day indicators require a real booking or explicit series 
   assert.notEqual(hqBookingSeriesKey(first), hqBookingSeriesKey({ ...second, vehicleId: 'vehicle-b' }));
 });
 
-test('calendar keeps seven slim columns and exposes mobile tap / desktop hover preview without losing detail callback', () => {
+test('calendar keeps seven slim columns and mobile tap peek while never showing desktop hover preview', () => {
   const source = readFileSync(new URL('../components/hq/HqDispatchCalendar.tsx', import.meta.url), 'utf8');
   assert.match(source, /grid grid-cols-7/);
   assert.match(source, /data-calendar-peek-trigger/);
-  assert.match(source, /onMouseEnter=/);
+  assert.doesNotMatch(source, /onMouseEnter=/);
+  assert.match(source, /window\.innerWidth < 1024/);
   assert.match(source, /createPortal\(/);
   assert.match(source, /onViewBooking\(booking\)/);
   assert.match(source, /aria-label=.*배차 미리보기/);

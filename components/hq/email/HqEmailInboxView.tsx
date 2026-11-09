@@ -27,7 +27,6 @@ import { buildEmailDispatchPlan } from '@/utils/emailDispatchPlan';
 import type { ExistingEmailBookingCandidate } from '@/services/emailBookingMatchService';
 import { prepareEmailRevisionDraft } from '@/utils/emailBookingRevision';
 import { HqEmailRevisionMatchPanel } from './HqEmailRevisionMatchPanel';
-import { HqEmailBatchRevisionPanel } from './HqEmailBatchRevisionPanel';
 import {
   emailBatchNeedsReview, emailBatchRows, prepareEmailBatchRevisionDraft,
   buildEmailBatchRevisionApproval, type EmailBatchDecisions, type EmailBatchAssignments,
@@ -827,9 +826,10 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       if (batch) {
         const plan = buildEmailBatchRevisionApproval(
           currentDraft, vehicleSlots, candidates, batchDecisionsByEmail[currentSummary.id] || {},
-          batchCancelIdsByEmail[currentSummary.id] || [],
-          batchCancelReasonsByEmail[currentSummary.id] || {},
-          batchAssignmentsByEmail[currentSummary.id] || {},
+          // Cancellation is managed explicitly in HQ dispatch, not hidden in the email form.
+          [],
+          {},
+          {},
           status,
         );
         items = plan.items;
@@ -1302,30 +1302,15 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
             </div>
           ) : (
             <div key={workflowStep} className={workflowStep === 'step4_booking_confirmed' ? undefined : 'animate-step-slide'}>
-              {workflowStep === 'step1_extract' && currentDraft && (
-                emailBatchNeedsReview(currentDraft, vehicleSlots.length, (matchesByEmail[currentSummary.id] || []).length)
-                  ? <HqEmailBatchRevisionPanel
-                      draft={currentDraft}
-                      slots={vehicleSlots}
-                      candidates={matchesByEmail[currentSummary.id] || []}
-                      decisions={batchDecisionsByEmail[currentSummary.id] || {}}
-                      cancelIds={batchCancelIdsByEmail[currentSummary.id] || []}
-                      cancelReasons={batchCancelReasonsByEmail[currentSummary.id] || {}}
-                      assignments={batchAssignmentsByEmail[currentSummary.id] || {}}
-                      onSelect={handleChooseBatchTarget}
-                      onCancel={handleBatchCancel}
-                      onCancelReason={handleBatchCancelReason}
-                      onAssignment={handleBatchAssignment}
-                      onAddVehicle={handleAddBatchVehicle}
-                      onRemoveLastVehicle={handleRemoveBatchVehicle}
-                    />
-                  : <HqEmailRevisionMatchPanel
-                      draft={currentDraft}
-                      matches={matchesByEmail[currentSummary.id] || []}
-                      decision={matchDecisionByEmail[currentSummary.id] || null}
-                      onSelect={handleChooseRevision}
-                      onNew={handleChooseNewBooking}
-                    />
+              {workflowStep === 'step1_extract' && currentDraft &&
+                !emailBatchNeedsReview(currentDraft, vehicleSlots.length, (matchesByEmail[currentSummary.id] || []).length) && (
+                  <HqEmailRevisionMatchPanel
+                    draft={currentDraft}
+                    matches={matchesByEmail[currentSummary.id] || []}
+                    decision={matchDecisionByEmail[currentSummary.id] || null}
+                    onSelect={handleChooseRevision}
+                    onNew={handleChooseNewBooking}
+                  />
               )}
               {workflowStep === 'step1_extract' && (
                 <HqStep1ExtractView
@@ -1340,6 +1325,11 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                     showToast('수정된 예약 초안이 저장되었습니다.');
                   }}
                   onUpdateDraft={handleUpdateDraft}
+                  batchReviewRows={currentDraft && emailBatchNeedsReview(currentDraft, vehicleSlots.length, (matchesByEmail[currentSummary.id] || []).length)
+                    ? emailBatchRows(currentDraft, vehicleSlots, matchesByEmail[currentSummary.id] || [], batchDecisionsByEmail[currentSummary.id] || {})
+                    : undefined}
+                  batchReviewCandidates={matchesByEmail[currentSummary.id] || []}
+                  onChooseBatchTarget={handleChooseBatchTarget}
                 />
               )}
 
@@ -1367,34 +1357,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                   onUpdateVehicleSlots={setVehicleSlots}
                   isDispatching={isDispatching}
                   dispatchError={dispatchError}
-                  batchReview={currentDraft && emailBatchNeedsReview(currentDraft, vehicleSlots.length, (matchesByEmail[currentSummary.id] || []).length)
-                    ? <HqEmailBatchRevisionPanel
-                        draft={currentDraft}
-                        slots={vehicleSlots}
-                        candidates={matchesByEmail[currentSummary.id] || []}
-                        decisions={batchDecisionsByEmail[currentSummary.id] || {}}
-                        cancelIds={batchCancelIdsByEmail[currentSummary.id] || []}
-                        cancelReasons={batchCancelReasonsByEmail[currentSummary.id] || {}}
-                        assignments={batchAssignmentsByEmail[currentSummary.id] || {}}
-                        drivers={hqDrivers}
-                        onSelect={handleChooseBatchTarget}
-                        onCancel={handleBatchCancel}
-                        onCancelReason={handleBatchCancelReason}
-                        onAssignment={handleBatchAssignment}
-                        onAddVehicle={handleAddBatchVehicle}
-                        onRemoveLastVehicle={handleRemoveBatchVehicle}
-                        onUpdateSlots={updated => setVehicleSlots(previous =>
-                          previous.map((slot, index) => ({
-                            ...slot, assignedFlightKeys: updated[index]?.assignedFlightKeys,
-                            sharedRouteConfirmed: updated[index]?.sharedRouteConfirmed,
-                          })))}
-                        onUpdateDraft={handleUpdateDraft}
-                        showAssignments
-                        isSubmitting={isDispatching}
-                        onApprove={() => void handleConfirmDispatch('published')}
-                        onRequestUnassigned={() => void handleConfirmDispatch('unassigned')}
-                      />
-                    : undefined}
+
                 />
               )}
 
