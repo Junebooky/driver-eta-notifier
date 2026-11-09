@@ -379,8 +379,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   const [pickupEndDate, setPickupEndDate] = useState<string>(() => initialBooking?.endDate || initialBooking?.pickupDate || getKstTodayDateStr());
 
   // 3. Pickup Time State
-  const [pickupTimeOnly, setPickupTimeOnly] = useState(() => initialBooking?.pickupTime || '09:00');
-  const [timeInputText, setTimeInputText] = useState(() => formatTimeKoreanAmPm(initialBooking?.pickupTime || '09:00'));
+  const [pickupTimeOnly, setPickupTimeOnly] = useState(() => initialBooking ? (initialBooking.pickupTime || '') : '09:00');
+  const [timeInputText, setTimeInputText] = useState(() => formatTimeKoreanAmPm(initialBooking ? (initialBooking.pickupTime || '') : '09:00'));
   const [isInputFocused, setIsInputFocused] = useState(false);
   const selectedTimeItemRef = useRef<HTMLButtonElement>(null);
   const timeDropdownListRef = useRef<HTMLDivElement>(null);
@@ -500,7 +500,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       setSelectedCustomerId(initialBooking.customerId || null);
       setPickupDate(initialBooking.pickupDate || getKstTodayDateStr());
       setPickupEndDate(initialBooking.endDate || initialBooking.pickupDate || getKstTodayDateStr());
-      setPickupTimeOnly(initialBooking.pickupTime || '09:00');
+      setPickupTimeOnly(initialBooking.pickupTime || '');
       setTimeInputText(formatTimeKoreanAmPm(initialBooking.pickupTime || '09:00'));
       setEndTime(initialBooking.endTime || '');
       setPickupLocation(initialBooking.pickupLocation || '');
@@ -947,8 +947,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       haptics.warningPulse();
       return;
     }
-    if (!pickupDate || !pickupTimeOnly) {
-      setErrorMsg('운행 일자와 픽업 시간을 입력해 주세요.');
+    if (!pickupDate || (mode === 'published' && !pickupTimeOnly)) {
+      setErrorMsg('배차 확정에는 운행 일자와 픽업 시간이 필요합니다. 미정이면 미배정 예약으로 저장해 주세요.');
       haptics.warningPulse();
       return;
     }
