@@ -50,7 +50,7 @@ export function scheduleForecastDate(date: string, time?: string | null): Date |
   return instant;
 }
 
-function loadForecast(key: string, departureTime: Date, origin: ForecastLocation, destination: ForecastLocation): Promise<ForecastValue | null> {
+function loadForecast(key: string, predictionTime: string, origin: ForecastLocation, destination: ForecastLocation): Promise<ForecastValue | null> {
   const existing = resultCache.get(key);
   if (existing && existing.expiresAt > Date.now()) return existing.promise;
   const promise = fetch('/api/route/prediction', {
@@ -58,7 +58,7 @@ function loadForecast(key: string, departureTime: Date, origin: ForecastLocation
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       singleSlot: true,
-      predictionTime: departureTime.toISOString().replace('Z', '+00:00'),
+      predictionTime,
       departure: { name: origin.name, lat: origin.lat, lng: origin.lng },
       destination: { name: destination.name, lat: destination.lat, lng: destination.lng },
       waypoints: [],
@@ -113,7 +113,7 @@ export function RouteForecastChip({
       if (started) return;
       started = true;
       setState('loading');
-      void loadForecast(routeKey, departureTime, origin, destination).then((result) => {
+      void loadForecast(routeKey, `${date}T${time}:00+09:00`, origin, destination).then((result) => {
         if (disposed) return;
         setValue(result);
         setState(result ? 'ready' : 'unavailable');
