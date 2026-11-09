@@ -96,11 +96,11 @@ export async function POST(req: NextRequest) {
     const candidates = rawItems.map((item) => normalizePayloadItem(item, body));
 
     for (const cand of candidates) {
-      if (!cand.date || !cand.pickupTime || !cand.origin?.trim() || !cand.destination?.trim()) {
+      if (!cand.date || (cand.dispatchStatus === 'published' && !cand.pickupTime) || !cand.origin?.trim() || !cand.destination?.trim()) {
         return NextResponse.json(
           {
             ok: false,
-            error: '운행 일자, 픽업 시간, 출발지, 목적지는 필수 입력 항목입니다.',
+            error: '운행 일자와 출발지·도착지를 입력해 주세요. 출발 시간 미지정 상태는 미배정 예약만 저장할 수 있습니다.',
           },
           { status: 400 }
         );
