@@ -8,6 +8,8 @@ import { getUnconfirmedEmailRouteStops } from '@/utils/emailRoutePlaceVerificati
 import { HqRoutePlaceVerification } from './HqRoutePlaceVerification';
 import { VIP_REAL_VEHICLES } from '@/utils/vehicleData';
 import { driverSupportsEnglish } from './HqDriverSelectModal';
+import { emailFlightAssignmentIssues } from '@/utils/emailDispatchPlan';
+import { HqFlightAssignmentSection } from './HqFlightAssignmentSection';
 import { getVerifiedVehiclePhoto, HqVehicleSelectModal } from './HqVehicleSelectModal';
 import type { VehicleSlotAssignment } from './HqStep2BookingDetailView';
 
@@ -39,7 +41,8 @@ export const HqStep5AssignmentPanel: React.FC<HqStep5AssignmentPanelProps> = ({
   const uniqueDrivers = new Set(selectedDriverIds).size === selectedDriverIds.length;
   const unconfirmedStops = draft ? getUnconfirmedEmailRouteStops(draft) : [];
   const allPlacesConfirmed = Boolean(draft) && unconfirmedStops.length === 0;
-  const allAssigned = allPlacesConfirmed && !loading && !fleetError && uniqueDrivers && slots.length > 0 && slots.every((slot) => {
+  const flightIssues = draft ? emailFlightAssignmentIssues(draft, slots) : [];
+  const allAssigned = flightIssues.length === 0 && allPlacesConfirmed && !loading && !fleetError && uniqueDrivers && slots.length > 0 && slots.every((slot) => {
     const vehicle = vehicles?.find((item) => item.plate === slot.vehiclePlate);
     return Boolean(vehicle?.isAvailable && slot.driver && (language !== 'english' || driverSupportsEnglish(slot.driver)));
   });
@@ -177,6 +180,8 @@ export const HqStep5AssignmentPanel: React.FC<HqStep5AssignmentPanelProps> = ({
         })}
       </div>
 
+      {draft && <HqFlightAssignmentSection draft={draft} slots={slots} onUpdateSlots={onUpdateSlots}
+        onUpdateDraft={onUpdateDraft} disabled={isDispatching}/>}
       {draft && <HqRoutePlaceVerification draft={draft} onUpdateDraft={onUpdateDraft} disabled={isDispatching} />}
 
       <div className="flex items-center justify-between px-1 py-1 text-xs">
