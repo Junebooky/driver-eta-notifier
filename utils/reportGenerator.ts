@@ -1,4 +1,4 @@
-import { DriverProfile, LocationPreset, ReportMode } from '@/types';
+import type { DriverProfile, LocationPreset, ReportMode } from '@/types';
 
 export interface GenerateReportParams {
   profile: DriverProfile;
@@ -30,6 +30,27 @@ export function formatReportHeader(vehicleNo?: string, driverName?: string): str
   return '[의전 드라이버]';
 }
 
+/**
+ * Display clocks consistently in 12-hour time with AM/PM in both Korean and English reports.
+ * Never change an already-tagged AM/PM period, and do not fabricate a time for pending ETA.
+ */
+export function formatEtaWithAmPm(etaFormatted: string): string {
+  const explicitMatch = etaFormatted.match(/\b(\d{1,2}):(\d{2})\s*(AM|PM)\b/i);
+  if (explicitMatch) {
+    const hours = Number(explicitMatch[1]);
+    if (hours > 23) return etaFormatted.trim();
+    return `${hours % 12 || 12}:${explicitMatch[2]} ${explicitMatch[3].toUpperCase()}`;
+  }
+  const timeMatch = etaFormatted.match(/\b(\d{1,2}):(\d{2})\b/);
+  if (timeMatch) {
+    const hours = Number(timeMatch[1]);
+    if (hours > 23) return etaFormatted.trim();
+    const period = hours >= 12 ? 'PM' : 'AM';
+    return `${hours % 12 || 12}:${timeMatch[2]} ${period}`;
+  }
+  return etaFormatted.replace(/\s*\(.*?\)/, '').trim();
+}
+
 export function generateReportText({
   profile,
   origin,
@@ -45,14 +66,7 @@ export function generateReportText({
   const destName = typeof destination === 'string' ? destination : destination.shortName;
   const originName = typeof origin === 'string' ? origin : origin ? origin.shortName : '현 위치';
 
-  // Strict 24h format HH:mm (e.g. 03:08, 14:35) without "(xx분 소요)" or "오전/오후"
-  let cleanEta = etaFormatted;
-  const timeMatch = etaFormatted.match(/(\d{1,2}:\d{2})/);
-  if (timeMatch) {
-    cleanEta = timeMatch[1].padStart(5, '0');
-  } else {
-    cleanEta = etaFormatted.replace(/\s*\(.*?\)/, '').trim();
-  }
+  const cleanEta = formatEtaWithAmPm(etaFormatted);
 
   const header = formatReportHeader(profile.vehicleNo, profile.driverName);
 

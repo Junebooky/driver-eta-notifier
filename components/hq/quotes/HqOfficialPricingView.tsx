@@ -1,0 +1,548 @@
+'use client';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { HqCard, HqSegmentedTabs } from '@/components/hq/ui';
+import {
+  Car,
+  Truck,
+  Bus,
+  Loader2,
+  Calculator,
+  Plus,
+} from 'lucide-react';
+import { OfficialPriceCard } from '@/types/officialPricingHq';
+import { haptics } from '@/utils/haptics';
+import { formatCapacity } from '@/utils/formatters';
+
+interface HqOfficialPricingViewProps {
+  onOpenQuoteModal: (vehicleProductCode?: string) => void;
+  onOpenChauffeurCard?: () => void;
+}
+
+export type CategoryTabId = 'all' | 'sedan' | 'suv' | 'van' | 'sprinter' | 'bus';
+
+export interface PricingTableRow {
+  vehicleProductCode: string;
+  vehicleProductLabel: string;
+  yearTrim: string;
+  seats: string;
+  imageUrl: string;
+  dailyMetroKrw: number | null;
+  dailyRegionalKrw: number | null;
+  airportGimpoKrw: number | null;
+  airportIncheonKrw: number | null;
+  quoteRequired: boolean;
+  category: CategoryTabId;
+  categoryLabel: string;
+}
+
+/**
+ * 2026 Canonical VIP Vehicle Pricing Data
+ * Seat capacity formatted cleanly without redundant trims/years in the capacity column.
+ */
+const CANONICAL_VEHICLES: PricingTableRow[] = [
+  // 1. Sedan
+  {
+    vehicleProductCode: 'benz_s560',
+    vehicleProductLabel: '벤츠 S560',
+    yearTrim: '2026년형',
+    seats: '3인',
+    imageUrl: '/images/vehicles/s560.webp',
+    dailyMetroKrw: 800000,
+    dailyRegionalKrw: 900000,
+    airportGimpoKrw: 350000,
+    airportIncheonKrw: 400000,
+    quoteRequired: false,
+    category: 'sedan',
+    categoryLabel: '세단',
+  },
+  {
+    vehicleProductCode: 'genesis_g90_donghaeng',
+    vehicleProductLabel: '제네시스 G90 리무진 롱휠',
+    yearTrim: '2026년형',
+    seats: '3인',
+    imageUrl: '/images/vehicles/g90_lwb.webp',
+    dailyMetroKrw: 800000,
+    dailyRegionalKrw: 900000,
+    airportGimpoKrw: 350000,
+    airportIncheonKrw: 400000,
+    quoteRequired: false,
+    category: 'sedan',
+    categoryLabel: '세단',
+  },
+  {
+    vehicleProductCode: 'genesis_g90_standard',
+    vehicleProductLabel: '제네시스 G90 신차 최고급형',
+    yearTrim: '2026년형',
+    seats: '3인',
+    imageUrl: '/images/vehicles/g90_black.webp',
+    dailyMetroKrw: 550000,
+    dailyRegionalKrw: 600000,
+    airportGimpoKrw: 220000,
+    airportIncheonKrw: 250000,
+    quoteRequired: false,
+    category: 'sedan',
+    categoryLabel: '세단',
+  },
+
+  // 2. SUV
+  {
+    vehicleProductCode: 'genesis_gv80_new',
+    vehicleProductLabel: '제네시스 GV80 신차',
+    yearTrim: '2026년형',
+    seats: '4인',
+    imageUrl: '/images/vehicles/gv80.webp',
+    dailyMetroKrw: 500000,
+    dailyRegionalKrw: 550000,
+    airportGimpoKrw: 200000,
+    airportIncheonKrw: 230000,
+    quoteRequired: false,
+    category: 'suv',
+    categoryLabel: 'SUV',
+  },
+
+  // 3. Van
+  {
+    vehicleProductCode: 'hyundai_staria_lounge_limo',
+    vehicleProductLabel: '현대 스타리아 라운지 리무진 최고급형',
+    yearTrim: '2026년형',
+    seats: '7~9인',
+    imageUrl: '/images/vehicles/staria.webp',
+    dailyMetroKrw: 430000,
+    dailyRegionalKrw: 480000,
+    airportGimpoKrw: 200000,
+    airportIncheonKrw: 220000,
+    quoteRequired: false,
+    category: 'van',
+    categoryLabel: '밴',
+  },
+  {
+    vehicleProductCode: 'kia_carnival_hi_limo',
+    vehicleProductLabel: '기아 카니발 하이리무진 최고급형',
+    yearTrim: '2026년형',
+    seats: '4~7인',
+    imageUrl: '/images/vehicles/carnival_high.webp',
+    dailyMetroKrw: 430000,
+    dailyRegionalKrw: 480000,
+    airportGimpoKrw: 200000,
+    airportIncheonKrw: 220000,
+    quoteRequired: false,
+    category: 'van',
+    categoryLabel: '밴',
+  },
+
+  // 4. Sprinter
+  {
+    vehicleProductCode: 'sprinter_319_new_6seat',
+    vehicleProductLabel: '벤츠 스프린터 319 신차',
+    yearTrim: '2026년형',
+    seats: '6인',
+    imageUrl: '/images/vehicles/sprinter_319.webp',
+    dailyMetroKrw: 800000,
+    dailyRegionalKrw: 900000,
+    airportGimpoKrw: 350000,
+    airportIncheonKrw: 400000,
+    quoteRequired: false,
+    category: 'sprinter',
+    categoryLabel: '스프린터',
+  },
+  {
+    vehicleProductCode: 'sprinter_519_business',
+    vehicleProductLabel: '벤츠 스프린터 519 비즈니스',
+    yearTrim: '2026년형',
+    seats: '15~16인',
+    imageUrl: '/images/vehicles/sprinter_519.webp',
+    dailyMetroKrw: 700000,
+    dailyRegionalKrw: 800000,
+    airportGimpoKrw: 300000,
+    airportIncheonKrw: 350000,
+    quoteRequired: false,
+    category: 'sprinter',
+    categoryLabel: '스프린터',
+  },
+  {
+    vehicleProductCode: 'sprinter_519_business_premium',
+    vehicleProductLabel: '벤츠 스프린터 519 비즈니스 최고급',
+    yearTrim: '2026년형',
+    seats: '15~16인',
+    imageUrl: '/images/vehicles/sprinter_519.webp',
+    dailyMetroKrw: 800000,
+    dailyRegionalKrw: 900000,
+    airportGimpoKrw: 350000,
+    airportIncheonKrw: 400000,
+    quoteRequired: false,
+    category: 'sprinter',
+    categoryLabel: '스프린터',
+  },
+  {
+    vehicleProductCode: 'sprinter_519_shuttle_premium',
+    vehicleProductLabel: '벤츠 스프린터 519 셔틀 최고급',
+    yearTrim: '2026년형',
+    seats: '15~16인',
+    imageUrl: '/images/vehicles/sprinter_519.webp',
+    dailyMetroKrw: 800000,
+    dailyRegionalKrw: 900000,
+    airportGimpoKrw: 350000,
+    airportIncheonKrw: 400000,
+    quoteRequired: false,
+    category: 'sprinter',
+    categoryLabel: '스프린터',
+  },
+  {
+    vehicleProductCode: 'sprinter_519_shuttle_standard',
+    vehicleProductLabel: '벤츠 스프린터 519 셔틀 일반',
+    yearTrim: '2026년형',
+    seats: '15~16인',
+    imageUrl: '/images/vehicles/sprinter_519.webp',
+    dailyMetroKrw: 700000,
+    dailyRegionalKrw: 800000,
+    airportGimpoKrw: 300000,
+    airportIncheonKrw: 350000,
+    quoteRequired: false,
+    category: 'sprinter',
+    categoryLabel: '스프린터',
+  },
+  {
+    vehicleProductCode: 'sprinter_519_premium',
+    vehicleProductLabel: '벤츠 스프린터 519 최고급형',
+    yearTrim: '2026년형',
+    seats: '16인',
+    imageUrl: '/images/vehicles/sprinter_519.webp',
+    dailyMetroKrw: 800000,
+    dailyRegionalKrw: 900000,
+    airportGimpoKrw: 350000,
+    airportIncheonKrw: 400000,
+    quoteRequired: false,
+    category: 'sprinter',
+    categoryLabel: '스프린터',
+  },
+  {
+    vehicleProductCode: 'sprinter_519_standard',
+    vehicleProductLabel: '벤츠 스프린터 리무진 519 일반형',
+    yearTrim: '2026년형',
+    seats: '15~16인',
+    imageUrl: '/images/vehicles/sprinter_519.webp',
+    dailyMetroKrw: 700000,
+    dailyRegionalKrw: 800000,
+    airportGimpoKrw: 350000,
+    airportIncheonKrw: 400000,
+    quoteRequired: false,
+    category: 'sprinter',
+    categoryLabel: '스프린터',
+  },
+
+  // 5. Bus
+  {
+    vehicleProductCode: 'bus_45',
+    vehicleProductLabel: '버스',
+    yearTrim: '2026년형',
+    seats: '45인',
+    imageUrl: '/images/vehicles/bus.webp',
+    dailyMetroKrw: null,
+    dailyRegionalKrw: null,
+    airportGimpoKrw: null,
+    airportIncheonKrw: null,
+    quoteRequired: true,
+    category: 'bus',
+    categoryLabel: '버스',
+  },
+  {
+    vehicleProductCode: 'bus_limo_28',
+    vehicleProductLabel: '리무진 버스',
+    yearTrim: '2026년형',
+    seats: '28인',
+    imageUrl: '/images/vehicles/bus.webp',
+    dailyMetroKrw: null,
+    dailyRegionalKrw: null,
+    airportGimpoKrw: null,
+    airportIncheonKrw: null,
+    quoteRequired: true,
+    category: 'bus',
+    categoryLabel: '버스',
+  },
+  {
+    vehicleProductCode: 'bus_premium_22',
+    vehicleProductLabel: '프리미엄 럭셔리 리무진 버스',
+    yearTrim: '2026년형',
+    seats: '22인',
+    imageUrl: '/images/vehicles/bus.webp',
+    dailyMetroKrw: null,
+    dailyRegionalKrw: null,
+    airportGimpoKrw: null,
+    airportIncheonKrw: null,
+    quoteRequired: true,
+    category: 'bus',
+    categoryLabel: '버스',
+  },
+];
+
+const CATEGORY_TABS: { id: CategoryTabId; label: string; icon: React.FC<{ className?: string }> }[] = [
+  { id: 'all', label: '전체', icon: Car },
+  { id: 'sedan', label: '세단', icon: Car },
+  { id: 'suv', label: 'SUV', icon: Car },
+  { id: 'van', label: '밴', icon: Truck },
+  { id: 'sprinter', label: '스프린터', icon: Truck },
+  { id: 'bus', label: '버스', icon: Bus },
+];
+
+export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
+  onOpenQuoteModal,
+}) => {
+  const [activeTab, setActiveTab] = useState<CategoryTabId>('all');
+  const [cards, setCards] = useState<OfficialPriceCard[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchOfficialData = async () => {
+      try {
+        setIsLoading(true);
+        const res = await fetch('/api/hq/official-pricing');
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          throw new Error(data.error || '공식 요금표를 불러오지 못했습니다.');
+        }
+        if (isMounted) {
+          setCards(data.cards || []);
+        }
+      } catch (err: any) {
+        console.warn('[HqOfficialPricingView] Notice:', err.message);
+        if (isMounted) setError(err.message);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+    fetchOfficialData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Merge live Supabase price cards with canonical pricing items
+  const allMergedVehicles = useMemo(() => {
+    return CANONICAL_VEHICLES.map((item) => {
+      const liveCard = cards.find(
+        (c) => c.vehicleProductCode.toLowerCase() === item.vehicleProductCode.toLowerCase()
+      );
+      if (!liveCard) return item;
+      return {
+        ...item,
+        dailyMetroKrw: liveCard.dailyMetroKrw !== undefined ? liveCard.dailyMetroKrw : item.dailyMetroKrw,
+        dailyRegionalKrw: liveCard.dailyRegionalKrw !== undefined ? liveCard.dailyRegionalKrw : item.dailyRegionalKrw,
+        airportGimpoKrw: liveCard.airportGimpoKrw !== undefined ? liveCard.airportGimpoKrw : item.airportGimpoKrw,
+        airportIncheonKrw: liveCard.airportIncheonKrw !== undefined ? liveCard.airportIncheonKrw : item.airportIncheonKrw,
+        quoteRequired: Boolean(liveCard.quoteRequired ?? item.quoteRequired),
+      };
+    });
+  }, [cards]);
+
+  // Tab counts
+  const tabCounts = useMemo(() => {
+    return {
+      all: allMergedVehicles.length,
+      sedan: allMergedVehicles.filter((v) => v.category === 'sedan').length,
+      suv: allMergedVehicles.filter((v) => v.category === 'suv').length,
+      van: allMergedVehicles.filter((v) => v.category === 'van').length,
+      sprinter: allMergedVehicles.filter((v) => v.category === 'sprinter').length,
+      bus: allMergedVehicles.filter((v) => v.category === 'bus').length,
+    };
+  }, [allMergedVehicles]);
+
+  // Filtered displayed vehicles based on active pill tab
+  const displayedVehicles = useMemo(() => {
+    if (activeTab === 'all') return allMergedVehicles;
+    return allMergedVehicles.filter((v) => v.category === activeTab);
+  }, [allMergedVehicles, activeTab]);
+
+  if (isLoading && cards.length === 0) {
+    return (
+      <div className="rounded-[24px] bg-white py-24 text-center shadow-[0_6px_20px_rgba(35,49,78,0.055)]">
+        <Loader2 className="w-8 h-8 mx-auto text-[#1E60F3] animate-spin mb-3" />
+        <p className="font-extrabold text-sm text-slate-700">2026 공식 요율표 로드 중...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="hq-pricing-a space-y-5">
+      {error && (
+        <div className="rounded-[16px] bg-[#FFF9F1] p-4 text-[12px] font-medium text-[#8E633F]">
+          ⚠️ {error} (로컬 캐시 표준 요율표를 표시합니다)
+        </div>
+      )}
+
+      {/* Top Header Card: Icon + Title + Count */}
+      <HqCard className="flex items-center justify-between gap-3 p-5 sm:px-6">
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+          {/* 견적서 아이콘 & 마우스 호버 툴팁 */}
+          <div className="relative group/quotes inline-flex items-center justify-center cursor-pointer shrink-0">
+            <img
+              src="/images/icons/calculator.png"
+              alt="견적서"
+              className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0 transition-transform duration-150 group-hover/quotes:scale-110"
+            />
+
+            {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
+            <div className="absolute bottom-full left-0 mb-2 hidden group-hover/quotes:flex flex-col items-start pointer-events-none z-[100]">
+              <span className="whitespace-nowrap rounded-[12px] bg-white px-3 py-2 text-[11px] font-medium text-[#4D607C] shadow-[0_8px_22px_rgba(35,49,78,0.1)] animate-in fade-in-50 duration-150">
+                차종별 공식 표준 요율을 확인하고 맞춤 견적서를 생성해요
+              </span>
+              <div className="-mt-1 ml-3.5 size-2 rotate-45 bg-white" />
+            </div>
+          </div>
+
+          <h2 className="truncate whitespace-nowrap text-[19px] font-bold tracking-[-0.03em] text-[#17233B] sm:text-[22px]">
+            표준 요금표 · 견적서
+          </h2>
+          <span className="rounded-full bg-[#F7F9FC] px-3 py-1 text-[11px] font-medium text-[#73839D] whitespace-nowrap shrink-0">
+            {tabCounts.all}개 차종
+          </span>
+        </div>
+
+        {/* Quick Quote Calculator Trigger: Mobile '+' icon button, PC '견적서 작성' */}
+        <button
+          type="button"
+          onClick={() => onOpenQuoteModal()}
+          aria-label="견적서 작성"
+          className="flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-[14px] bg-[#1E60F3] px-3 text-[12px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-colors hover:bg-[#1757DC] active:scale-[0.99] sm:px-4"
+        >
+          <Plus className="w-5 h-5 sm:hidden stroke-[2.5]" />
+          <Calculator className="hidden sm:block w-3.5 h-3.5" />
+          <span className="hidden sm:inline">견적서 작성</span>
+        </button>
+      </HqCard>
+
+      {/* 1. Shared HQ segmented category tabs */}
+      <HqCard className="p-3 sm:px-5">
+        <HqSegmentedTabs
+          aria-label="요금표 차종 선택"
+          value={activeTab}
+          tabs={CATEGORY_TABS.map((tab) => ({
+            id: tab.id,
+            label: tab.label,
+            count: tabCounts[tab.id],
+          }))}
+          onValueChange={(id) => {
+            haptics.selection();
+            setActiveTab(id as CategoryTabId);
+          }}
+        />
+      </HqCard>
+
+      {/* 2. Unified Pricing Table (Single Clean Table Container) */}
+      <div className="overflow-hidden rounded-[23px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055)]">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-[#FAFBFD] text-[11px] font-medium text-[#73839D] sm:text-[12px] select-none">
+                <th className="py-3.5 px-5 font-bold text-slate-800 text-left min-w-[240px]">
+                  차량명
+                </th>
+                <th className="py-3.5 px-3 font-bold text-slate-800 text-center min-w-[80px] whitespace-nowrap">
+                  탑승 정원
+                </th>
+                <th className="py-3.5 px-3 font-bold text-slate-800 text-center min-w-[110px]">
+                  수도권 (9시간)
+                </th>
+                <th className="py-3.5 px-3 font-bold text-slate-800 text-center min-w-[110px]">
+                  지방 (9시간)
+                </th>
+                <th className="py-3.5 px-3 font-bold text-slate-800 text-center min-w-[110px]">
+                  김포공항 편도
+                </th>
+                <th className="py-3.5 px-3 font-bold text-slate-800 text-center min-w-[110px]">
+                  인천공항 편도
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-xs">
+              {displayedVehicles.map((item) => (
+                <tr
+                  key={item.vehicleProductCode}
+                  onClick={() => {
+                    haptics.lightTap();
+                    onOpenQuoteModal(item.vehicleProductCode);
+                  }}
+                  className="group cursor-pointer transition-colors hover:bg-[#FAFBFD]"
+                  title="클릭하여 이 차량으로 견적서 작성"
+                >
+                  {/* 1. 차량명 (썸네일 + 라벨 + 서브텍스트 연식) */}
+                  <td className="py-3.5 px-5">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-14 shrink-0 items-center justify-center rounded-[11px] bg-[#F7F9FC] p-1">
+                        <img
+                          src={item.imageUrl}
+                          alt={item.vehicleProductLabel}
+                          className="max-w-full max-h-full object-contain"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = '/images/vehicles/bus.webp';
+                          }}
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs sm:text-[13px] font-bold text-slate-900 group-hover:text-[#1E60F3] transition-colors">
+                            {item.vehicleProductLabel}
+                          </span>
+                          {activeTab === 'all' && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200/80">
+                              {item.categoryLabel}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-400 font-medium mt-0.5">
+                          {item.yearTrim}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+
+                  {/* 2. 탑승 정원 (토스/애플 스타일 간결한 [숫자]인 표준 규격) */}
+                  <td className="py-3.5 px-3 text-center text-xs text-slate-600 font-medium whitespace-nowrap">
+                    {formatCapacity(item.seats)}
+                  </td>
+
+                  {/* 3~6. 요금 4개 열 (버스는 하이픈 4번 대신 별도 상담 전화 아이콘 표시) */}
+                  {item.quoteRequired ? (
+                    <td colSpan={4} className="py-3.5 px-3 text-center bg-slate-50/50">
+                      <div className="inline-flex items-center justify-center group/call cursor-pointer" title="별도 상담 (전화 문의)">
+                        <img
+                          src="/images/icons/quotes/call.png"
+                          alt="별도 상담"
+                          className="w-10 h-10 object-contain transition-transform duration-200 group-hover/call:scale-125 drop-shadow-xs"
+                        />
+                      </div>
+                    </td>
+                  ) : (
+                    <>
+                      {/* 수도권 (9시간) */}
+                      <td className="py-3.5 px-3 text-center text-xs sm:text-[13px] font-extrabold text-slate-900 font-mono tracking-tight whitespace-nowrap">
+                        {item.dailyMetroKrw !== null ? `${item.dailyMetroKrw.toLocaleString()}원` : '-'}
+                      </td>
+
+                      {/* 지방 (9시간) */}
+                      <td className="py-3.5 px-3 text-center text-xs sm:text-[13px] font-extrabold text-slate-900 font-mono tracking-tight whitespace-nowrap">
+                        {item.dailyRegionalKrw !== null ? `${item.dailyRegionalKrw.toLocaleString()}원` : '-'}
+                      </td>
+
+                      {/* 김포공항 편도 */}
+                      <td className="py-3.5 px-3 text-center text-xs sm:text-[13px] font-extrabold text-slate-900 font-mono tracking-tight whitespace-nowrap">
+                        {item.airportGimpoKrw !== null ? `${item.airportGimpoKrw.toLocaleString()}원` : '-'}
+                      </td>
+
+                      {/* 인천공항 편도 */}
+                      <td className="py-3.5 px-3 text-center text-xs sm:text-[13px] font-extrabold text-slate-900 font-mono tracking-tight whitespace-nowrap">
+                        {item.airportIncheonKrw !== null ? `${item.airportIncheonKrw.toLocaleString()}원` : '-'}
+                      </td>
+                    </>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};

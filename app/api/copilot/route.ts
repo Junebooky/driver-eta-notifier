@@ -1,6 +1,9 @@
+import { queryServerSchedules } from '@/lib/dispatch/scheduleServerStore';
+import { getKstTodayDateStr, getKstTomorrowDateStr } from '@/utils/dispatchConflictDetector';
+import { verifyServerAuth } from '@/lib/auth/serverAuth';
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
-import { CONFIRMED_FERRARI_SCHEDULES, ScheduleItem } from '@/data/ferrariSchedules';
+import { ScheduleItem } from '@/data/ferrariSchedules';
 import { DEFAULT_PRESET_LOCATIONS } from '@/utils/presets';
 
 interface CopilotRequestBody {
@@ -102,112 +105,20 @@ function processDeterministicFallback(
     };
   }
 
-  // 2. Flight Query Check
-  if (normalized.includes('sq612') || normalized.includes('sq 612') || (normalized.includes('9/17') && normalized.includes('항공'))) {
-    return {
-      reply: `[SQ 612 항공편 실시간 운항 브리핑]
-• 항공편명: 싱가포르항공 SQ 612 (싱가포르 SIN ➔ 인천 ICN)
-• 예정 착륙: 2026-09-17 09:50 착륙 (정시 운항 예정)
-• 도착 터미널: 인천공항 제1여객터미널 (T1)
-• 영접 가이드: T1 1층 입국장 피켓 대기 (단기 지상주차장 A구역 추천)
-• 연계 일정: 조선팰리스 강남 이동 (DENZEL SOFYAN VIP 영접)`,
-      type: 'flight',
-    };
+  if (/항공|비행|[a-z]{2}\s*\d{2,4}/i.test(normalized)) {
+    return { reply: '항공편 메뉴에서 최신 운항 정보를 확인해 주세요. 현재 코파일럿은 실시간 항공편 조회에 연결되어 있지 않습니다.', type: 'flight' };
   }
-
-  if (normalized.includes('sq601') || normalized.includes('sq 601') || (normalized.includes('9/20') && normalized.includes('항공'))) {
-    return {
-      reply: `[SQ 601 항공편 실시간 운항 브리핑]
-• 항공편명: 싱가포르항공 SQ 601 (인천 ICN ➔ 싱가포르 SIN)
-• 출발 시각: 2026-09-20 16:45 출국 (정시 예정)
-• 출발 터미널: 인천공항 제1여객터미널 (T1 3층 출국장)
-• 샌딩 가이드: 13:00 조선팰리스 강남 픽업 후 T1 3층 게이트 하차
-• 연계 일정: KAI THIO 승객 출국 샌딩`,
-      type: 'flight',
-    };
-  }
-
-  // 3. Schedule Briefing by Date
-  if (normalized.includes('9.18') || normalized.includes('9/18') || normalized.includes('9월 18') || normalized.includes('18일') || normalized.includes('내일')) {
-    const item = schedules.find((s) => s.date.includes('09-18')) || CONFIRMED_FERRARI_SCHEDULES[1];
-    return {
-      reply: formatScheduleBriefing(item),
-      type: 'briefing',
-    };
-  }
-
-  if (normalized.includes('9.17') || normalized.includes('9/17') || normalized.includes('9월 17') || normalized.includes('17일')) {
-    const item = schedules.find((s) => s.date.includes('09-17')) || CONFIRMED_FERRARI_SCHEDULES[0];
-    return {
-      reply: formatScheduleBriefing(item),
-      type: 'briefing',
-    };
-  }
-
-  if (normalized.includes('9.19') || normalized.includes('9/19') || normalized.includes('9월 19') || normalized.includes('19일')) {
-    const item = schedules.find((s) => s.date.includes('09-19')) || CONFIRMED_FERRARI_SCHEDULES[2];
-    return {
-      reply: formatScheduleBriefing(item),
-      type: 'briefing',
-    };
-  }
-
-  if (normalized.includes('9.20') || normalized.includes('9/20') || normalized.includes('9월 20') || normalized.includes('20일')) {
-    const item = schedules.find((s) => s.date.includes('09-20')) || CONFIRMED_FERRARI_SCHEDULES[3];
-    return {
-      reply: formatScheduleBriefing(item),
-      type: 'briefing',
-    };
-  }
-
-  // 4. Schedule Registration Intent
-  if (
-    normalized.includes('등록') ||
-    normalized.includes('추가') ||
-    normalized.includes('작성') ||
-    normalized.includes('새 스케줄')
-  ) {
-    return {
-      reply: `📝 신규 스케줄 등록 팝업을 열었습니다.\n운행 일자(8자리 숫자) 및 상세 일정을 입력해 주세요.`,
-      type: 'schedule_form',
-    };
-  }
-
-  // 5. Full Schedule Briefing
-  if (
-    normalized.includes('전체') ||
-    normalized.includes('모든') ||
-    normalized.includes('스케줄') ||
-    normalized.includes('배차표') ||
-    normalized.includes('일정') ||
-    normalized.includes('브리핑')
-  ) {
-    const list = schedules.length > 0 ? schedules : CONFIRMED_FERRARI_SCHEDULES;
-    const briefings = list.map((item) => formatScheduleBriefing(item)).join('\n\n');
-    return {
-      reply: `[${profile.vehicleNo || '4호차'} ${profile.driverName || '윤태준'} 기사님 확정 배차표 브리핑]\n\n${briefings}`,
-      type: 'briefing',
-    };
-  }
-
-  // 5. Default fallback: Guide driver on supported protocol cockpit actions
-  if (!hasDomainKeyword) {
-    return {
-      reply: GUARDRAIL_REJECTION_MESSAGE,
-      type: 'guardrail',
-    };
-  }
-
-  return {
-    reply: `기사님, 배차표 관련 요청을 확인했습니다.\n• 특정 일자 브리핑(예: "9.18일 일정 브리핑해줘")\n• 항공편 상태(예: "SQ612 상태 어때?")\n• 전체 일정 브리핑을 말씀해 주시면 즉시 정확한 관제 정보를 안내해 드리겠습니다.`,
-    type: 'general',
-  };
+  const target = normalized.includes('내일') ? getKstTomorrowDateStr() : getKstTodayDateStr();
+  const matching = schedules.filter(s => s.date === target);
+  return { reply: matching.length ? matching.map(formatScheduleBriefing).join('\n\n') : '해당 날짜에 확인된 배차가 없습니다. 스케줄 메뉴에서 확인해 주세요.', type: 'schedule' };
 }
 
 export async function POST(req: NextRequest) {
+  const apiAuth = await verifyServerAuth(req);
+  if (!apiAuth.ok) return NextResponse.json({ ok: false, error: apiAuth.error }, { status: apiAuth.statusCode });
   try {
     const body: CopilotRequestBody = await req.json();
-    const { query, image, mode, model, profile = {}, schedules = CONFIRMED_FERRARI_SCHEDULES } = body;
+    const { query, image, mode, model, profile = {}, schedules = [] } = body;
 
     if (!query || typeof query !== 'string' || !query.trim()) {
       return NextResponse.json({ error: 'Query is required' }, { status: 400 });
@@ -217,7 +128,10 @@ export async function POST(req: NextRequest) {
     const driverName = profile.driverName || '윤태준';
     const passengerName = profile.passengerName || 'DENZEL SOFYAN';
 
-    const activeSchedules = schedules && schedules.length > 0 ? schedules : CONFIRMED_FERRARI_SCHEDULES;
+    const session = apiAuth.session!;
+    const verified = await queryServerSchedules({ role: session.role === 'hq_admin' ? 'hq' : 'driver', driverId: session.driverId, statusParam: 'published' });
+    if (verified.error) return NextResponse.json({ error: '배차 정보를 조회할 수 없습니다.' }, { status: 503 });
+    const activeSchedules = verified.schedules;
 
     // Fast-path guardrail check before invoking external API
     const normalized = query.trim().toLowerCase();

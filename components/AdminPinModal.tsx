@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, ShieldCheck, KeyRound, LogOut } from 'lucide-react';
+import Link from 'next/link';
+import { X, ShieldCheck, KeyRound, LogOut, LayoutDashboard } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface AdminPinModalProps {
@@ -109,7 +110,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh] sm:items-center sm:pt-0 p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in overscroll-contain select-none touch-none"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overscroll-contain select-none touch-none driver-modal-backdrop"
       style={{ overscrollBehavior: 'contain', touchAction: 'none' }}
       onTouchMove={(e) => e.preventDefault()}
       onWheel={(e) => e.preventDefault()}
@@ -121,7 +122,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
     >
       <div
         ref={modalRef}
-        className="w-full max-w-xs bg-white border border-slate-200 rounded-3xl shadow-2xl p-5 text-slate-900 space-y-4 transform transition-transform duration-200 ease-out focus-within:-translate-y-8 sm:focus-within:translate-y-0 overscroll-contain select-text"
+        className="w-full max-w-xs bg-white border border-slate-200 rounded-3xl shadow-2xl p-5 text-slate-900 space-y-4 transform transition-all duration-300 ease-out focus-within:-translate-y-8 sm:focus-within:translate-y-0 overscroll-contain select-text driver-modal-card"
         style={{ overscrollBehavior: 'contain', touchAction: 'none' }}
         onTouchMove={(e) => e.preventDefault()}
         onWheel={(e) => e.preventDefault()}
@@ -155,6 +156,15 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
               </p>
             </div>
 
+            <Link
+              href="/hq"
+              onClick={() => handleClose()}
+              className="w-full py-3 rounded-xl bg-[#1E60F3] hover:bg-[#1346D8] text-white text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+            >
+              <LayoutDashboard className="w-4 h-4 text-white" />
+              <span>VIP HQ 운영 대시보드 열기 ➔</span>
+            </Link>
+
             <button
               type="button"
               onClick={() => {
@@ -162,9 +172,9 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
                 onToggleAdmin(false);
                 handleClose();
               }}
-              className="w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+              className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer active:scale-98"
             >
-              <LogOut className="w-4 h-4 text-slate-500" />
+              <LogOut className="w-3.5 h-3.5 text-slate-500" />
               <span>관리자 모드 종료</span>
             </button>
           </div>

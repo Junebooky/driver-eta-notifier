@@ -1,0 +1,141 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {buildEmailDispatchPlan,emailDispatchDays} from './emailDispatchPlan';
+import {createEmptyDraft} from '../services/emailBookingGeminiService';
+import {atomicUpsertServerDispatchBatch} from '../lib/dispatch/scheduleServerStore';
+import {supabaseAdmin} from '../lib/supabase/server';
+import {VIP_REAL_VEHICLES} from './vehicleData';
+const draft=()=>({...createEmptyDraft({emailId:'message-one',subject:'일정',sender:'fixture@example.invalid',bodyText:''}),companyName:'테스트 고객',passengerName:'테스트 승객',pickupDate:'2026-12-10',pickupTime:'09:00',pickupLocation:'공항',dropoffLocation:'호텔',waypoints:['2026-12-10','2026-12-11'].flatMap((date,day)=>['공항','행사장','호텔'].map((location,index)=>({id:`${day}-${index}`,order:day*3+index,date,time:['09:00','12:00','18:00'][index],location,lat:37.4,lng:126.5,isPoiConfirmed:true})))});
+const slots=()=>VIP_REAL_VEHICLES.slice(0,2).map((car,index)=>({vehicleModel:car.model,vehiclePlate:car.plate,driver:{id:`a0000000-0000-4000-8000-00000000000${index+1}`,name:`기사 ${index+1}`}}));
+test('existing extracted stops become independent daily rows for every selected vehicle, without inter-day phantom routes',()=>{
+ const resumed=buildEmailDispatchPlan({...draft(),savedScheduleIds:{'2026-12-10:0':'existing-one'}},slots(),'published');assert.equal(resumed[0].scheduleId,'existing-one');
+ const days=emailDispatchDays(draft());assert.equal(days.length,2);assert.equal(days[0].points.length,3);
+ const plan=buildEmailDispatchPlan(draft(),slots(),'published');assert.equal(plan.length,4);assert.deepEqual(plan.map(row=>row.date),['2026-12-10','2026-12-10','2026-12-11','2026-12-11']);assert.ok(plan.every(row=>row.origin==='공항'&&row.destination==='호텔'&&row.endTime==='18:00'&&row.routeWaypoints.length===3));
+});
+test('two flights, two passenger arrival groups, ONE Staria slot create one driver schedule per day',()=>{
+ const oneVehicle=slots().slice(0,1);
+ const withTwoArrivals={...draft(),passengerCount:3,flights:[
+  {date:'2026-12-10',flightNumber:'KE2104',originAirport:'HND',destinationAirport:'GMP',role:'arrival' as const,scheduledArrival:'09:00',passengers:['Guest A','Guest B']},
+  {date:'2026-12-10',flightNumber:'NH867',originAirport:'HND',destinationAirport:'GMP',role:'arrival' as const,scheduledArrival:'09:05',passengers:['Guest C']},
+ ]};
+ const plan=buildEmailDispatchPlan(withTwoArrivals,oneVehicle,'published');
+ assert.equal(plan.length,2,'one vehicle, not two vehicles for each arrival flight');
+ const first=plan[0];
+ assert.equal(first.flightNumber,'KE2104, NH867');
+ assert.match(first.notes,/1차 KE2104 도착 09:00 \(Guest A, Guest B\)/);
+ assert.match(first.notes,/2차 NH867 도착 09:05 \(Guest C\)/);
+ assert.match(first.notes,/전원 합류 후 이동/);
+ assert.equal(first.passengerCount,3);
+ assert.equal(first.passengerName,'Guest A, Guest B, Guest C');
+ assert.equal(first.groupTotalVehicles,1);
+ assert.equal(plan[1].notes.includes('공항 입국 그룹별 픽업'),false,
+  'November 18 shared arrivals should not leak into the next service day');
+});
+
+test('missing end/POI/assignment fails; an unassigned mobile request retains every day without inventing an assignment',()=>{
+ const missing=draft();missing.waypoints[2].time='';assert.throws(()=>buildEmailDispatchPlan(missing,slots(),'published'),/종료/);
+ missing.waypoints[2].isPoiConfirmed=false;assert.equal(buildEmailDispatchPlan(missing,slots().map(s=>({...s,driver:null,vehiclePlate:undefined})),'unassigned').length,4);
+ const plan=buildEmailDispatchPlan(missing,slots(),'unassigned');assert.ok(plan.every(row=>!row.driverId&&!row.vehiclePlate));
+ assert.throws(()=>buildEmailDispatchPlan(draft(),slots().map(s=>({...s,vehiclePlate:undefined})),'published'),/번호판/);
+ const unknown=draft();unknown.waypoints[0].date='12/10';assert.throws(()=>emailDispatchDays(unknown),/추정/);
+});
+test('existing atomic save preserves the full route for the driver app and uses existing IDs on continuation',async()=>{
+ const original=supabaseAdmin.rpc;const originalFrom=supabaseAdmin.from;let calls=0;
+ supabaseAdmin.from=((table:string)=>{if(table==='vehicles'){const registry={select:()=>registry,eq:async()=>({data:VIP_REAL_VEHICLES.map(v=>({id:v.uuid,organization_id:'vip_limousine_korea',plate:v.plate,model:v.model,model_short:v.modelShort,plate_short:v.plateShort,brand:v.brand,category:v.category,category_label:v.categoryLabel,sub_type:v.subType,capacity:v.capacity,fuel_type:v.fuelType,status:'available'})),error:null})};return registry;}return originalFrom(table as 'schedules');}) as typeof supabaseAdmin.from;
+ supabaseAdmin.rpc=(async(name:string,args:{p_items:Array<{row:Record<string,unknown>}>})=>{calls++;assert.equal(name,'commit_dispatch_batch');assert.equal(args.p_items.length,4);assert.ok(args.p_items.every(i=>(i.row.schedule_meta as {routeWaypoints:unknown[]}).routeWaypoints.length===3));return {data:args.p_items.map(i=>({...i.row,origin_lat:undefined,origin_lng:undefined,destination_lat:undefined,destination_lng:undefined})),error:null};}) as unknown as typeof original;
+ try{const result=await atomicUpsertServerDispatchBatch(buildEmailDispatchPlan(draft(),slots(),'published'));assert.equal(result.ok,true,result.error);assert.equal(calls,1);assert.equal(result.schedules?.[0].adminWaypoints?.[0].name,'행사장');assert.equal(result.schedules?.[0].origin_lat,37.4);assert.equal(result.schedules?.[0].destination_lng,126.5);}finally{supabaseAdmin.rpc=original;supabaseAdmin.from=originalFrom;}
+});
+import {acknowledgeServerSchedule} from '../lib/dispatch/scheduleServerStore';
+import {POST as ackRoute} from '../app/api/schedules/ack/route';
+import {NextRequest} from 'next/server';
+import {signCockpitSession} from '../lib/auth/serverAuth';
+test('HQ cannot impersonate a driver acknowledgment; same-name other UUID is rejected',async()=>{
+ const token=signCockpitSession({userId:'hq',org:'vip_limousine_korea',role:'hq_admin'});
+ assert.equal((await ackRoute(new NextRequest('http://localhost/api/schedules/ack',{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({scheduleId:'one',driverId:'assigned'})}))).status,403);
+ const original=supabaseAdmin.from;let writes=0;
+ const row={id:'one',driver_id:'assigned',driver_name:'같은 이름',date:'2026-12-10',pickup_time:'09:00',dispatch_status:'published',schedule_meta:{version:1,driverId:'assigned',driverName:'같은 이름',dispatchStatus:'published'}};
+ supabaseAdmin.from=(()=>{let patch={};const q={select:()=>q,eq:()=>q,maybeSingle:async()=>({data:row,error:null}),update:(value:object)=>{writes++;patch=value;return q;},single:async()=>({data:{...row,...patch},error:null})};return q;}) as unknown as typeof original;
+ try{assert.equal((await acknowledgeServerSchedule({scheduleId:'one',driverId:'other',driverName:'같은 이름',version:1})).statusCode,403);assert.equal(writes,0);assert.equal((await acknowledgeServerSchedule({scheduleId:'one',driverId:'assigned',driverName:'변경된 성함',version:1})).error,undefined);assert.equal(writes,1);}finally{supabaseAdmin.from=original;}
+});
+
+import {emailDispatchProgress} from './emailDispatchPlan';
+test('completion screen counts every saved day and requires the latest real acknowledgment',()=>{
+ const first={id:'one',dispatch_status:'published',version:2,last_ack_version:2,isAcknowledged:true};
+ assert.equal(emailDispatchProgress(['one','two'],[first]).complete,false);
+ assert.equal(emailDispatchProgress(['one','two'],[first,{...first,id:'two',last_ack_version:1}]).complete,false);
+ assert.equal(emailDispatchProgress(['one','two'],[first,{...first,id:'two'}]).complete,true);
+ assert.equal(emailDispatchProgress(['one'],[{...first,dispatch_status:'cancelled'}]).complete,false);
+ assert.equal(emailDispatchProgress([],[]).complete,false);
+});
+
+test('English-language VIP assignment is saved and validated for every vehicle slot',()=>{
+ const english={...draft(),specialRequests:'영어 가능한 기사님 배정 부탁드립니다.'};
+ assert.throws(()=>buildEmailDispatchPlan(english,slots(),'published'),/영어 가능/);
+ const qualified=slots().map(slot=>({...slot,driver:slot.driver && {...slot.driver,languages:['ko','en']}}));
+ const englishPlan=buildEmailDispatchPlan(english,qualified,'published');
+ assert.equal(englishPlan.length,4);
+ assert.ok(englishPlan.every(item=>item.requestedLanguage==='en'));
+ const toAssign=buildEmailDispatchPlan(english,slots().map(slot=>({...slot,driver:null,vehiclePlate:undefined})),'unassigned');
+ assert.ok(toAssign.every(item=>item.requestedLanguage==='en'&&!item.driverId));
+ const manuallyOverridden=buildEmailDispatchPlan({...english,requestedLanguage:'ko'},slots(),'published');
+ assert.ok(manuallyOverridden.every(item=>item.requestedLanguage==='ko'));
+});
+
+
+test('confirmed email event name survives all dates and cars without being replaced by the client name', () => {
+  const draftWithEvent = { ...draft(), companyName: 'FRED', eventName: '90th Anniversary' };
+  const rows = buildEmailDispatchPlan(draftWithEvent, slots(), 'published');
+  assert.equal(rows.length, 4);
+  assert.ok(rows.every(row => row.eventName === '90th Anniversary' && row.customerName === 'FRED'));
+  assert.equal(new Set(rows.map(row => row.eventId)).size, 1, 'all event days must share one event ID');
+  assert.equal(new Set(rows.map(row => row.groupId)).size, 2, 'different dates stay independent');
+});
+
+test('each driver receives ONLY assigned flight numbers, riders and airport notes',()=>{
+ const day='2026-12-10';
+ const base=draft();
+ const firstStop={...base.waypoints[0],
+   notes:'픽업 장소 확인 · 입국 그룹별 픽업 · 1차 KE2104 09:00 (Guest A, Guest B) / 2차 NH867 09:05 (Guest C)'};
+ const w=[firstStop,...base.waypoints.slice(1).filter(point=>point.date===day)];
+ const d={...base,passengerName:'Guest A, Guest B, Guest C',passengerPhone:'010-1111-2222',
+   passengerCount:3,specialRequests:'물 준비',waypoints:w,
+   flights:[
+     {date:day,flightNumber:'KE2104',role:'arrival' as const,destinationAirport:'GMP',
+      scheduledArrival:'09:00',passengers:['Guest A','Guest B']},
+     {date:day,flightNumber:'NH867',role:'arrival' as const,destinationAirport:'GMP',
+      scheduledArrival:'09:05',passengers:['Guest C']},
+   ]};
+ const vehicles=slots().map((s,i)=>({...s,sharedRouteConfirmed:true,assignedFlightKeys:[day+':'+(i===0?'KE2104':'NH867')]}));
+ const rows=buildEmailDispatchPlan(d,vehicles,'published').filter(x=>x.date===day);
+ assert.equal(rows.length,2);
+ assert.deepEqual(rows.map(r=>r.flightNumber),['KE2104','NH867']);
+ assert.deepEqual(rows.map(r=>r.passengerName),['Guest A, Guest B','Guest C']);
+ assert.deepEqual(rows.map(r=>r.passengerCount),[2,1]);
+ assert.deepEqual(rows.map(r=>r.passengerPhone),['','']);
+ assert.equal(rows[0].driverId,vehicles[0].driver.id);
+ assert.equal(rows[1].driverId,vehicles[1].driver.id);
+ const contentA=JSON.stringify(rows[0]);
+ const contentB=JSON.stringify(rows[1]);
+ assert.ok(contentA.includes('Guest A'));
+ assert.ok(!contentA.includes('NH867')&&!contentA.includes('Guest C'), 'no other driver passenger or flight may appear anywhere in saved row');
+ assert.ok(!contentB.includes('KE2104')&&!contentB.includes('Guest A'), 'no first vehicle passenger or flight may appear anywhere in saved row');
+});
+test('multi-driver flight assignment must be explicit, unique, and have verified riders',()=>{
+ const day='2026-12-10';
+ const source={...draft(),waypoints:draft().waypoints.filter(point=>point.date===day),flights:[
+  {date:day,flightNumber:'KE2104',role:'arrival' as const,passengers:['Guest A']},
+  {date:day,flightNumber:'NH867',role:'arrival' as const,passengers:['Guest B']},
+ ]};
+ const two=slots();
+ assert.throws(()=>buildEmailDispatchPlan(source,two,'published'),/담당 차량/);
+ assert.throws(()=>buildEmailDispatchPlan(source,two.map(s=>({...s,assignedFlightKeys:[day+':KE2104',day+':NH867']})),'published'),/담당 차량/);
+ const mapped=two.map((s,i)=>({...s,sharedRouteConfirmed:true,assignedFlightKeys:[day+':'+(i===0?'KE2104':'NH867')]}));
+ const unknown={...source,flights:[source.flights[0],{...source.flights[1],passengers:[]}]};
+ assert.throws(()=>buildEmailDispatchPlan(unknown,mapped,'published'),/탑승객 이름/);
+ const duplicated={...source,flights:[source.flights[0],{...source.flights[1],passengers:['Guest A']}]};
+ assert.throws(()=>buildEmailDispatchPlan(duplicated,mapped,'published'),/중복 배정/);
+ const multiDay={...source,waypoints:draft().waypoints};
+ assert.throws(()=>buildEmailDispatchPlan(multiDay,mapped,'published'),/날짜별 승객 배정/);
+ const pending=buildEmailDispatchPlan(source,two,'unassigned');
+ assert.ok(pending.every(x=>!x.driverId && !x.vehiclePlate));
+});
