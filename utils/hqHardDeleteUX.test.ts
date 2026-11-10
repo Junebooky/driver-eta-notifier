@@ -34,15 +34,21 @@ test('real operations events are deletable and never replaced by fake fixtures a
   assert.match(ops,/sameEvent \? first\.eventName : '전체 배차 현황'/);
 });
 
-test('hard delete requires HQ role, explicit confirmation and protects work records',()=>{
+test('admin deletion requires HQ confirmation and preserves linked records',()=>{
   assert.match(api,/requireHqAdmin\(req\)/);
   assert.match(api,/payload\?\.confirm !== true/);
   assert.match(api,/scope === 'event' && anchor\.group_id/);
   assert.match(api,/scope === 'customer'/);
   assert.match(api,/normalizeOperationalCustomerName\(item\.customer_name\) === normalized/);
-  for(const name of ['driving_logs','expenses','settlement_documents','driving_log_booking_link_audit','vehicle_custodies','vehicle_custody_requests']){
-    assert.ok(api.includes(name),name);
-  }
-  assert.match(api,/\.delete\(\)\.in\('id', ids\)\.select\('id'\)/);
+  // Operational/financial/custody references remain intact in the database.
+  assert.doesNotMatch(api,/BOOKING_HAS_OPERATIONAL_RECORDS/);
+  assert.match(api,/\.update\(\{ status: 'deleted', dispatch_status: 'cancelled'/);
+  assert.match(api,/operationalRecordsPreserved: true/);
   assert.match(api,/assignmentsReleased: true/);
+  const store = file('lib/dispatch/scheduleServerStore.ts');
+  assert.match(store,/r\.status !== 'deleted'/);
+  assert.match(store,/ex\.status === 'deleted'/);
+  assert.match(quick,/연결된 운행일지·경비·정산·차량 인수 기록은 보존하고 배차만 목록에서 제거돼요/);
+  assert.match(ops,/배차는 목록에서 사라지고, 운행일지·경비·정산·차량 인수 기록은 보존돼요/);
+
 });
