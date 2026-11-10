@@ -3,101 +3,117 @@ import { requireHqAdmin } from '@/lib/auth/serverAuth';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { isNamedOperationalCustomer, normalizeOperationalCustomerName } from '@/utils/hqOperationsCustomerGroups';
 
-/**
- * Explicit administrator removal from active dispatch, not a cancellation notice.
- * A deleted schedule is retained as a non-active tombstone for foreign-key
- * integrity: work logs, expenses, issued settlements and custody histories
- * remain intact, while driver/calendar queries never return deleted rows.
- *
- * A group delete resolves the entire saved group from the database, not the
- * partial set of vehicles currently visible in the operations filter.
- */
-export async function DELETE(req: NextRequest) {
+const IS_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+type DeleteScope = 'booking' | 'event' | 'customer';
+type DeleteMode = 'schedule_only' | 'include_drafts';
+
+function failure(error: string, status: number) {
+  return { ids: null, response: NextResponse.json({ ok: false, error }, { status }) };
+}
+
+/** Resolve exact server-owned IDs for both preview and confirmation. */
+async function resolveIds(payload: Record<string, unknown> | null) {
+  const id = typeof payload?.scheduleId === 'string' ? payload.scheduleId : '';
+  const scope = payload?.scope as DeleteScope;
+  if (!IS_UUID.test(id) || !['booking', 'event', 'customer'].includes(scope)) {
+    return failure('삭제할 일정과 범위를 확인해 주세요.', 400);
+  }
+
+  const { data: anchor, error: anchorError } = await supabaseAdmin.from('schedules')
+    .select('id, group_id, event_id, status, customer_name')
+    .eq('id', id).maybeSingle();
+  if (anchorError) throw anchorError;
+  if (!anchor || anchor.status === 'deleted') {
+    return failure('이미 삭제됐거나 존재하지 않는 배차입니다.', 404);
+  }
+
+  let ids: string[];
+  if (scope === 'customer') {
+    const supplied = payload?.scheduleIds;
+    if (!Array.isArray(supplied) || supplied.length < 1 || supplied.length > 100 ||
+        !supplied.every(value => typeof value === 'string' && IS_UUID.test(value))) {
+      return failure('고객사 배차 목록이 올바르지 않습니다.', 400);
+    }
+    ids = [...new Set(supplied as string[])];
+    if (!ids.includes(id) || !isNamedOperationalCustomer(anchor.customer_name)) {
+      return failure('고객사 연결 정보를 확인해 주세요.', 409);
+    }
+    const { data: targets, error } = await supabaseAdmin.from('schedules')
+      .select('id, customer_name, dispatch_status, status').in('id', ids);
+    if (error) throw error;
+    const normalized = normalizeOperationalCustomerName(anchor.customer_name);
+    if (!targets || targets.length !== ids.length || !targets.every(item =>
+      normalizeOperationalCustomerName(item.customer_name) === normalized &&
+      item.dispatch_status === 'published' && item.status !== 'deleted')) {
+      return failure('삭제 대상의 고객사 또는 배차 상태가 달라졌습니다. 새로고침 후 다시 확인해 주세요.', 409);
+    }
+  } else {
+    let query = supabaseAdmin.from('schedules').select('id, status');
+    if (scope === 'event' && anchor.group_id) query = query.eq('group_id', anchor.group_id);
+    else if (scope === 'event' && anchor.event_id) query = query.eq('event_id', anchor.event_id);
+    else query = query.eq('id', id);
+    const { data: targets, error } = await query;
+    if (error) throw error;
+    ids = [...new Set((targets || []).filter(item => item.status !== 'deleted').map(item => item.id))];
+  }
+
+  if (!ids.length || ids.length > 100) {
+    return failure('삭제 대상 일정이 없거나 100건을 초과합니다.', 409);
+  }
+  return { ids, response: null };
+}
+
+async function processRequest(req: NextRequest, inspect: boolean) {
   try {
     const auth = await requireHqAdmin(req);
-    if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    if (!auth.ok || !auth.session) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+    const payload = await req.json().catch(() => null) as Record<string, unknown> | null;
+    if (!inspect && payload?.confirm !== true) {
+      return NextResponse.json({ ok: false, error: '관리자의 삭제 확인이 필요합니다.' }, { status: 400 });
+    }
+    const selection = await resolveIds(payload);
+    if (selection.response) return selection.response;
 
-    const payload = await req.json().catch(() => null);
-    const id = typeof payload?.scheduleId === 'string' ? payload.scheduleId : '';
-    const scope = payload?.scope === 'event' ? 'event' : payload?.scope === 'booking' ? 'booking' : payload?.scope === 'customer' ? 'customer' : '';
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
-        || !scope || payload?.confirm !== true) {
-      return NextResponse.json({ ok: false, error: '삭제할 일정과 삭제 범위 및 확인 동작을 지정해 주세요.' }, { status: 400 });
+    const mode = inspect ? 'inspect' : payload?.mode;
+    if (!['inspect', 'schedule_only', 'include_drafts'].includes(String(mode))) {
+      return NextResponse.json({ ok: false, error: '배차만 삭제할지 관련 초안까지 삭제할지 선택해 주세요.' }, { status: 400 });
     }
 
-    const { data: anchor, error: anchorError } = await supabaseAdmin.from('schedules')
-      .select('id, group_id, event_id, status, customer_name').eq('id', id).maybeSingle();
-    if (anchorError) throw anchorError;
-    if (!anchor || anchor.status === 'deleted') return NextResponse.json({ ok: false, error: '이미 삭제됐거나 존재하지 않는 배차입니다.' }, { status: 404 });
-
-    let ids: string[];
-    if (scope === 'customer') {
-      // The customer card lists all its dispatches, even when it visually
-      // collapses to five rows. Delete exactly those IDs, not just the first
-      // driver's groupId or unrelated historic/draft records.
-      const suppliedIds: unknown = payload?.scheduleIds;
-      if (!Array.isArray(suppliedIds) || suppliedIds.length < 1 || suppliedIds.length > 100 ||
-        !suppliedIds.every(value => typeof value === 'string' &&
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value))) {
-        return NextResponse.json({ ok: false, error: '고객사 배차 목록이 올바르지 않습니다.' }, { status: 400 });
+    // One database transaction handles inspection, reference integrity,
+    // optional deletion of unsubmitted drafts and the final archive/delete.
+    // This is authoritative even if the preview was outdated.
+    const { data, error } = await supabaseAdmin.rpc('admin_schedule_delete', {
+      p_ids: selection.ids,
+      p_action: mode,
+      p_actor: auth.session.userId,
+    });
+    if (error) {
+      if (/RECORDS_REQUIRE_RETENTION/.test(error.message)) {
+        return NextResponse.json({ ok: false, code: 'RECORDS_REQUIRE_RETENTION',
+          error: '제출·승인·정산·증빙·차량 인수 기록이 있어 관련 기록을 전체 삭제할 수 없습니다. 배차만 삭제를 선택해 주세요.' }, { status: 409 });
       }
-      ids = [...new Set(suppliedIds as string[])];
-      if (!ids.includes(id) || !isNamedOperationalCustomer(anchor.customer_name)) {
-        return NextResponse.json({ ok: false, error: '고객사 연결 정보를 확인해 주세요.' }, { status: 409 });
+      if (/DELETE_TARGET_CHANGED/.test(error.message)) {
+        return NextResponse.json({ ok: false, error: '삭제 대상이 변경됐습니다. 다시 확인해 주세요.' }, { status: 409 });
       }
-      const { data: targets, error: targetError } = await supabaseAdmin.from('schedules')
-        .select('id, customer_name, dispatch_status, status').in('id', ids);
-      if (targetError) throw targetError;
-      const normalized = normalizeOperationalCustomerName(anchor.customer_name);
-      if (!targets || targets.length !== ids.length || !targets.every(item =>
-        normalizeOperationalCustomerName(item.customer_name) === normalized &&
-        item.dispatch_status === 'published' && item.status !== 'deleted')) {
-        return NextResponse.json({
-          ok: false,
-          error: '삭제 대상의 고객사 또는 배차 상태가 달라졌습니다. 운영보드를 새로고침하고 다시 확인해 주세요.',
-        }, { status: 409 });
-      }
-    } else {
-      // Keep existing single-booking and saved-event deletion semantics.
-      let targetQuery = supabaseAdmin.from('schedules').select('id, status');
-      if (scope === 'event' && anchor.group_id) {
-        targetQuery = targetQuery.eq('group_id', anchor.group_id);
-      } else if (scope === 'event' && anchor.event_id) {
-        targetQuery = targetQuery.eq('event_id', anchor.event_id);
-      } else {
-        targetQuery = targetQuery.eq('id', id);
-      }
-      const { data: targets, error: targetError } = await targetQuery;
-      if (targetError) throw targetError;
-      ids = [...new Set((targets || []).filter(row => row.status !== 'deleted').map(row => row.id))];
+      throw error;
     }
-    if (!ids.length || ids.length > 100) {
-      return NextResponse.json({ ok: false, error: '삭제 대상 일정이 없거나 100건을 초과합니다.' }, { status: 409 });
-    }
-
-    // A real SQL DELETE would fail on the settlement/custody FK constraints.
-    // Archive ALL selected rows in ONE statement instead. No linked operational
-    // records are deleted or orphaned, and no extra data-destructive requests are
-    // made. The cancelled dispatch status releases the active assignment; status
-    // 'deleted' prevents even cancellation-history views from showing the row.
-    // Preserve the original driver/vehicle IDs on the tombstone for custody audit.
-    const { data: removedRows, error: removeError } = await supabaseAdmin
-      .from('schedules')
-      .update({ status: 'deleted', dispatch_status: 'cancelled', updated_at: new Date().toISOString() })
-      .in('id', ids)
-      .select('id');
-    if (removeError) throw removeError;
-    const removed = removedRows?.length || 0;
-    if (removed !== ids.length) {
-      return NextResponse.json({
-        ok: false, error: '일정이 동시에 변경됐습니다. 서버 목록을 새로고침해 삭제 상태를 확인해 주세요.',
-        deletedCount: removed,
-      }, { status: 409 });
-    }
-
-    return NextResponse.json({ ok: true, deletedCount: removed, deletedScheduleIds: ids, assignmentsReleased: true, operationalRecordsPreserved: true });
+    if (!data || data.ok !== true) throw new Error('Deletion transaction did not confirm the requested action');
+    return NextResponse.json(inspect ? { ...data, scheduleIds: selection.ids } :
+      { ...data, deletedScheduleIds: selection.ids });
   } catch (error: unknown) {
-    console.error('HQ hard delete failed:', error instanceof Error ? error.message : 'Unknown error');
-    return NextResponse.json({ ok: false, error: '삭제에 실패했습니다. 서버 상태를 다시 확인해 주세요.' }, { status: 500 });
+    console.error('HQ schedule removal failed:', error instanceof Error ? error.message : 'Unknown error');
+    return NextResponse.json({ ok: false, error: '배차 삭제를 완료하지 못했습니다. 서버 상태를 확인해 주세요.' }, { status: 500 });
   }
+}
+
+/** Inspect server-held records before showing the delete options. Read-only. */
+export async function POST(req: NextRequest) {
+  return processRequest(req, true);
+}
+
+/** HQ-confirmed transaction; all IDs succeed together or nothing changes. */
+export async function DELETE(req: NextRequest) {
+  return processRequest(req, false);
 }
