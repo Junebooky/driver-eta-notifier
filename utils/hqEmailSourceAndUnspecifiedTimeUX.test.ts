@@ -17,12 +17,13 @@ test('text is selectable by default while source address is a real action', () =
   assert.match(read('components/hq/email/HqStep1ExtractView.tsx'), /sourceEvidence=\{currentEvidence\?\.address === wp\.clientAddress/);
 });
 
-test('the extra batch comparison card is not mounted in the email workflow', () => {
+test('direct AI scheduling has neither an extra comparison card nor per-day registration dropdowns', () => {
   const inbox = read('components/hq/email/HqEmailInboxView.tsx');
   assert.doesNotMatch(inbox, /<HqEmailBatchRevisionPanel/);
-  assert.match(inbox, /batchReviewRows=\{/);
-  assert.match(inbox, /buildEmailBatchRevisionApproval/);
-  assert.match(read('components/hq/email/HqStep1ExtractView.tsx'), /등록 방법 선택/);
+  assert.doesNotMatch(inbox, /batchReviewRows=\{|buildEmailBatchRevisionApproval/);
+  const review = read('components/hq/email/HqStep1ExtractView.tsx');
+  assert.doesNotMatch(review, /등록 방법 선택|<select/);
+  assert.match(review, /HqEmailVehicleRouteEditor/);
 });
 
 test('address matching tolerates punctuation differences but not unrelated districts', () => {
