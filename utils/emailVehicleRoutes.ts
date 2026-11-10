@@ -9,7 +9,7 @@ export const emailVehicleLabelKey = (label: string) => normalized(label) || 'unl
 
 /** Only an explicit car label is authoritative. No guessed vehicle count from prose. */
 export function carLabelInSource(name: string): string | undefined {
-  const m = name.match(/\bcar[\s_\-#]*0*(\d+)\b|\b0*(\d+)\s*호차\b/i);
+  const m = name.match(/\bcar[\s_\-#]*0*(\d+)\b|(?:^|\D)0*(\d+)\s*호차/i);
   if (m) return `Car ${Number(m[1] || m[2])}`;
   const letter = name.match(/\bcar[\s_\-#]*([A-Z])(?=[\s_\-.]|$)/i);
   if (letter) return `Car ${letter[1].toUpperCase()}`;
@@ -106,9 +106,10 @@ export function reconcileVehicleExcelEvidence(
     const first=source[0];
     const explicit = carLabelInSource(first.sheetName) || carLabelInSource(first.filename);
     const labels = [...new Set(result.map(route=>route.vehicleLabel))];
-    const matched = explicit
-      ? labels.find(label => emailVehicleLabelKey(label) === emailVehicleLabelKey(explicit))
-      : labels.length === 1 ? labels[0] : undefined;
+    const sameFilename = [...new Set(result.filter(route=>route.sourceFilename===first.filename).map(route=>route.vehicleLabel))];
+    const matched = (explicit ? labels.find(label => emailVehicleLabelKey(label) === emailVehicleLabelKey(explicit)) : undefined)
+      || (sameFilename.length===1 ? sameFilename[0] : undefined)
+      || (!explicit && labels.length===1 ? labels[0] : undefined);
     // If Gemini assigned named Car groups, unlabelled document rows must NOT
     // be attached arbitrarily to Car 1.
     if (!explicit && labels.length > 1 && !matched) {
