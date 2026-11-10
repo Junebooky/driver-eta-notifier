@@ -50,7 +50,9 @@ try {
       assert.equal(await page.getByRole('heading',{name:'AI가 추출한 예약 정보'}).count(),0);
       const trigger=page.getByRole('button',{name:'AI로 분석하기'});
       await trigger.waitFor();
-      assert.ok(await trigger.isInViewport(), 'AI action must be visible without scrolling down past the email body');
+      const ctaRect = await trigger.boundingBox();
+      assert.ok(ctaRect && ctaRect.y >= 0 && ctaRect.y + ctaRect.height <= 900,
+        'AI action must be visible without scrolling down past the email body');
       assert.ok(await trigger.isEnabled(), 'loaded email must be ready for AI analysis');
       let posted=0;
       await page.route('**/api/email/extract-booking', async route=>{
