@@ -98,3 +98,65 @@ test('route viewer has no native per-date registration method dropdown',()=>{
   assert.match(ui,/HqEmailVehicleRouteEditor/);
   assert.match(inbox,/parseVehicleSlotsFromDraft/);
 });
+
+test('plain text email, one unlabeled car: one neutral route and exactly one slot',()=>{
+  const routes=normalizeGeminiVehicleRoutes([{
+    vehicleLabel:'',date:'2026-11-10',stops:[
+      {time:'10:00',location:'인천공항'}, {time:'',location:'서울 호텔'},
+    ],
+  }],'2026-11-10');
+  assert.equal(routes.length,1);
+  assert.equal(routes[0].vehicleLabel,'의전 차량');
+  const draft={...sampleDraft(),tripType:'single' as const,requestedVehicleClass:'',vehicleRoutes:routes};
+  assert.deepEqual(vehicleRouteLabels(draft),['의전 차량']);
+  const slots=parseVehicleSlotsFromDraft(draft);
+  assert.equal(slots.length,1);
+  assert.equal(slots[0].vehicleModel,'차량 미지정');
+  const planned=buildEmailDispatchPlan(draft,slots,'unassigned');
+  assert.equal(planned.length,1);
+  assert.deepEqual(planned[0].routeWaypoints.map(p=>p.location),['인천공항','서울 호텔']);
+  assert.equal(planned[0].vehicleModel,'차량 미지정');
+});
+
+test('plain text multi-day event for one vehicle creates one slot but different dated schedules',()=>{
+  const draft={...sampleDraft(),tripType:'single' as const,requestedVehicleClass:'스타리아 리무진 1대',
+    vehicleRoutes:normalizeGeminiVehicleRoutes([
+      {vehicleLabel:'',date:'2026-11-10',stops:[{time:'09:00',location:'호텔'},{time:'17:00',location:'행사장'}]},
+      {vehicleLabel:'',date:'2026-11-11',stops:[{time:'09:00',location:'행사장'},{time:'17:00',location:'공항'}]},
+    ],'2026-11-10'),
+  };
+  const slots=parseVehicleSlotsFromDraft(draft);
+  assert.equal(slots.length,1);
+  assert.equal(buildEmailDispatchPlan(draft,slots,'unassigned').length,2);
+  assert.deepEqual(buildEmailDispatchPlan(draft,slots,'unassigned').map(p=>p.origin),['호텔','행사장']);
+});
+
+test('two attachment files without car labels are not automatically two vehicle requests',()=>{
+  const records=['programme.xlsx','revision.xlsx'].flatMap((filename,sourceIndex)=>[
+    {filename,sourceIndex,sourceSha256:'hash-'+sourceIndex,sheetName:'일정',
+      cell:'B2',date:'2026-11-10',dateLabel:'Nov 10',time:'09:00',
+      title:'Lobby pickup',originalText:'Lobby pickup',clockSource:'text' as const},
+  ]);
+  const draft={...sampleDraft(),requestedVehicleClass:''};
+  const missingGemini=reconcileVehicleExcelEvidence(draft,records);
+  assert.equal(missingGemini.vehicleRoutes?.length || 0,0);
+  assert.match(missingGemini.warnings.join(' '),/차량별 경로를 특정할 수 없어서/);
+  const extracted={...draft,vehicleRoutes:normalizeGeminiVehicleRoutes([
+    {vehicleLabel:'',date:'2026-11-10',sourceFilename:'programme.xlsx',
+      stops:[{time:'09:00',location:'Lobby pickup'},{time:'18:00',location:'Hotel return'}]},
+  ],'2026-11-10')};
+  const reconciled=reconcileVehicleExcelEvidence(extracted,records);
+  assert.deepEqual(vehicleRouteLabels(reconciled),['의전 차량']);
+  assert.equal(parseVehicleSlotsFromDraft(reconciled).length,1);
+});
+
+test('Gemini keeps arbitrary customer labels and vehicle counts without hard-coded Car 1 or Car 2',()=>{
+  const draft={...sampleDraft(),requestedVehicleClass:'스타리아 1대, 카니발 1대',
+    vehicleRoutes:normalizeGeminiVehicleRoutes([
+      raw('VIP Van','2026-11-10',['터미널','호텔']),
+      raw('Chairman Sedan','2026-11-10',['회사','공항']),
+    ],'2026-11-10')};
+  assert.deepEqual(vehicleRouteLabels(draft),['VIP Van','Chairman Sedan']);
+  assert.equal(parseVehicleSlotsFromDraft(draft).length,2);
+  assert.notEqual(draft.vehicleRoutes?.[0].stops[0].location,draft.vehicleRoutes?.[1].stops[0].location);
+});
