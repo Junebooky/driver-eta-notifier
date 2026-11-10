@@ -94,7 +94,14 @@ test('real Gemini service keeps a partial draft for explicit review and marks co
     const result = {
       pickupDate:dates[0], pickupLocation:'Airport', dropoffLocation:'Hotel',
       tripType:'single', warnings:[],
-      documentCoverage:files.map((_,i)=>({sourceId:`attachment-${i+1}`,reviewedSheets:i<2?['일정표','안내']:[],scheduleDates:dates})),
+      documentCoverage:files.map((_,i)=>({sourceId:`attachment-${i+1}`,reviewedSheets:i<2?['일정표','안내']:[],scheduleDates:dates,
+        ...(i===2 ? {pdfEvidence:[
+          {pageNumber:2,originalText:'2026-11-09 09:00 Airport pickup'},
+          {pageNumber:2,originalText:'2026-11-09 09:00 Airport pickup'},
+          {pageNumber:0,originalText:'Invalid page'},
+          {pageNumber:3,originalText:' '},
+        ]} : {}),
+      })),
       waypoints:(allDays?dates:dates.slice(0,1)).flatMap(date=>[
         {date,time:'09:00',location:'Airport'},{date,time:'10:00',location:'Hotel'},
       ]),
@@ -110,6 +117,10 @@ test('real Gemini service keeps a partial draft for explicit review and marks co
   const complete = await extractBookingFromEmail(params);
   assert.equal(complete.ok,true,complete.error);
   assert.equal(complete.draft.documentAnalysis?.length,3);
+  assert.deepEqual(complete.draft.documentAnalysis?.[2].pdfEvidence, [
+    {pageNumber:2,originalText:'2026-11-09 09:00 Airport pickup'},
+  ]);
+  assert.equal(complete.draft.documentAnalysis?.[0].pdfEvidence,undefined);
   assert.doesNotThrow(()=>assertAttachmentDatesReviewed(complete.draft));
   assert.deepEqual([...new Set(complete.draft.waypoints?.map(point=>point.date))],dates);
   const parts = requests[0].contents[0].parts;
