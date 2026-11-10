@@ -99,7 +99,20 @@ export function emailDispatchDays(draft:HqEmailExtractedDraft){
  if(!groups.size){groups.set(draft.pickupDate,[{id:'pickup',order:1,date:draft.pickupDate,time:draft.pickupTime,location:draft.pickupLocation,lat:draft.pickupLat,lng:draft.pickupLng,isPoiConfirmed:draft.isPickupPoiConfirmed},{id:'dropoff',order:2,date:draft.pickupDate,location:draft.dropoffLocation,lat:draft.dropoffLat,lng:draft.dropoffLng,isPoiConfirmed:draft.isDropoffPoiConfirmed}]);}
  return [...groups.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([date,points])=>({date,points,start:points[0],end:points[points.length-1],endTime:draft.dayEndTimes && Object.prototype.hasOwnProperty.call(draft.dayEndTimes,date) ? draft.dayEndTimes[date] || '' : points[points.length-1].time || ''}));
 }
-export function buildEmailDispatchPlan(draft:HqEmailExtractedDraft,slots:Array<{vehicleModel:string;vehiclePlate?:string;driver:{id:string;name:string;phone?:string;languages?:string[];englishAvailable?:boolean}|null;assignedFlightKeys?:string[]}>,status:'published'|'unassigned'){
+export interface EmailPlannedDispatch {
+ scheduleId?:string;
+ date:string;endDate:string;pickupTime:string;endTime?:string;
+ origin:string;originLat?:number;originLng?:number;
+ destination:string;destinationLat?:number;destinationLng?:number;
+ routeWaypoints:RouteWaypointItem[];
+ customerName?:string;customerId?:string;passengerName:string;
+ passengerPhone:string;passengerCount:number;flightNumber:string;notes:string;
+ eventId:string;eventName:string;groupId:string;groupVehicleIndex:number;groupTotalVehicles:number;
+ vehicleModel:string;vehiclePlate?:string;driverId?:string;driverName?:string;driverPhone?:string;
+ dispatchStatus:'published'|'unassigned';intakeSource:'email';
+ requestedLanguage:'ko'|'en';placeVerified:boolean;allowUnverified:boolean;
+}
+export function buildEmailDispatchPlan(draft:HqEmailExtractedDraft,slots:Array<{vehicleModel:string;vehiclePlate?:string;driver:{id:string;name:string;phone?:string;languages?:string[];englishAvailable?:boolean}|null;assignedFlightKeys?:string[]}>,status:'published'|'unassigned'):EmailPlannedDispatch[]{
  assertAttachmentDatesReviewed(draft);
  if (draft.vehicleRoutes?.length) {
   const labels=vehicleRouteLabels(draft);
