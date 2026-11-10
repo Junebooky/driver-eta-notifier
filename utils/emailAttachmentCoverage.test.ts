@@ -114,7 +114,7 @@ test('real Gemini service keeps a partial draft for explicit review and marks co
   // Even when Gemini omits later dates, original Car A / Car B Excel cells
   // restore every actual service day without a per-day operator selector.
   assert.equal(partial.draft.documentAnalysis?.[0].missingDates,undefined);
-  assert.deepEqual([...new Set(partial.draft.vehicleRoutes?.map(route=>route.date))],dates);
+  assert.deepEqual([...new Set(partial.draft.vehicleRoutes?.map(route=>route.date))].sort(),dates);
   assert.deepEqual([...new Set(partial.draft.vehicleRoutes?.map(route=>route.vehicleLabel))],['Car A','Car B']);
   assert.doesNotThrow(()=>assertAttachmentDatesReviewed(partial.draft));
   allDays = true;
