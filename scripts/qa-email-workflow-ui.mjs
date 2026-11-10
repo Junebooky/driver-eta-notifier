@@ -58,8 +58,17 @@ try {
       await page.route('**/api/email/extract-booking', async route=>{
         posted++;
         await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
-          ok:true,matches:[],draft:{...sample.extractedDraft,id:'isolated-mobile-analysis',emailId:'isolated-unprocessed-mobile',
-            documentAnalysis:undefined,warnings:[],status:'draft'},
+          ok:true,matches:[],draft:{
+            id:'isolated-mobile-analysis',emailId:'isolated-unprocessed-mobile',
+            senderEmail:'qa@example.invalid',companyName:'테스트 고객사',eventName:'테스트 배차',
+            contactName:'테스트 담당자',contactPhone:'',contactEmail:'',
+            passengerName:'테스트 승객',passengerCount:1,
+            pickupDate:'2026-11-10',pickupTime:'09:00',pickupLocation:'테스트 호텔',
+            dropoffLocation:'테스트 목적지',isPickupPoiConfirmed:false,isDropoffPoiConfirmed:false,
+            requestedVehicleClass:'카니발 1대',specialRequests:'',tripType:'single',
+            confidence:0.96,warnings:[],status:'draft',updatedAt:'2026-11-10T00:00:00.000Z',
+            assignedDriver:null,assignedVehicle:null,assignedVehiclePlate:null,
+          },
         })});
       });
       await trigger.click();
