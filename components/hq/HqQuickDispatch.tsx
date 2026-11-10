@@ -2639,7 +2639,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 <div className="space-y-1 rounded-xl bg-[#F8FAFC] border border-slate-100 p-3 text-[12px] leading-relaxed text-[#64748B]">
                   <div className="flex items-start gap-1.5">
                     <span className="shrink-0 text-slate-400 font-semibold">ⓘ</span>
-                    <span>운행일지나 정산 내역이 남아있는 배차는 안전하게 보관돼요.</span>
+                    <span>연결된 운행일지·경비·정산·차량 인수 기록은 보존하고 배차만 목록에서 제거돼요.</span>
                   </div>
                   <div className="flex items-start gap-1.5 text-[#A34E45] font-medium">
                     <span className="shrink-0 font-semibold">ⓘ</span>
