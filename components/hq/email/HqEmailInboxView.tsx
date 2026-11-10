@@ -751,17 +751,15 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       const response = await dispatchMutation.send('/api/schedules/dispatch', { items: approvedItems });
       const data = await response.json();
       if (!response.ok || !data.ok || data.schedules?.length !== items.length) throw new Error(data.error || '전체 일정 저장을 확인하지 못했습니다.');
-      // Cancelled original rows are still in the atomic result, but must never
-      // become the saved ID for a newly-added vehicle in the same date/slot.
-      const nextSavedScheduleIds = Object.fromEntries(items.flatMap((item, index) =>
-        item.dispatchStatus === 'cancelled' ? [] :
-          [[`${String(item.date)}:${Number(item.groupVehicleIndex || 1) - 1}`, data.schedules[index].id]],
+      // Only new Car/day schedules are submitted from the email AI flow.
+      const nextSavedScheduleIds = Object.fromEntries(items.map((item, index) =>
+        [`${String(item.date)}:${Number(item.groupVehicleIndex || 1) - 1}`, data.schedules[index].id],
       ));
       const updated = { ...currentDraft, status: status === 'published' ? 'published' as const : 'saved' as const, associatedBookingId: data.schedules[0].id, savedScheduleIds: nextSavedScheduleIds };
       saveEmailDraft(updated); setDraftsByEmailId(previous => ({ ...previous, [currentSummary.id]: updated }));
       setDispatchedSchedule(data.schedules[0]);
       data.schedules.forEach((schedule: import('@/data/ferrariSchedules').ScheduleItem, index: number) => {
-        if (items[index]?.dispatchStatus !== 'cancelled') onCreateBooking?.(mapScheduleItemToHqBooking(schedule, index));
+        onCreateBooking?.(mapScheduleItemToHqBooking(schedule, index));
       });
       await onSavedServer?.();
       if (status === 'published') setWorkflowStep('step4_dispatch_done');
