@@ -4,7 +4,8 @@
  * Strictly prevents hardcoding dummy vehicles (e.g. Sprinter 319 CDI + G90 LWB).
  */
 
-import type { VehicleSlotAssignment } from '@/types/emailHq';
+import type { VehicleSlotAssignment, HqEmailExtractedDraft } from '@/types/emailHq';
+import { vehicleRouteLabels, emailVehicleLabelKey } from './emailVehicleRoutes';
 import { VIP_REAL_VEHICLES, getVehicleImage } from '@/utils/vehicleData';
 
 export const STANDARD_FLEET_MODELS = [
@@ -162,4 +163,29 @@ export function parseVehicleSlotsFromRequestedClass(
   }
 
   return slots;
+}
+
+/** One physical vehicle slot per distinct client-specified Car label, reused on
+ * its different service dates. No duplicate generic routes are generated.
+ */
+export function parseVehicleSlotsFromDraft(
+  draft: Pick<HqEmailExtractedDraft,'requestedVehicleClass' | 'vehicleRoutes'>,
+): VehicleSlotAssignment[] {
+  const parsed = parseVehicleSlotsFromRequestedClass(draft.requestedVehicleClass);
+  const labels = vehicleRouteLabels(draft);
+  if (!labels.length) return parsed;
+  const count = Math.max(labels.length, parsed.length);
+  if (count > 12) throw new Error('차량 수가 12대를 초과합니다. 고객사 요청을 확인해 주세요.');
+  return Array.from({ length: count }, (_, index) => {
+    const route = draft.vehicleRoutes?.find(item =>
+      emailVehicleLabelKey(item.vehicleLabel) === emailVehicleLabelKey(labels[index] || ''));
+    return {
+      slotIndex: index,
+      vehicleModel: route?.requestedVehicleClass
+        ? normalizeVehicleModelName(route.requestedVehicleClass)
+        : parsed[index]?.vehicleModel || '차량 미지정',
+      driver: null,
+      status: 'unassigned' as const,
+    };
+  });
 }
