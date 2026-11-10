@@ -74,6 +74,22 @@ export interface EmailFlightLeg {
   role?: 'arrival' | 'departure' | 'connection' | 'unknown';
 }
 
+/** One requested vehicle, one service date, and its complete source-supported route.
+ * Car 1 / Car 2 are client labels, NOT physical fleet assignments.
+ * A date is independent: a vehicle with no service that day has no row.
+ */
+export interface HqEmailVehicleRoute {
+  id: string;
+  vehicleLabel: string; // e.g. Car 1, Car 2, 1호차; stable across dates
+  date: string; // YYYY-MM-DD, explicitly supplied by source
+  stops: RouteWaypointItem[];
+  endTime?: string;
+  passengerName?: string;
+  passengerCount?: number;
+  requestedVehicleClass?: string;
+  sourceFilename?: string;
+}
+
 export interface HqGroupTripItem {
   id: string;
   passengerName: string;
@@ -158,6 +174,8 @@ export interface HqEmailExtractedDraft {
 
   // Multiple destinations / itinerary waypoints (when schedule visits multiple locations in a day)
   waypoints?: RouteWaypointItem[];
+  /** Source-driven per-car / per-day itineraries. Never flatten distinct vehicles into one route. */
+  vehicleRoutes?: HqEmailVehicleRoute[];
 
   flightNumber: string; // Backward-compatible primary flight only.
   flights?: EmailFlightLeg[]; // Every leg, including multiple arrivals and onward connections.

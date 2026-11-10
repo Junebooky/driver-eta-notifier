@@ -33,6 +33,7 @@ import { haptics } from '@/utils/haptics';
 import { HqPlaceSearchInput, PoiResult } from '@/components/hq/HqPlaceSearchInput';
 import { saveContactToCrm } from '@/utils/crmCustomerSync';
 import { HqStep5AssignmentPanel } from './HqStep5AssignmentPanel';
+import { HqEmailVehicleRouteEditor } from './HqEmailVehicleRouteEditor';
 
 export interface VehicleSlotAssignment {
   slotIndex: number;
@@ -364,6 +365,9 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
           <section className="mt-4 space-y-6">
             {(() => {
               try {
+                if (extractedDraft.vehicleRoutes?.length) {
+                  return <HqEmailVehicleRouteEditor draft={extractedDraft} onUpdateDraft={onUpdateDraft} compact />;
+                }
                 return emailDispatchDays(extractedDraft).map((day) => (
                   <div key={day.date} className="space-y-3">
                     <p className="text-sm font-bold text-slate-900">{day.date}</p>

@@ -10,6 +10,7 @@ import type { EmailFlightLeg } from '@/types/emailHq';
 import { enrichBookingDraftWithEmailEvidence } from '@/utils/emailBookingEvidence';
 import { attachmentManifest, verifyAttachmentCoverage } from '@/utils/emailAttachmentCoverage';
 import { datedExcelCalendarBlocks, reconcileSingleExcelCalendar } from '@/utils/emailCalendarGrid';
+import { normalizeGeminiVehicleRoutes, reconcileVehicleExcelEvidence } from '@/utils/emailVehicleRoutes';
 
 export interface ExtractBookingParams {
   emailId: string;
@@ -150,6 +151,28 @@ const BOOKING_RESPONSE_SCHEMA = {
         },
       },
     },
+    vehicleRoutes: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          vehicleLabel: { type: Type.STRING },
+          date: { type: Type.STRING },
+          vehicleClass: { type: Type.STRING },
+          passengerName: { type: Type.STRING },
+          passengerCount: { type: Type.INTEGER },
+          endTime: { type: Type.STRING },
+          sourceFilename: { type: Type.STRING },
+          stops: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: {
+            time: { type: Type.STRING },
+            location: { type: Type.STRING },
+            clientAddress: { type: Type.STRING },
+            notes: { type: Type.STRING },
+          }, required: ['time','location'] } },
+        },
+        required: ['date','stops'],
+      },
+    },
     groupTrips: {
       type: Type.ARRAY,
       items: {
@@ -168,7 +191,7 @@ const BOOKING_RESPONSE_SCHEMA = {
     confidence: { type: Type.NUMBER },
     warnings: { type: Type.ARRAY, items: { type: Type.STRING } },
   },
-  required: ['documentCoverage'],
+  required: ['documentCoverage','vehicleRoutes'],
 };
 
 /**
@@ -300,6 +323,7 @@ export async function extractBookingFromEmail(
 
   const prompt = `You are an expert AI reservation assistant for VIP LIMOUSINE KOREA.
 Extract structured VIP limousine reservation booking details from the incoming client email.
+PRIMARY OUTPUT: vehicleRoutes is the COMPLETE itinerary, dynamically determined from THIS request. Do not assume a fixed number of cars, attachments, or routes. Keep separately requested vehicle schedules separate; never copy one vehicle's route into another without explicit shared-route instructions.
 
 [REFERENCE MESSAGE DATE (KST)]
 The selected message date is ${todayKst} (YYYY-MM-DD, Asia/Seoul).
@@ -324,6 +348,23 @@ FORWARDED CONVERSATIONS: Read explicit message headers and distinguish dates of 
 
 [PDF ATTACHMENTS]
 ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, dates and all stops. PDF originals are provided as inline document parts.' : '(none)'}
+
+[FLEXIBLE SERVICE ITINERARY — CRITICAL]
+Determine the itinerary structure from the CURRENT email and its actual attachments (which may be NONE).
+- A plain email requesting one airport pickup with one car is a single vehicleRoutes entry with pickup and destination. A one-car, multi-day event has one dated entry per service day. No Excel/PDF is required.
+- Two or more cars with different itineraries need one entry per vehicle per service date. Distinct Car 1/Car 2 documents are merely ONE possible source pattern, not the default schema.
+- If a customer asks for an explicit number of vehicles on a clearly shared route, preserve the shared-route wording in notes rather than fabricate different stops.
+- Use EXACT vehicleLabel if the sender supplied one (for example Car 1, Car 2, Vehicle A, 1호차, VIP Van). If NO vehicle label was supplied, set vehicleLabel="" (empty string); the UI will show a neutral "의전 차량" label. NEVER fabricate "Car 1" solely because a route exists.
+- If multiple vehicle routes are genuinely distinct but unlabeled, distinguish by customer-provided passenger, schedule, or other source detail in notes; do not invent physical vehicle details.
+- A source file is NOT automatically one vehicle: several Excel sheets/PDFs may describe the same car, and one file may describe several cars.
+- Each service entry has date (YYYY-MM-DD), stops (all known places with time, location, exact clientAddress, and notes) in true route order, and endTime if explicitly given. Do not omit intermediate stops.
+- A venue appointment or Excel cell is not automatically a new car or a complete road segment. A trip with one known location can remain incomplete; do not invent pickup or dropoff.
+- Return all genuinely scheduled dates, not every date in an email subject or workbook heading. Days with no service must not create empty bookings.
+- A departure note "Head to X" denotes departure FROM the previous venue; the arrival time at X remains unknown unless explicitly supplied.
+- Preserve aircraft/flight details separately; a connection without ground transfer is not an extra chauffeur booking.
+- If there is no actual chauffeur service in the email, return vehicleRoutes=[] and do not fabricate a booking.
+- Include sourceFilename only when explicitly tied to a schedule from that file.
+- Do NOT require the operator to choose new/none for every date. Their job is reviewing extracted routes and manually assigning fleet vehicles/drivers.
 
 [EXTRACTION RULES]
 1. ZERO HALLUCINATION: If a field is not explicitly mentioned or clearly inferred, return empty string "".
@@ -506,6 +547,7 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
             });
           })()
         : undefined,
+      vehicleRoutes: normalizeGeminiVehicleRoutes(parsed.vehicleRoutes, String(parsed.pickupDate || '')),
       groupTrips: Array.isArray(parsed.groupTrips) && parsed.groupTrips.length > 0
         ? parsed.groupTrips.map((gt: any, idx: number) => ({
             id: String(gt.id || `gt-${idx + 1}`),
@@ -550,15 +592,14 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
     // A partial revision must not silently restore superseded appointments from
     // an older attachment. Show all original cells for review, but leave the
     // modification to the existing explicit revision-match workflow.
+    const baseDraft = parsed.tripType === 'modification' && parsed.revisionScope !== 'full'
+      ? evidenceDraft
+      : evidenceDraft.vehicleRoutes?.length ? evidenceDraft : reconcileSingleExcelCalendar(evidenceDraft, calendarBlocks);
+    // Gemini first, then deterministic Excel coverage for a missing vehicle/day.
+    // Do not convert multiple source vehicles into one common waypoints list.
     const completeDraft = parsed.tripType === 'modification' && parsed.revisionScope !== 'full'
-      ? {
-          ...evidenceDraft,
-          warnings: calendarBlocks.length
-            ? [...(evidenceDraft.warnings || []),
-                '부분 수정 요청: 엑셀 원본은 대조용으로 표시하며 변경 전 일정을 자동 복원하지 않았습니다.']
-            : evidenceDraft.warnings,
-        }
-      : reconcileSingleExcelCalendar(evidenceDraft, calendarBlocks);
+      ? baseDraft
+      : reconcileVehicleExcelEvidence(baseDraft, calendarBlocks);
     const coverage = verifyAttachmentCoverage(
       attachments, parsed.documentCoverage, completeDraft, Number(todayKst.slice(0,4))
     );

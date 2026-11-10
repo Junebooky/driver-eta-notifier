@@ -3,6 +3,7 @@ import { assertAttachmentDatesReviewed } from './emailAttachmentCoverage';
 import { VIP_REAL_VEHICLES } from './vehicleData';
 import { normalizeDateToIso,normalizeTimeHHmm } from './dispatchConflictDetector';
 import { buildAirportArrivalPickupGroups } from './emailBookingEvidence';
+import { vehicleRouteLabels, vehicleRouteDays, emailVehicleLabelKey } from './emailVehicleRoutes';
 /**
  * HQ flight-to-vehicle assignment identity: a flight can only be identified
  * within its service date. Never infer the assigned driver from the order of
@@ -28,7 +29,7 @@ export function emailFlightAssignmentIssues(
  draft:HqEmailExtractedDraft,
  slots:EmailFlightSlot[],
 ):string[]{
- if(slots.length<=1)return [];
+ if(slots.length<=1 || draft.vehicleRoutes?.length)return [];
  const flights=emailAssignableFlights(draft);
  if(!flights.length)return [];
  const valid=new Set(flights.map(emailFlightKey));
@@ -82,6 +83,12 @@ export function emailFlightAssignmentIssues(
 }
 
 export function emailDispatchDays(draft:HqEmailExtractedDraft){
+ if(draft.vehicleRoutes?.length){
+  return vehicleRouteDays(draft).map(route=>({
+   date:route.date, points:route.stops, start:route.stops[0],
+   end:route.stops[route.stops.length-1], endTime:route.endTime || '', vehicleLabel:route.vehicleLabel,
+  }));
+ }
  const hasMultipleDates=(draft.waypoints || []).some(point=>point.date && point.date!==draft.pickupDate);
  const groups=new Map<string,RouteWaypointItem[]>();
  for(const point of [...(draft.waypoints || [])].sort((a,b)=>a.order-b.order)){
@@ -90,10 +97,64 @@ export function emailDispatchDays(draft:HqEmailExtractedDraft){
   groups.set(date,[...(groups.get(date)||[]),point]);
  }
  if(!groups.size){groups.set(draft.pickupDate,[{id:'pickup',order:1,date:draft.pickupDate,time:draft.pickupTime,location:draft.pickupLocation,lat:draft.pickupLat,lng:draft.pickupLng,isPoiConfirmed:draft.isPickupPoiConfirmed},{id:'dropoff',order:2,date:draft.pickupDate,location:draft.dropoffLocation,lat:draft.dropoffLat,lng:draft.dropoffLng,isPoiConfirmed:draft.isDropoffPoiConfirmed}]);}
- return [...groups.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([date,points])=>({date,points,start:points[0],end:points[points.length-1],endTime:draft.dayEndTimes?.[date] || points[points.length-1].time || ''}));
+ return [...groups.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([date,points])=>({date,points,start:points[0],end:points[points.length-1],endTime:draft.dayEndTimes && Object.prototype.hasOwnProperty.call(draft.dayEndTimes,date) ? draft.dayEndTimes[date] || '' : points[points.length-1].time || ''}));
 }
-export function buildEmailDispatchPlan(draft:HqEmailExtractedDraft,slots:Array<{vehicleModel:string;vehiclePlate?:string;driver:{id:string;name:string;phone?:string;languages?:string[];englishAvailable?:boolean}|null;assignedFlightKeys?:string[]}>,status:'published'|'unassigned'){
+export interface EmailPlannedDispatch {
+ scheduleId?:string;
+ date:string;endDate:string;pickupTime:string;endTime?:string;
+ origin:string;originLat?:number;originLng?:number;
+ destination:string;destinationLat?:number;destinationLng?:number;
+ routeWaypoints:RouteWaypointItem[];
+ customerName?:string;customerId?:string;passengerName:string;
+ passengerPhone:string;passengerCount:number;flightNumber:string;notes:string;
+ eventId:string;eventName:string;groupId:string;groupVehicleIndex:number;groupTotalVehicles:number;
+ vehicleModel:string;vehiclePlate?:string;driverId?:string;driverName?:string;driverPhone?:string;
+ dispatchStatus:'published'|'unassigned';intakeSource:'email';
+ requestedLanguage:'ko'|'en';placeVerified:boolean;allowUnverified:boolean;
+}
+export function buildEmailDispatchPlan(draft:HqEmailExtractedDraft,slots:Array<{vehicleModel:string;vehiclePlate?:string;driver:{id:string;name:string;phone?:string;languages?:string[];englishAvailable?:boolean}|null;assignedFlightKeys?:string[]}>,status:'published'|'unassigned'):EmailPlannedDispatch[]{
  assertAttachmentDatesReviewed(draft);
+ if (draft.vehicleRoutes?.length) {
+  const labels=vehicleRouteLabels(draft);
+  if (slots.length!==labels.length) throw new Error(
+    `고객사 요청 차량은 ${labels.length}대인데 배정 차량은 ${slots.length}대입니다. 차량별 원문 경로를 확인해 주세요.`
+  );
+  // Each vehicle/day is saved as ONE independent schedule with ONLY its own
+  // points. Never fan out Car 1's route to Car 2 or invent no-service days.
+  return vehicleRouteDays(draft).map(route=>{
+    const index=labels.findIndex(label=>emailVehicleLabelKey(label)===emailVehicleLabelKey(route.vehicleLabel));
+    const slot=slots[index];
+    if(!slot || route.stops.length<2) throw new Error(`${route.date} ${route.vehicleLabel}: 출발지·목적지와 방문 장소를 확인해 주세요.`);
+    const first=route.stops[0],last=route.stops[route.stops.length-1];
+    const scopedFlights=(draft.flights || []).filter(f=>
+      labels.length===1 || (slot.assignedFlightKeys||[]).includes(emailFlightKey(f))
+    );
+    const dailyDraft:HqEmailExtractedDraft={
+      ...draft, vehicleRoutes:undefined, groupTrips:undefined, tripType:'single',
+      pickupDate:route.date,pickupTime:first.time||'',pickupLocation:first.location,
+      pickupLat:first.lat,pickupLng:first.lng,isPickupPoiConfirmed:Boolean(first.isPoiConfirmed),
+      dropoffLocation:last.location,dropoffLat:last.lat,dropoffLng:last.lng,
+      isDropoffPoiConfirmed:Boolean(last.isPoiConfirmed),
+      waypoints:route.stops, dayEndTimes:{[route.date]:route.endTime||''},
+      passengerName:route.passengerName || (labels.length===1 ? draft.passengerName : ''),
+      passengerCount:route.passengerCount ?? (labels.length===1 ? draft.passengerCount : 0),
+      flights:scopedFlights,flightNumber:scopedFlights.map(f=>f.flightNumber).join(', '),
+      requestedVehicleClass:route.requestedVehicleClass || draft.requestedVehicleClass,
+      savedScheduleIds:undefined,
+    };
+    const [planned]=buildEmailDispatchPlan(dailyDraft,[slot],status);
+    return {
+      ...planned,
+      scheduleId:draft.savedScheduleIds?.[`${route.date}:${index}`],
+      eventId:`email-${draft.emailId}`,
+      eventName:draft.eventName?.trim() || draft.companyName || '',
+      groupId:`email-${draft.emailId}-${route.date}`,
+      groupVehicleIndex:index+1,groupTotalVehicles:labels.length,
+      notes:[planned.notes,`${route.vehicleLabel} · ${route.date}`,
+        route.sourceFilename ? `원문: ${route.sourceFilename}` : ''].filter(Boolean).join(' · '),
+    };
+  });
+ }
  const assignmentIssues=status==='published'?emailFlightAssignmentIssues(draft,slots):[];
  if(assignmentIssues.length)throw new Error(assignmentIssues[0]);
  const requestedLanguage = draft.requestedLanguage || (/영어|english|외국인/i.test(draft.specialRequests || '') ? 'en' : 'ko');

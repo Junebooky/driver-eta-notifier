@@ -9,6 +9,7 @@ import { HqRoutePlaceVerification } from './HqRoutePlaceVerification';
 import { VIP_REAL_VEHICLES } from '@/utils/vehicleData';
 import { driverSupportsEnglish } from './HqDriverSelectModal';
 import { emailFlightAssignmentIssues } from '@/utils/emailDispatchPlan';
+import { vehicleRouteLabels } from '@/utils/emailVehicleRoutes';
 import { HqFlightAssignmentSection } from './HqFlightAssignmentSection';
 import { getVerifiedVehiclePhoto, HqVehicleSelectModal } from './HqVehicleSelectModal';
 import type { VehicleSlotAssignment } from './HqStep2BookingDetailView';
@@ -37,6 +38,7 @@ export const HqStep5AssignmentPanel: React.FC<HqStep5AssignmentPanelProps> = ({
   onSelectDriver, onRequestHelp, onConfirm, isDispatching,
 }) => {
   const [vehiclePickerIndex, setVehiclePickerIndex] = useState<number | null>(null);
+  const requestedLabels = draft ? vehicleRouteLabels(draft) : [];
   const selectedDriverIds = slots.map((slot) => slot.driver?.id).filter((id): id is string => Boolean(id));
   const uniqueDrivers = new Set(selectedDriverIds).size === selectedDriverIds.length;
   const unconfirmedStops = draft ? getUnconfirmedEmailRouteStops(draft) : [];
@@ -74,10 +76,10 @@ export const HqStep5AssignmentPanel: React.FC<HqStep5AssignmentPanelProps> = ({
             실제 차량관리·기사관리 정보와 일정별 예약 가능 여부를 기준으로 배정합니다.
           </p>
         </div>
-        <button type="button" onClick={addSlot} disabled={isDispatching || !onUpdateSlots}
+        {!requestedLabels.length && <button type="button" onClick={addSlot} disabled={isDispatching || !onUpdateSlots}
           className="inline-flex items-center gap-1 text-xs font-bold text-[#1E60F3] hover:underline transition-colors cursor-pointer disabled:opacity-40">
           <Plus className="h-3.5 w-3.5" strokeWidth={2} /> 차량 추가
-        </button>
+        </button>}
       </div>
 
       <div className="flex items-center gap-2 text-xs">
@@ -107,11 +109,11 @@ export const HqStep5AssignmentPanel: React.FC<HqStep5AssignmentPanelProps> = ({
             <div key={slot.slotIndex} className="space-y-2">
               {slots.length > 1 && (
                 <div className="flex items-center justify-between gap-3 px-1">
-                  <span className="text-sm font-black text-slate-900">{index + 1}호차</span>
-                  <button type="button" onClick={() => removeSlot(index)} aria-label={`${index + 1}호차 삭제`}
+                  <span className="text-sm font-black text-slate-900">{requestedLabels[index] || `${index + 1}호차`}</span>
+                  {!requestedLabels.length && <button type="button" onClick={() => removeSlot(index)} aria-label={`${index + 1}호차 삭제`}
                     className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-600 cursor-pointer">
                     <Trash2 className="h-4 w-4" strokeWidth={1.7} />
-                  </button>
+                  </button>}
                 </div>
               )}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
