@@ -16,7 +16,7 @@ test('dashboard calendar has no desktop hover peek, and excludes cancelled rows'
 });
 
 test('the dispatch delete action removes the saved booking rather than marking it cancelled',()=>{
-  assert.match(quick,/hardDeleteHqSchedule\(targetId, 'booking'\)/);
+  assert.match(quick,/hardDeleteHqSchedule\(targetId, 'booking', undefined, deleteMode\)/);
   assert.match(quick,/배차 완전 삭제/);
   assert.match(quick,/onSavedBookings\?\.\(\)/);
   assert.match(quick,/onClose\?\.\(\)/);
@@ -40,15 +40,23 @@ test('admin deletion requires HQ confirmation and preserves linked records',()=>
   assert.match(api,/scope === 'event' && anchor\.group_id/);
   assert.match(api,/scope === 'customer'/);
   assert.match(api,/normalizeOperationalCustomerName\(item\.customer_name\) === normalized/);
-  // Operational/financial/custody references remain intact in the database.
-  assert.doesNotMatch(api,/BOOKING_HAS_OPERATIONAL_RECORDS/);
-  assert.match(api,/\.update\(\{ status: 'deleted', dispatch_status: 'cancelled'/);
-  assert.match(api,/operationalRecordsPreserved: true/);
-  assert.match(api,/assignmentsReleased: true/);
+  assert.match(api, /supabaseAdmin\.rpc\('admin_schedule_delete'/);
+  assert.match(api, /export async function POST/);
+  assert.match(api, /export async function DELETE/);
+  assert.match(api, /payload\?\.mode/);
+  const migration = file('supabase/migrations/20261110090000_hq_admin_schedule_deletion.sql');
+  assert.match(migration,/IF p_action = 'schedule_only' AND v_has_records/);
+  assert.match(migration,/DELETE FROM cockpit\.schedules/);
+  assert.match(migration,/DELETE FROM cockpit\.expenses/);
+  assert.match(migration,/DELETE FROM cockpit\.driving_logs/);
+  assert.match(migration,/v_retain/);
+  assert.match(migration,/schedule_deletion_audit/);
   const store = file('lib/dispatch/scheduleServerStore.ts');
   assert.match(store,/r\.status !== 'deleted'/);
   assert.match(store,/ex\.status === 'deleted'/);
-  assert.match(quick,/연결된 운행일지·경비·정산·차량 인수 기록은 보존하고 배차만 목록에서 제거돼요/);
-  assert.match(ops,/배차는 목록에서 사라지고, 운행일지·경비·정산·차량 인수 기록은 보존돼요/);
-
+  const choices = file('components/hq/ui/HqScheduleDeleteChoices.tsx');
+  assert.match(choices,/배차만 삭제/);
+  assert.match(choices,/배차와 미제출 초안까지 삭제/);
+  assert.match(quick,/inspectHqScheduleDeletion\(id, 'booking'\)/);
+  assert.match(ops,/inspectHqScheduleDeletion\(/);
 });
