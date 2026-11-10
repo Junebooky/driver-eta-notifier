@@ -461,7 +461,9 @@ export async function queryServerSchedules(params: {
     return { schedules: [], hydratedRows: [], error: error.message };
   }
 
-  const allHydrated = (data || []).filter((r: Record<string, any>) => !r.org_id || r.org_id === 'vip_limousine_korea').map((r: Record<string, any>) => hydrateRawScheduleRow(r));
+  const allHydrated = (data || [])
+    .filter((r: Record<string, any>) => r.status !== 'deleted' && (!r.org_id || r.org_id === 'vip_limousine_korea'))
+    .map((r: Record<string, any>) => hydrateRawScheduleRow(r));
   const isHqView = params.role === 'hq' || params.statusParam === 'all';
 
   const reqDriverId = params.driverId?.trim() || '';
@@ -673,6 +675,7 @@ export async function checkServerDispatchConflicts(
       '_meta' in r ? (r as DbScheduleRow & { _meta: HqScheduleMeta }) : hydrateRawScheduleRow(r)
     )
     .filter((ex) => {
+      if (ex.status === 'deleted') return false;
       const exStart = normalizeDateToIso(ex.date);
       const exEnd = normalizeDateToIso(ex.end_date) || exStart;
       return exEnd >= expandedMinStartIso && exStart <= expandedMaxEndIso;
