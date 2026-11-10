@@ -111,8 +111,12 @@ test('real Gemini service keeps a partial draft for explicit review and marks co
   const params = {emailId:'test-source',subject:'Forwarded itinerary',sender:'test@example.invalid',sourceSentAt:'2026-11-07T01:45:00Z',bodyText:'See current attached schedules. Older proposal: 11/14.',attachments:files};
   const partial = await extractBookingFromEmail(params);
   assert.equal(partial.ok,true,partial.error);
-  assert.deepEqual(partial.draft.documentAnalysis?.[0].missingDates,['2026-11-09','2026-11-10']);
-  assert.throws(()=>assertAttachmentDatesReviewed(partial.draft),/검토 완료/);
+  // Even when Gemini omits later dates, original Car A / Car B Excel cells
+  // restore every actual service day without a per-day operator selector.
+  assert.equal(partial.draft.documentAnalysis?.[0].missingDates,undefined);
+  assert.deepEqual([...new Set(partial.draft.vehicleRoutes?.map(route=>route.date))],dates);
+  assert.deepEqual([...new Set(partial.draft.vehicleRoutes?.map(route=>route.vehicleLabel))],['Car A','Car B']);
+  assert.doesNotThrow(()=>assertAttachmentDatesReviewed(partial.draft));
   allDays = true;
   const complete = await extractBookingFromEmail(params);
   assert.equal(complete.ok,true,complete.error);
