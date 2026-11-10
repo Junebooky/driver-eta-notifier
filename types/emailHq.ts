@@ -127,6 +127,8 @@ export interface HqEmailExtractedDraft {
     reviewedSheets: string[];
     missingDates?: string[];
     dateReviewAcknowledged?: boolean;
+    /** Gemini-reported PDF excerpts and 1-based page numbers; NOT independently verified. */
+    pdfEvidence?: Array<{ pageNumber: number; originalText: string }>;
     /** Every non-empty appointment in a calendar-style Excel sheet, in its original cell. */
     calendarItems?: Array<{
       date: string; time: string; title: string; originalText: string;
