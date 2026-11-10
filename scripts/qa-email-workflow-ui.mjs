@@ -20,7 +20,12 @@ writeFileSync(join(dir, 'tsconfig.json'), JSON.stringify({compilerOptions:{targe
 writeFileSync(join(dir, 'next.config.mjs'), 'export default {devIndicators:false};');
 writeFileSync(join(dir, 'app/layout.tsx'), "import './globals.css'; export default function Layout({children}:{children:React.ReactNode}) {return <html lang='ko'><body>{children}</body></html>}");
 writeFileSync(join(dir, 'app/globals.css'), readFileSync(join(root, 'app/globals.css'), 'utf8') + `\n@source "${root}/components";\n`);
-writeFileSync(join(dir, "app/page.tsx"), " 'use client';\nimport {Suspense} from 'react';\nimport {HqEmailInboxView} from '@/components/hq/email/HqEmailInboxView';\nimport {REFERENCE_EMAILS} from '@/components/hq/email/emailReferenceData';\nconst sample=REFERENCE_EMAILS[0];\nsample.summary.subject='격리 검증용 예약 · 고객 제공 주소';\nsample.detail.bodyText='격리 검증용 메일입니다.\\n픽업 주소: 서울시 강남구 테헤란로 123\\n다음 장소는 호텔입니다.\\n반복 주소: 서울시 강남구 테헤란로 123';\nsample.extractedDraft={...sample.extractedDraft,id:'isolated-review',status:'draft',pickupDate:'2026-11-09',pickupTime:'09:00',pickupLocation:'테스트 호텔',dropoffLocation:'테스트 목적지',pickupProvidedAddress:'서울시 강남구 테헤란로 123',dropoffProvidedAddress:'원문에 없는 별도 첨부 주소',requestedVehicleClass:'카니발 1대',isPickupPoiConfirmed:false,isDropoffPoiConfirmed:false,waypoints:undefined,dayEndTimes:undefined,documentAnalysis:[{filename:'Car A 일정표.xlsx',kind:'excel',reviewedSheets:['일정표','안내'],missingDates:['2026-11-14']},{filename:'Car B 일정표.xlsx',kind:'excel',reviewedSheets:['일정표']}]};\nREFERENCE_EMAILS.splice(1);\nexport default function Page(){return <main className=\"mx-auto max-w-7xl p-4 bg-[#F7F9FC]\"><p>격리 UI 검증 · 실제 계정/메일/배차 없음</p><Suspense><HqEmailInboxView onCreateBooking={()=>{}}/></Suspense></main>}\n");
+writeFileSync(join(dir, "app/page.tsx"), " 'use client';\nimport {Suspense} from 'react';\nimport {HqEmailInboxView} from '@/components/hq/email/HqEmailInboxView';\nimport {REFERENCE_EMAILS} from '@/components/hq/email/emailReferenceData';\nconst sample=REFERENCE_EMAILS[0];\nsample.summary.subject='격리 검증용 예약 · 고객 제공 주소';\nsample.detail.bodyText='격리 검증용 메일입니다.\\n픽업 주소: 서울시 강남구 테헤란로 123\\n다음 장소는 호텔입니다.\\n반복 주소: 서울시 강남구 테헤란로 123';\nsample.extractedDraft={...sample.extractedDraft,id:'isolated-review',status:'draft',pickupDate:'2026-11-09',pickupTime:'09:00',pickupLocation:'테스트 호텔',dropoffLocation:'테스트 목적지',pickupProvidedAddress:'서울시 강남구 테헤란로 123',dropoffProvidedAddress:'원문에 없는 별도 첨부 주소',requestedVehicleClass:'카니발 1대',isPickupPoiConfirmed:false,isDropoffPoiConfirmed:false,waypoints:undefined,dayEndTimes:undefined,documentAnalysis:[{filename:'Car A 일정표.xlsx',kind:'excel',reviewedSheets:['일정표','안내'],missingDates:['2026-11-14']},{filename:'Car B 일정표.xlsx',kind:'excel',reviewedSheets:['일정표']}]};\nREFERENCE_EMAILS.splice(1);
+REFERENCE_EMAILS.push({
+  summary:{...sample.summary,id:'isolated-unprocessed-mobile',subject:'모바일 AI 분석 버튼 테스트',aiStatus:'not_analyzed',draftId:undefined},
+  detail:{...sample.detail,bodyText:'11월 10일 오전 9시 호텔 픽업, 오후 5시 종료. 첨부파일 없음.'},
+  extractedDraft:undefined,
+});\nexport default function Page(){return <main className=\"mx-auto max-w-7xl p-4 bg-[#F7F9FC]\"><p>격리 UI 검증 · 실제 계정/메일/배차 없음</p><Suspense><HqEmailInboxView onCreateBooking={()=>{}}/></Suspense></main>}\n");
 writeFileSync(join(dir, "app/api/[...path]/route.ts"), "import {VIP_REAL_VEHICLES,mapVehicleToUiCategory} from '@/utils/vehicleData';\nexport async function GET(req:Request){\nconst path=new URL(req.url).pathname;const vehicles=VIP_REAL_VEHICLES.slice(0,3);\nif(path==='/api/fleet/registry')return Response.json({ok:true,records:vehicles.map(v=>({vehicle_id:v.uuid,plate:v.plate,organization_id:'vip_limousine_korea',profile:v,archived:false}))});\nif(path==='/api/fleet/availability')return Response.json({ok:true,vehicles:vehicles.map((v,i)=>({...v,uiCategory:mapVehicleToUiCategory(v),isAvailable:i===0,currentStatus:i===1?'maintenance':'available',requestedIntervalStatus:i===0?'available':'booked',unavailabilityReason:i===1?'정비 중':i===2?'기존 배차와 충돌':undefined})),drivers:[]});\nif(path==='/api/hq/drivers')return Response.json({ok:true,drivers:[]});\nif(path==='/api/places')return Response.json({ok:true,pois:[],results:[]});\nreturn Response.json({ok:true,bookings:[],schedules:[],drivers:[],matches:[],requests:[]});\n}\n");
 
 const server = spawn(process.execPath, [join(root,'node_modules/next/dist/bin/next'), 'dev', '--webpack', '--hostname', '127.0.0.1', '--port', String(port)], {
@@ -42,6 +47,30 @@ try {
     await context.route('**/*',route=>new URL(route.request().url()).origin===base?route.continue():route.abort());
     const page=await context.newPage(); const pageErrors=[]; page.on('pageerror',error=>pageErrors.push(error.message));
     await page.goto(base+'/?demo=true');
+    if (width === 390) {
+      // Mobile starts at the inbox, not the off-screen detail card.
+      assert.equal(await page.getByRole('button',{name:'AI로 분석하기'}).count(),0);
+      await page.getByRole('button',{name:/모바일 AI 분석 버튼 테스트 메일 열기/}).click();
+      const trigger=page.getByRole('button',{name:'AI로 분석하기'});
+      await trigger.waitFor();
+      assert.ok(await trigger.isInViewport(), 'AI action must be visible without scrolling down past the email body');
+      assert.ok(await trigger.isEnabled(), 'loaded email must be ready for AI analysis');
+      let posted=0;
+      await page.route('**/api/email/extract-booking', async route=>{
+        posted++;
+        await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
+          ok:true,matches:[],draft:{...sample.extractedDraft,id:'isolated-mobile-analysis',emailId:'isolated-unprocessed-mobile',
+            documentAnalysis:undefined,warnings:[],status:'draft'},
+        })});
+      });
+      await trigger.click();
+      await page.getByRole('heading',{name:'AI가 추출한 예약 정보'}).waitFor();
+      assert.equal(posted,1,'mobile action must make exactly one AI request');
+      await page.screenshot({path:join(artifacts,'mobile-ai-extracted.png'),fullPage:true});
+      await page.getByRole('button',{name:'이메일 목록으로 돌아가기'}).click();
+      await page.getByRole('button',{name:/격리 검증용 예약 · 고객 제공 주소 메일 열기/}).click();
+      await page.getByRole('button',{name:'이메일 목록으로 돌아가기'}).waitFor();
+    }
     await page.locator('.hq-ui-badge[data-tone="warning"]').first().waitFor();
     assert.equal(await page.locator('.hq-ui-badge[data-tone="warning"]').first().evaluate(element=>getComputedStyle(element).backgroundColor),'rgb(255, 249, 241)','actual shared warning CSS must be loaded');
     await page.getByRole('status').filter({hasText:'본문과 첨부 2개를 함께 읽었습니다.'}).waitFor();
