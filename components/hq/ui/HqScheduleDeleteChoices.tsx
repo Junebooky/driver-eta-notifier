@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import type { HqScheduleDeleteInspection, HqScheduleDeleteMode } from '@/utils/hqScheduleHardDelete';
 
 export function HqScheduleDeleteChoices({
@@ -9,6 +10,7 @@ export function HqScheduleDeleteChoices({
   mode: HqScheduleDeleteMode;
   onModeChange: (next: HqScheduleDeleteMode) => void;
 }) {
+  const radioGroupName = useId();
   if (!inspection) {
     return <p role="status" className="rounded-[13px] bg-[#F7F9FC] px-3.5 py-3 text-[12px] text-[#6E809B]">
       연결된 업무 기록을 확인하고 있어요…
@@ -32,7 +34,7 @@ export function HqScheduleDeleteChoices({
       {counts.custodies + counts.custodyRequests > 0 && ` · 차량 인수 ${counts.custodies + counts.custodyRequests}건`}
     </p>
     <label className={`flex cursor-pointer items-start gap-2.5 rounded-[13px] px-3.5 py-3 transition-colors ${mode === 'schedule_only' ? 'bg-[#F1F5FE]' : 'bg-[#F7F9FC]'}`}>
-      <input type="radio" name="hq-delete-scope" value="schedule_only"
+      <input type="radio" name={radioGroupName} value="schedule_only"
         checked={mode === 'schedule_only'} onChange={() => onModeChange('schedule_only')}
         className="mt-0.5 accent-[#1E60F3]" />
       <span className="min-w-0">
@@ -43,7 +45,7 @@ export function HqScheduleDeleteChoices({
       </span>
     </label>
     <label className={`flex items-start gap-2.5 rounded-[13px] px-3.5 py-3 transition-colors ${!inspection.canIncludeDrafts ? 'cursor-not-allowed opacity-60 bg-[#F7F9FC]' : mode === 'include_drafts' ? 'cursor-pointer bg-[#F1F5FE]' : 'cursor-pointer bg-[#F7F9FC]'}`}>
-      <input type="radio" name="hq-delete-scope" value="include_drafts"
+      <input type="radio" name={radioGroupName} value="include_drafts"
         checked={mode === 'include_drafts'} disabled={!inspection.canIncludeDrafts}
         onChange={() => onModeChange('include_drafts')}
         className="mt-0.5 accent-[#1E60F3]" />
