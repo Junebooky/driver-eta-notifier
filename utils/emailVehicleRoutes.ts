@@ -26,14 +26,14 @@ export function vehicleRouteLabels(draft: Pick<HqEmailExtractedDraft, 'vehicleRo
   });
 }
 
-/** Gemini's detailed itinerary is authoritative. Never silently replace it with a
- * one-start/one-destination summary or drop intermediate stops.
+/** Gemini's detailed itinerary is authoritative. Simple body-only requests,
+ * single-car event plans, and labelled multi-car plans use the same structure.
  */
 export function normalizeGeminiVehicleRoutes(raw: unknown, fallbackDate: string): HqEmailVehicleRoute[] {
   if (!Array.isArray(raw)) return [];
-  const seen = new Set<string>();
   return raw.slice(0, 300).flatMap((entry: any, i: number) => {
-    const label = typeof entry?.vehicleLabel === 'string' ? entry.vehicleLabel.trim() : '';
+    // Neutral UI fallback only. Never invent "Car 1" when the client supplied no label.
+    const label = (typeof entry?.vehicleLabel === 'string' ? entry.vehicleLabel.trim() : '') || '의전 차량';
     const directDate = typeof entry?.date === 'string' ? entry.date.trim() : '';
     const stopDate = Array.isArray(entry?.stops) ? entry.stops.find((s: any) => validDate(String(s?.date || '')))?.date : '';
     const date = directDate || stopDate || fallbackDate;
@@ -50,10 +50,8 @@ export function normalizeGeminiVehicleRoutes(raw: unknown, fallbackDate: string)
       }];
     });
     if (!stops.length) return [];
-    const key = emailVehicleLabelKey(label)+':'+date;
     // Multiple blocks can describe the same car/date: combine, never overwrite.
     const routeId = `car-route-${i}`;
-    seen.add(key);
     return [{
       id: routeId, vehicleLabel: label, date, stops,
       endTime: typeof entry?.endTime === 'string' && validClock(entry.endTime.trim()) ? entry.endTime.trim() : undefined,
@@ -80,7 +78,7 @@ export function normalizeGeminiVehicleRoutes(raw: unknown, fallbackDate: string)
 }
 
 /**
- * Excel appointment cells are a fallback for an omitted Car 1/Car 2. Do NOT
+ * Excel appointment cells are optional evidence for any itinerary. Do NOT
  * fold different files/sheets into the same generic route. If Gemini already
  * found a matching stop, keep its label/notes and avoid duplicate cells.
  * Unknown cell-only locations remain unverified; TMAP validation is separate.
@@ -110,13 +108,19 @@ export function reconcileVehicleExcelEvidence(
     const matched = (explicit ? labels.find(label => emailVehicleLabelKey(label) === emailVehicleLabelKey(explicit)) : undefined)
       || (sameFilename.length===1 ? sameFilename[0] : undefined)
       || (!explicit && labels.length===1 ? labels[0] : undefined);
-    // If Gemini assigned named Car groups, unlabelled document rows must NOT
-    // be attached arbitrarily to Car 1.
+    // Unlabelled source rows cannot be attached arbitrarily to another car.
     if (!explicit && labels.length > 1 && !matched) {
       skipped.push(`${first.filename} / ${first.sheetName}: 차량 구분을 확인할 수 없는 원본 셀이 있어요.`);
       continue;
     }
-    const label = matched || explicit || (groups.size===1 ? labels[0] || 'Car 1' : first.filename.replace(/\.[^.]+$/,''));
+    // Several Excel files do not prove that several cars were requested.
+    // When Gemini missed all routes and sources have no car labels, leave a
+    // visible warning rather than turning file names into invented fleet slots.
+    if (!matched && !explicit && groups.size>1) {
+      skipped.push(`${first.filename} / ${first.sheetName}: 차량별 경로를 특정할 수 없어서 원문 확인이 필요해요.`);
+      continue;
+    }
+    const label = matched || explicit || labels[0] || '의전 차량';
     for (const cell of source) {
       let route=result.find(item=>item.date===cell.date && emailVehicleLabelKey(item.vehicleLabel)===emailVehicleLabelKey(label));
       if (!route) {
