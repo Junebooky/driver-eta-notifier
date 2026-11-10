@@ -56,6 +56,8 @@ interface HqStep1ExtractViewProps {
   isLoadingDetail?: boolean;
   isExtractingAi?: boolean;
   onExtractWithAi: () => void;
+  mobileView?: 'source' | 'analysis';
+  onMobileViewChange?: (view: 'source' | 'analysis') => void;
   onProceedToBooking: () => void;
   onSaveModifiedDraft?: () => void;
   onUpdateDraft?: (updated: HqEmailExtractedDraft) => void;
@@ -80,6 +82,8 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   isLoadingDetail,
   isExtractingAi,
   onExtractWithAi,
+  mobileView = 'source',
+  onMobileViewChange,
   onProceedToBooking,
   onSaveModifiedDraft,
   onUpdateDraft,
@@ -105,9 +109,11 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
     setSourceEvidence(previous => ({
       emailId: emailSummary.id, address, query: first ? address : '', excerpt, revision: previous.revision + 1,
       message: isLoadingDetail ? '이메일 원문을 불러온 뒤 다시 확인해 주세요.'
-        : first ? `이메일 원문 ${matches.length}곳과 연결했습니다. 왼쪽 원문에서도 강조 표시합니다.`
+        : first ? `이메일 원문 ${matches.length}곳과 연결했습니다. 원문에서 강조 표시합니다.`
         : '이메일 본문에는 같은 문구가 없습니다. 아래 첨부 일정표의 원문 근거도 확인해 주세요.',
     }));
+    // Source evidence always brings mobile operators back to the actual source.
+    onMobileViewChange?.('source');
   };
   const currentEvidence = sourceEvidence.emailId === emailSummary.id ? sourceEvidence : null;
   // Show only evidence actually retained from the original Excel schedule, never AI-invented coordinates.
@@ -566,12 +572,24 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
       {/* 1. Left Sub-Column: Original Safe Email Viewer */}
-      <div className="order-2 flex min-h-0 flex-col overflow-hidden rounded-[23px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055)] lg:order-1 lg:col-span-6 lg:min-h-[640px]">
+      <div className={`${mobileView === 'source' ? 'flex' : 'hidden'} min-h-0 flex-col overflow-hidden rounded-[23px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055)] md:flex lg:col-span-6 lg:min-h-[640px]`}>
         {/* Email Header */}
         <div className="bg-white p-5">
-          <h2 className="text-[18px] font-bold leading-snug tracking-[-0.02em] text-[#17233B]">
-            {subject}
-          </h2>
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="min-w-0 break-words text-[17px] font-bold leading-snug tracking-[-0.02em] text-[#17233B] sm:text-[18px]">
+              {subject}
+            </h2>
+            <button
+              type="button"
+              onClick={() => extractedDraft ? onMobileViewChange?.('analysis') : onExtractWithAi()}
+              disabled={isExtractingAi || isLoadingDetail}
+              aria-label={extractedDraft ? 'AI 분석 결과 보기' : 'AI로 분석하기'}
+              className="inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-[13px] bg-[#F4F7FC] px-2.5 text-[12px] font-semibold text-[#1E60F3] transition-colors hover:bg-[#EAF1FF] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1E60F3] disabled:cursor-not-allowed disabled:opacity-50 md:hidden"
+            >
+              <img src="/images/icons/ai_email.png" alt="" aria-hidden="true" className="h-6 w-6 object-contain" />
+              <span>{extractedDraft ? '분석 결과' : isExtractingAi ? '분석 중' : 'AI 분석'}</span>
+            </button>
+          </div>
 
           <div className="mt-3 flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 font-extrabold text-xs flex items-center justify-center shrink-0 shadow-xs uppercase">
@@ -712,7 +730,15 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
       </div>
 
       {/* 2. Right Sub-Column: AI Extraction Card */}
-      <div className="relative order-1 flex min-h-[300px] flex-col justify-between overflow-visible rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055)] sm:p-6 lg:order-2 lg:col-span-6 lg:min-h-[640px]">
+      <div className={`${mobileView === 'analysis' ? 'flex' : 'hidden'} relative min-h-0 flex-col justify-between overflow-visible rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055)] md:flex md:min-h-[300px] sm:p-6 lg:col-span-6 lg:min-h-[640px]`}>
+        <button
+          type="button"
+          onClick={() => onMobileViewChange?.('source')}
+          className="mb-4 inline-flex min-h-10 w-fit items-center gap-1.5 rounded-[12px] bg-[#F4F7FC] px-3 text-[12px] font-semibold text-[#4D607C] md:hidden"
+        >
+          <ChevronDown className="h-4 w-4 rotate-90" strokeWidth={1.8} />
+          메일 원문 보기
+        </button>
         {extractedDraft ? (
           <div className="space-y-4">
             {/* Header: Sparkles + Title + Refresh Button */}
