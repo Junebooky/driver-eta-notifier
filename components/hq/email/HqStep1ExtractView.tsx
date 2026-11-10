@@ -44,8 +44,7 @@ import { findEmailSourceRanges } from '@/utils/emailWorkflowReview';
 import { HqPlaceSearchInput, PoiResult } from '@/components/hq/HqPlaceSearchInput';
 import { saveContactToCrm } from '@/utils/crmCustomerSync';
 import { HqEmailAddressCandidate } from './HqEmailAddressCandidate';
-import type { EmailBatchReviewRow } from '@/utils/emailBatchRevision';
-import type { ExistingEmailBookingCandidate } from '@/services/emailBookingMatchService';
+import { HqEmailVehicleRouteEditor } from './HqEmailVehicleRouteEditor';
 import { buildAirportArrivalPickupGroups } from '@/utils/emailBookingEvidence';
 import { confirmEmailRouteStop, changeEmailRouteStopName, getUnconfirmedEmailRouteStops, isVerifiedEmailRouteStop } from '@/utils/emailRoutePlaceVerification';
 
@@ -61,10 +60,6 @@ interface HqStep1ExtractViewProps {
   onProceedToBooking: () => void;
   onSaveModifiedDraft?: () => void;
   onUpdateDraft?: (updated: HqEmailExtractedDraft) => void;
-  /** Inline choices, integrated with the existing itinerary instead of a separate comparison card. */
-  batchReviewRows?: EmailBatchReviewRow[];
-  batchReviewCandidates?: ExistingEmailBookingCandidate[];
-  onChooseBatchTarget?: (rowKey: string, selection: string) => void;
 }
 
 type WaypointEditDraft = {
@@ -87,9 +82,6 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   onProceedToBooking,
   onSaveModifiedDraft,
   onUpdateDraft,
-  batchReviewRows,
-  batchReviewCandidates = [],
-  onChooseBatchTarget,
 }) => {
   const subject = emailDetail?.subject || emailSummary.subject;
   const fromName = emailDetail?.from?.name || emailSummary.from.name;
@@ -176,7 +168,10 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   // Multi-destination waypoints check & Multi-day grouping
   const waypoints: RouteWaypointItem[] = extractedDraft?.waypoints || [];
   const hasMultipleWaypoints = waypoints.length > 2;
-  const unconfirmedPlaces = extractedDraft ? getUnconfirmedEmailRouteStops(extractedDraft).length : 0;
+  const hasVehicleRoutes = Boolean(extractedDraft?.vehicleRoutes?.length);
+  const actualStops = hasVehicleRoutes ? extractedDraft!.vehicleRoutes!.reduce((sum,route)=>sum+route.stops.length,0) : waypoints.length || 2;
+  const actualDates = hasVehicleRoutes ? new Set(extractedDraft!.vehicleRoutes!.map(route=>route.date)).size : 0;
+  const unconfirmedPlaces = extractedDraft ? (hasVehicleRoutes ? extractedDraft.vehicleRoutes!.reduce((total,route)=>total+route.stops.filter(stop=>!isVerifiedEmailRouteStop(stop)).length,0) : getUnconfirmedEmailRouteStops(extractedDraft).length) : 0;
 
   // Extract unique dates for multi-day itineraries
   const waypointDates = waypoints
@@ -971,8 +966,8 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                 <Compass className="w-4.5 h-4.5 text-slate-800 shrink-0" />
                 <span className="text-sm font-black text-slate-900 shrink-0">운행 경로 (상세 일정)</span>
                 <span className="text-xs font-normal text-slate-400 truncate">
-                  총 {waypoints.length > 0 ? waypoints.length : 2}개 경유지
-                  {hasMultipleDates && ` · ${uniqueDates.length}일간`}
+                  총 {actualStops}개 방문지
+                  {(hasVehicleRoutes ? actualDates > 1 : hasMultipleDates) && ` · ${hasVehicleRoutes ? actualDates : uniqueDates.length}일간`}
                 </span>
                 {unconfirmedPlaces > 0 && (
                   <HqBadge tone="warning" className="ml-auto shrink-0">주소 {unconfirmedPlaces}곳 확인 필요</HqBadge>
@@ -985,38 +980,10 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                 </p>
               )}
 
-              {Boolean(batchReviewRows?.length) && (
-                <div role="group" aria-label="기존 예약 연결" className="space-y-2">
-                  <p className="text-[11px] leading-relaxed text-[#73839D]">
-                    변경될 기존 예약이 있다면 아래에서 연결해 주세요. 기존 예약을 임의로 덮어쓰거나 취소하지 않습니다.
-                  </p>
-                  {batchReviewRows!.map(row => (
-                    <label key={row.key} className="flex flex-wrap items-center gap-2 rounded-[14px] bg-[#F7F9FC] px-3 py-2.5">
-                      <span className="min-w-[125px] text-[12px] font-semibold tabular-nums text-[#52647A]">
-                        {row.date} · {row.index + 1}호차
-                      </span>
-                      <select
-                        value={row.selection}
-                        onChange={event => onChooseBatchTarget?.(row.key, event.target.value)}
-                        aria-label={`${row.date} ${row.index + 1}호차 기존 예약 연결`}
-                        className="min-h-10 min-w-0 flex-1 rounded-[12px] bg-white px-3 text-[12px] font-medium text-[#17233B] shadow-[0_2px_7px_rgba(35,49,78,0.04)] outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25"
-                      >
-                        <option value="">등록 방법 선택</option>
-                        <option value="new">신규 예약 등록</option>
-                        <option value="skip">해당 날짜 운행 없음</option>
-                        {batchReviewCandidates.map(candidate => (
-                          <option key={candidate.scheduleId} value={candidate.scheduleId}>
-                            {candidate.pickupDate} {candidate.pickupTime} · {candidate.vehiclePlate || '미배정'} · {candidate.pickupLocation}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  ))}
-                </div>
-              )}
-
               {/* Multi-destination Timeline Accordion */}
-              {hasMultipleWaypoints ? (
+              {hasVehicleRoutes && extractedDraft ? (
+                <HqEmailVehicleRouteEditor draft={extractedDraft} onUpdateDraft={onUpdateDraft} onLocateSource={locateSource} />
+              ) : hasMultipleWaypoints ? (
                 <div className="space-y-3">
                   {dayGroups.map((group) => {
                     const isCollapsed = isDayCollapsed(group.date);
