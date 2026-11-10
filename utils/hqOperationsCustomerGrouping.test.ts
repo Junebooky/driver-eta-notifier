@@ -36,7 +36,7 @@ test('operations keeps the updated deletion dialog copy and actions', () => {
     '이 행사를 삭제할까요?',
     '배차된 일정과 기사·차량 배정이 모두 취소돼요.',
     '한 번 삭제하면 다시 되돌릴 수 없어요.',
-    '배차는 목록에서 사라지고, 운행일지·경비·정산·차량 인수 기록은 보존돼요.',
+    '선택한 범위에 따라 관련 기록 보존 여부가 결정돼요.',
     "'삭제 중…' : '삭제하기'",
     '>\n                취소\n',
   ]) assert.ok(file.includes(phrase), phrase);
