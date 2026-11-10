@@ -37,11 +37,11 @@ export function attachmentManifest(files: AnalyzedScheduleAttachment[], referenc
 /** A successful API call is not proof that every document reached the draft. */
 export function verifyAttachmentCoverage(
   files: AnalyzedScheduleAttachment[], rawCoverage: unknown,
-  draft: Pick<HqEmailExtractedDraft, 'pickupDate' | 'waypoints'>, referenceYear: number,
+  draft: Pick<HqEmailExtractedDraft, 'pickupDate' | 'waypoints' | 'vehicleRoutes'>, referenceYear: number,
 ): EmailDocumentCoverage[] {
   if (!files.length) return [];
   const coverage = Array.isArray(rawCoverage) ? rawCoverage as Partial<EmailDocumentCoverage>[] : [];
-  const resultDates = new Set([draft.pickupDate, ...(draft.waypoints || []).map(point => point.date || '')]);
+  const resultDates = new Set([draft.pickupDate, ...(draft.waypoints || []).map(point => point.date || ''), ...(draft.vehicleRoutes || []).map(route => route.date)]);
   const verified: EmailDocumentCoverage[] = [];
   for (const source of attachmentManifest(files, referenceYear)) {
     const matches = coverage.filter(item => item?.sourceId === source.sourceId);
