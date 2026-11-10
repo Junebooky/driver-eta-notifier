@@ -170,7 +170,7 @@ const BOOKING_RESPONSE_SCHEMA = {
             notes: { type: Type.STRING },
           }, required: ['time','location'] } },
         },
-        required: ['vehicleLabel','date','stops'],
+        required: ['date','stops'],
       },
     },
     groupTrips: {
@@ -323,7 +323,7 @@ export async function extractBookingFromEmail(
 
   const prompt = `You are an expert AI reservation assistant for VIP LIMOUSINE KOREA.
 Extract structured VIP limousine reservation booking details from the incoming client email.
-PRIMARY OUTPUT: vehicleRoutes is the COMPLETE authoritative itinerary. Preserve EVERY Car 1/Car 2 vehicle schedule as SEPARATE dated routes. A single shared waypoints list is not enough for multi-car schedules.
+PRIMARY OUTPUT: vehicleRoutes is the COMPLETE itinerary, dynamically determined from THIS request. Do not assume a fixed number of cars, attachments, or routes. Keep separately requested vehicle schedules separate; never copy one vehicle's route into another without explicit shared-route instructions.
 
 [REFERENCE MESSAGE DATE (KST)]
 The selected message date is ${todayKst} (YYYY-MM-DD, Asia/Seoul).
@@ -349,20 +349,22 @@ FORWARDED CONVERSATIONS: Read explicit message headers and distinguish dates of 
 [PDF ATTACHMENTS]
 ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, dates and all stops. PDF originals are provided as inline document parts.' : '(none)'}
 
-[PER-VEHICLE SERVICE ROUTES — CRITICAL]
-Return vehicleRoutes as one record for EACH vehicle AND EACH date that contains actual chauffeured service.
-- Each entry: vehicleLabel ("Car 1", "Car 2", etc. EXACT client label when available), date (YYYY-MM-DD), stops (every real requested pickup, intermediate stop, standby venue and dropoff, in order), endTime only if explicitly given.
-- For example Car 1 Nov 8/9/10 and Car 2 Nov 9/10 must be FIVE distinct dated entries, and MUST NOT silently reuse Car 1 stops as Car 2.
-- A time-and-place in a PDF/Excel cell is one stop, not a new physical vehicle. For a 2+ car workbook, assign each source sheet/file to the correct vehicle; do NOT merge different cars.
-- For each stop: location, time (HH:mm if explicit, otherwise ""), clientAddress EXACT as quoted (otherwise ""), notes with the exact origin/purpose where useful. Never interpret "Head to X" as arrival at X; keep departure notes on previous venue.
-- If no Car label was supplied and there is a single vehicle, call it "Car 1". If several vehicles are requested but source cannot distinguish their stops, do not fabricate identical routes: return only the evidenced vehicle routes and warn about missing vehicle-specific plans.
-- A multi-stop day requires EVERY location, not only the first and last. Do not flatten distinct vehicle/day routes into waypoints.
-- For simple one-vehicle, one-leg trips, return one vehicleRoutes entry containing pickup and destination stops, with unknown destination time as "".
-- If the source has no actual chauffeur service, return [] instead of inventing any route.
-- Vehicle class and passenger count belong to each vehicle if shown; do not assume all vehicles have the same passengers.
-- Empty calendar days, fee tables, quoted outdated proposals and flight-only connections are NOT chauffeured schedules.
-- Do NOT ask the HQ operator to choose "신규 예약"/"운행 없음" for every date. Extract the source schedule directly.
-- Keep sourceFilename exactly as supplied whenever a route comes from an attachment.
+[FLEXIBLE SERVICE ITINERARY — CRITICAL]
+Determine the itinerary structure from the CURRENT email and its actual attachments (which may be NONE).
+- A plain email requesting one airport pickup with one car is a single vehicleRoutes entry with pickup and destination. A one-car, multi-day event has one dated entry per service day. No Excel/PDF is required.
+- Two or more cars with different itineraries need one entry per vehicle per service date. Distinct Car 1/Car 2 documents are merely ONE possible source pattern, not the default schema.
+- If a customer asks for an explicit number of vehicles on a clearly shared route, preserve the shared-route wording in notes rather than fabricate different stops.
+- Use EXACT vehicleLabel if the sender supplied one (for example Car 1, Car 2, Vehicle A, 1호차, VIP Van). If NO vehicle label was supplied, set vehicleLabel="" (empty string); the UI will show a neutral "의전 차량" label. NEVER fabricate "Car 1" solely because a route exists.
+- If multiple vehicle routes are genuinely distinct but unlabeled, distinguish by customer-provided passenger, schedule, or other source detail in notes; do not invent physical vehicle details.
+- A source file is NOT automatically one vehicle: several Excel sheets/PDFs may describe the same car, and one file may describe several cars.
+- Each service entry has date (YYYY-MM-DD), stops (all known places with time, location, exact clientAddress, and notes) in true route order, and endTime if explicitly given. Do not omit intermediate stops.
+- A venue appointment or Excel cell is not automatically a new car or a complete road segment. A trip with one known location can remain incomplete; do not invent pickup or dropoff.
+- Return all genuinely scheduled dates, not every date in an email subject or workbook heading. Days with no service must not create empty bookings.
+- A departure note "Head to X" denotes departure FROM the previous venue; the arrival time at X remains unknown unless explicitly supplied.
+- Preserve aircraft/flight details separately; a connection without ground transfer is not an extra chauffeur booking.
+- If there is no actual chauffeur service in the email, return vehicleRoutes=[] and do not fabricate a booking.
+- Include sourceFilename only when explicitly tied to a schedule from that file.
+- Do NOT require the operator to choose new/none for every date. Their job is reviewing extracted routes and manually assigning fleet vehicles/drivers.
 
 [EXTRACTION RULES]
 1. ZERO HALLUCINATION: If a field is not explicitly mentioned or clearly inferred, return empty string "".
