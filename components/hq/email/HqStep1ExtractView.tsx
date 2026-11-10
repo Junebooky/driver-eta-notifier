@@ -566,7 +566,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
       {/* 1. Left Sub-Column: Original Safe Email Viewer */}
-      <div className="lg:col-span-6 flex min-h-[640px] flex-col overflow-hidden rounded-[23px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055)]">
+      <div className="order-2 flex min-h-0 flex-col overflow-hidden rounded-[23px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055)] lg:order-1 lg:col-span-6 lg:min-h-[640px]">
         {/* Email Header */}
         <div className="bg-white p-5">
           <h2 className="text-[18px] font-bold leading-snug tracking-[-0.02em] text-[#17233B]">
@@ -712,7 +712,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
       </div>
 
       {/* 2. Right Sub-Column: AI Extraction Card */}
-      <div className="relative lg:col-span-6 flex min-h-[640px] flex-col justify-between overflow-visible rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055)] sm:p-6">
+      <div className="relative order-1 flex min-h-[300px] flex-col justify-between overflow-visible rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055)] sm:p-6 lg:order-2 lg:col-span-6 lg:min-h-[640px]">
         {extractedDraft ? (
           <div className="space-y-4">
             {/* Header: Sparkles + Title + Refresh Button */}
@@ -1385,7 +1385,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
             <div className="group relative flex flex-col items-center cursor-pointer">
               {/* Speech Bubble - reveals on hover */}
               <div className="absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-[12px] bg-white px-3 py-2 text-[11px] font-medium text-[#4D607C] shadow-[0_8px_22px_rgba(35,49,78,0.1)] opacity-0 pointer-events-none group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-200 flex items-center gap-1.5 z-20">
-                <span>⚡ 3초만에 스케줄링 해드릴게요!</span>
+                <span>이메일 본문과 첨부파일을 함께 분석해요</span>
                 <div className="absolute -bottom-1 left-1/2 size-2.5 -translate-x-1/2 rotate-45 bg-white" />
               </div>
 
@@ -1403,16 +1403,16 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
               메일에서 예약 정보를 찾아낼까요?
             </h4>
             <p className="text-xs text-slate-500 max-w-sm leading-relaxed">
-              고객사, 담당자 연락처, 픽업 일정부터 목적지까지 AI가 한눈에 보기 쉽게 정리해 드려요.
+              이메일 본문과 Excel·PDF 일정표를 함께 분석하고, 배차 정보를 정리해 드려요.
             </p>
             <button
               type="button"
               onClick={onExtractWithAi}
               disabled={isExtractingAi || isLoadingDetail}
-              className="mt-3 px-5 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-blue-500/15 active:translate-y-0 active:scale-98 text-white text-sm font-extrabold shadow-2xs transition-all duration-150 cursor-pointer flex items-center gap-2 disabled:opacity-50"
+              className="mt-3 flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-[14px] bg-[#1E60F3] px-5 py-3 text-[14px] font-semibold text-white transition-colors hover:bg-[#1752D4] active:bg-[#164CC2] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             >
               <Sparkles className={`w-4 h-4 ${isExtractingAi ? 'animate-spin' : ''}`} />
-              <span>{isExtractingAi ? '예약 내용을 꼼꼼히 읽고 있어요...' : '3초 만에 예약 정보 채우기'}</span>
+              <span>{isExtractingAi ? '예약 내용을 분석하고 있어요...' : 'AI로 분석하기'}</span>
             </button>
             <p className="text-[11px] text-slate-400 pt-2">
               * 직접 누르실 때만 안전하게 분석이 시작됩니다.
