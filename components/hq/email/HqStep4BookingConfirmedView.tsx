@@ -23,7 +23,7 @@ export const HqStep4BookingConfirmedView: React.FC<HqStep4BookingConfirmedViewPr
 }) => {
   const [checkImageFailed, setCheckImageFailed] = useState(false);
   const dates = Array.from(
-    new Set((extractedDraft.waypoints || []).map((wp) => wp.date?.trim()).filter((d): d is string => Boolean(d)))
+    new Set([...(extractedDraft.vehicleRoutes || []).map(route => route.date), ...(extractedDraft.waypoints || []).map((wp) => wp.date?.trim())].filter((d): d is string => Boolean(d)))
   );
   const firstDate = dates[0] || extractedDraft.pickupDate;
   const lastDate = dates[dates.length - 1];
@@ -31,7 +31,7 @@ export const HqStep4BookingConfirmedView: React.FC<HqStep4BookingConfirmedViewPr
     ? `${firstDate} ~ ${lastDate} · ${dates.length}일`
     : firstDate || '날짜 미지정';
   const dailyRoutes = (extractedDraft.waypoints || []).reduce<
-    Array<{ date: string; first: string; last: string; count: number }>
+    Array<{ date: string; first: string; last: string; count: number; vehicleLabel?: string }>
   >((days, waypoint) => {
     const date = waypoint.date?.trim() || extractedDraft.pickupDate || '날짜 미지정';
     const location = waypoint.location?.trim() || '장소 미지정';
@@ -44,6 +44,14 @@ export const HqStep4BookingConfirmedView: React.FC<HqStep4BookingConfirmedViewPr
     }
     return days;
   }, []).sort((left, right) => left.date.localeCompare(right.date));
+
+  const visibleRoutes = extractedDraft.vehicleRoutes?.length
+    ? [...extractedDraft.vehicleRoutes].sort((a,b)=>a.date.localeCompare(b.date)).map(route=>({
+        date:route.date,first:route.stops[0]?.location || '장소 미지정',
+        last:route.stops[route.stops.length-1]?.location || '장소 미지정',
+        count:route.stops.length,vehicleLabel:route.vehicleLabel,
+      }))
+    : dailyRoutes;
 
   const routeLabel = [extractedDraft.pickupLocation, extractedDraft.dropoffLocation]
     .filter(Boolean).join(' → ') || '경로 미지정';
@@ -95,20 +103,20 @@ export const HqStep4BookingConfirmedView: React.FC<HqStep4BookingConfirmedViewPr
             <div className="flex items-start justify-between gap-4">
               <dt className="shrink-0 text-slate-400 font-medium">운행 경로</dt>
               <dd className="min-w-0 flex-1 text-right font-bold leading-relaxed text-slate-900">
-                {dailyRoutes.length > 1 ? (
+                {visibleRoutes.length > 1 ? (
                   <div className="space-y-2">
-                    {dailyRoutes.map((day) => (
-                      <div key={day.date} className="flex flex-col gap-0.5">
+                    {visibleRoutes.map((day) => (
+                      <div key={day.date + ':' + (day.vehicleLabel || '')} className="flex flex-col gap-0.5">
                         <span className="text-[11px] font-medium text-slate-400">
-                          {day.date} · {day.count}곳
+                          {day.vehicleLabel ? day.vehicleLabel + ' · ' : ''}{day.date} · {day.count}곳
                         </span>
                         <span>{day.first} → {day.last}</span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <span>{dailyRoutes.length === 1
-                    ? `${dailyRoutes[0].first} → ${dailyRoutes[0].last}`
+                  <span>{visibleRoutes.length === 1
+                    ? `${visibleRoutes[0].first} → ${visibleRoutes[0].last}`
                     : routeLabel}</span>
                 )}
               </dd>
