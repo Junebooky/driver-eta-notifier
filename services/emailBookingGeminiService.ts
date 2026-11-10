@@ -10,6 +10,7 @@ import type { EmailFlightLeg } from '@/types/emailHq';
 import { enrichBookingDraftWithEmailEvidence } from '@/utils/emailBookingEvidence';
 import { attachmentManifest, verifyAttachmentCoverage } from '@/utils/emailAttachmentCoverage';
 import { datedExcelCalendarBlocks, reconcileSingleExcelCalendar } from '@/utils/emailCalendarGrid';
+import { normalizeGeminiVehicleRoutes, reconcileVehicleExcelEvidence } from '@/utils/emailVehicleRoutes';
 
 export interface ExtractBookingParams {
   emailId: string;
@@ -150,6 +151,28 @@ const BOOKING_RESPONSE_SCHEMA = {
         },
       },
     },
+    vehicleRoutes: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          vehicleLabel: { type: Type.STRING },
+          date: { type: Type.STRING },
+          vehicleClass: { type: Type.STRING },
+          passengerName: { type: Type.STRING },
+          passengerCount: { type: Type.INTEGER },
+          endTime: { type: Type.STRING },
+          sourceFilename: { type: Type.STRING },
+          stops: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: {
+            time: { type: Type.STRING },
+            location: { type: Type.STRING },
+            clientAddress: { type: Type.STRING },
+            notes: { type: Type.STRING },
+          }, required: ['time','location'] } },
+        },
+        required: ['vehicleLabel','date','stops'],
+      },
+    },
     groupTrips: {
       type: Type.ARRAY,
       items: {
@@ -168,7 +191,7 @@ const BOOKING_RESPONSE_SCHEMA = {
     confidence: { type: Type.NUMBER },
     warnings: { type: Type.ARRAY, items: { type: Type.STRING } },
   },
-  required: ['documentCoverage'],
+  required: ['documentCoverage','vehicleRoutes'],
 };
 
 /**
@@ -300,6 +323,7 @@ export async function extractBookingFromEmail(
 
   const prompt = `You are an expert AI reservation assistant for VIP LIMOUSINE KOREA.
 Extract structured VIP limousine reservation booking details from the incoming client email.
+PRIMARY OUTPUT: vehicleRoutes is the COMPLETE authoritative itinerary. Preserve EVERY Car 1/Car 2 vehicle schedule as SEPARATE dated routes. A single shared waypoints list is not enough for multi-car schedules.
 
 [REFERENCE MESSAGE DATE (KST)]
 The selected message date is ${todayKst} (YYYY-MM-DD, Asia/Seoul).
@@ -324,6 +348,21 @@ FORWARDED CONVERSATIONS: Read explicit message headers and distinguish dates of 
 
 [PDF ATTACHMENTS]
 ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, dates and all stops. PDF originals are provided as inline document parts.' : '(none)'}
+
+[PER-VEHICLE SERVICE ROUTES — CRITICAL]
+Return vehicleRoutes as one record for EACH vehicle AND EACH date that contains actual chauffeured service.
+- Each entry: vehicleLabel ("Car 1", "Car 2", etc. EXACT client label when available), date (YYYY-MM-DD), stops (every real requested pickup, intermediate stop, standby venue and dropoff, in order), endTime only if explicitly given.
+- For example Car 1 Nov 8/9/10 and Car 2 Nov 9/10 must be FIVE distinct dated entries, and MUST NOT silently reuse Car 1 stops as Car 2.
+- A time-and-place in a PDF/Excel cell is one stop, not a new physical vehicle. For a 2+ car workbook, assign each source sheet/file to the correct vehicle; do NOT merge different cars.
+- For each stop: location, time (HH:mm if explicit, otherwise ""), clientAddress EXACT as quoted (otherwise ""), notes with the exact origin/purpose where useful. Never interpret "Head to X" as arrival at X; keep departure notes on previous venue.
+- If no Car label was supplied and there is a single vehicle, call it "Car 1". If several vehicles are requested but source cannot distinguish their stops, do not fabricate identical routes: return only the evidenced vehicle routes and warn about missing vehicle-specific plans.
+- A multi-stop day requires EVERY location, not only the first and last. Do not flatten distinct vehicle/day routes into waypoints.
+- For simple one-vehicle, one-leg trips, return one vehicleRoutes entry containing pickup and destination stops, with unknown destination time as "".
+- If the source has no actual chauffeur service, return [] instead of inventing any route.
+- Vehicle class and passenger count belong to each vehicle if shown; do not assume all vehicles have the same passengers.
+- Empty calendar days, fee tables, quoted outdated proposals and flight-only connections are NOT chauffeured schedules.
+- Do NOT ask the HQ operator to choose "신규 예약"/"운행 없음" for every date. Extract the source schedule directly.
+- Keep sourceFilename exactly as supplied whenever a route comes from an attachment.
 
 [EXTRACTION RULES]
 1. ZERO HALLUCINATION: If a field is not explicitly mentioned or clearly inferred, return empty string "".
@@ -506,6 +545,7 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
             });
           })()
         : undefined,
+      vehicleRoutes: normalizeGeminiVehicleRoutes(parsed.vehicleRoutes, String(parsed.pickupDate || '')),
       groupTrips: Array.isArray(parsed.groupTrips) && parsed.groupTrips.length > 0
         ? parsed.groupTrips.map((gt: any, idx: number) => ({
             id: String(gt.id || `gt-${idx + 1}`),
@@ -550,15 +590,14 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
     // A partial revision must not silently restore superseded appointments from
     // an older attachment. Show all original cells for review, but leave the
     // modification to the existing explicit revision-match workflow.
+    const baseDraft = parsed.tripType === 'modification' && parsed.revisionScope !== 'full'
+      ? evidenceDraft
+      : evidenceDraft.vehicleRoutes?.length ? evidenceDraft : reconcileSingleExcelCalendar(evidenceDraft, calendarBlocks);
+    // Gemini first, then deterministic Excel coverage for a missing vehicle/day.
+    // Do not convert multiple source vehicles into one common waypoints list.
     const completeDraft = parsed.tripType === 'modification' && parsed.revisionScope !== 'full'
-      ? {
-          ...evidenceDraft,
-          warnings: calendarBlocks.length
-            ? [...(evidenceDraft.warnings || []),
-                '부분 수정 요청: 엑셀 원본은 대조용으로 표시하며 변경 전 일정을 자동 복원하지 않았습니다.']
-            : evidenceDraft.warnings,
-        }
-      : reconcileSingleExcelCalendar(evidenceDraft, calendarBlocks);
+      ? baseDraft
+      : reconcileVehicleExcelEvidence(baseDraft, calendarBlocks);
     const coverage = verifyAttachmentCoverage(
       attachments, parsed.documentCoverage, completeDraft, Number(todayKst.slice(0,4))
     );
