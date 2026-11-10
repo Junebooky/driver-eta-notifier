@@ -25,7 +25,7 @@ async function main() {
     GRANT USAGE ON SCHEMA cockpit TO anon, authenticated, service_role;
     CREATE TABLE cockpit.schedules (
       id uuid PRIMARY KEY, org_id text DEFAULT 'vip_limousine_korea',
-      status text NOT NULL DEFAULT 'scheduled',
+      status text DEFAULT 'scheduled',
       dispatch_status text NOT NULL DEFAULT 'published',
       updated_at timestamptz DEFAULT now()
     );
@@ -94,6 +94,12 @@ async function main() {
     assert.equal(plainDeleted.appliedMode,'hard_deleted');
     assert.equal(await saved(plain),undefined);
     console.log('PASS clean booking is physically deleted');
+    // Legacy imported bookings may have NULL status; they are still deletable.
+    const legacy = await schedule();
+    await db.query('UPDATE cockpit.schedules SET status=NULL WHERE id=$1',[legacy]);
+    assert.equal((await call([legacy],'schedule_only')).appliedMode,'hard_deleted');
+    assert.equal(await saved(legacy),undefined);
+    console.log('PASS legacy null-status booking can be deleted');
 
     // Linked drafts default to retaining those drafts and hiding only booking.
     const retain = await schedule();
