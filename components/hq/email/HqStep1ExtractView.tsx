@@ -121,6 +121,15 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
           .map(entry => ({ filename: document.filename, entry }))
       ).slice(0, 8)
     : [];
+  // The PDF excerpts and page numbers come from Gemini, not a deterministic PDF text parser.
+  // Only show excerpts containing the clicked source value; never claim these are verified.
+  const pdfSourceEvidence = currentEvidence?.address
+    ? (extractedDraft?.documentAnalysis || []).flatMap(document =>
+        document.kind === 'pdf' ? (document.pdfEvidence || [])
+          .filter(entry => findEmailSourceRanges(entry.originalText, currentEvidence.address).length > 0)
+          .map(entry => ({ filename: document.filename, entry })) : []
+      ).slice(0, 12)
+    : [];
   const sourceHasBodyMatch = Boolean(currentEvidence?.query);
 
 
@@ -612,9 +621,30 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                   </div>
                 ))}
               </div>
-            ) : !sourceHasBodyMatch ? (
-              <p className="text-[11px] text-[#6E809B]">이메일 본문과 보존된 첨부 일정 셀에서 일치하는 근거를 찾지 못했습니다. 원본 파일을 직접 확인해 주세요.</p>
             ) : null}
+            {pdfSourceEvidence.length > 0 && (
+              <div className="space-y-2 rounded-[14px] bg-white p-3 shadow-[0_3px_14px_rgba(35,49,78,0.05)]">
+                <p className="text-[12px] font-semibold text-[#25344D]">PDF 원문 근거 후보</p>
+                <p className="text-[11px] text-[#6E809B]">Gemini가 찾아준 문구와 페이지예요. 원본 PDF에서 직접 확인해 주세요.</p>
+                {pdfSourceEvidence.length > 1 && <p className="text-[11px] text-[#6E809B]">같은 값이 여러 곳에 있어요. 올바른 날짜·차량의 일정인지 확인해 주세요.</p>}
+                {pdfSourceEvidence.map(({ filename, entry }, index) => (
+                  <div key={filename + ':' + entry.pageNumber + ':' + index} className="space-y-1.5 rounded-[11px] bg-[#F6F8FC] p-3">
+                    <p className="break-words text-[11px] font-semibold text-[#25344D]">{filename} · {entry.pageNumber}페이지 (AI 추출 · 확인 필요)</p>
+                    <div className="whitespace-pre-wrap break-words text-[12px] leading-relaxed text-[#25344D]">
+                      <HqSourceText text={entry.originalText} query={currentEvidence.address} revision={currentEvidence.revision} />
+                    </div>
+                    <a href={`/api/email/${encodeURIComponent(emailDetail?.id || emailSummary.id)}/attachment?filename=${encodeURIComponent(filename)}#page=${entry.pageNumber}`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="inline-block text-[11px] font-semibold text-[#1E60F3] underline underline-offset-2">
+                      원본 PDF에서 확인
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
+            {!sourceHasBodyMatch && attachmentEvidence.length === 0 && pdfSourceEvidence.length === 0 && (
+              <p className="text-[11px] text-[#6E809B]">이메일 본문과 보존된 첨부 근거에서 일치하는 문구를 찾지 못했습니다. 원본 파일을 직접 확인해 주세요.</p>
+            )}
           </div>
         )}
 
