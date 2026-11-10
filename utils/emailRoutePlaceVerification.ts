@@ -23,6 +23,13 @@ export const isVerifiedEmailRouteStop = (stop: EmailRouteStop): boolean =>
   Math.abs(stop.lat!) <= 90 && Math.abs(stop.lng!) <= 180;
 
 export function getEmailRouteStops(draft: HqEmailExtractedDraft): EmailRouteStop[] {
+  if (draft.vehicleRoutes?.length) {
+    return draft.vehicleRoutes.flatMap(route => route.stops.map(point => ({
+      id: point.id, date: route.date, time: point.time || '', location: point.location,
+      address: point.address, clientAddress: point.clientAddress,
+      lat: point.lat, lng: point.lng, isPoiConfirmed: Boolean(point.isPoiConfirmed),
+    })));
+  }
   if (draft.waypoints && draft.waypoints.length >= 2) {
     return [...draft.waypoints].sort((a, b) => a.order - b.order).map((point) => ({
       id: point.id,
@@ -85,6 +92,11 @@ function updateRouteStop(
   stopId: string,
   change: Pick<RouteWaypointItem, 'location' | 'address' | 'lat' | 'lng' | 'isPoiConfirmed'>,
 ): HqEmailExtractedDraft {
+  if (draft.vehicleRoutes?.some(route => route.stops.some(stop => stop.id === stopId))) {
+    return {...draft, vehicleRoutes:draft.vehicleRoutes.map(route => ({
+      ...route,stops:route.stops.map(stop => stop.id===stopId ? {...stop,...change} : stop),
+    }))};
+  }
   const waypoints = draft.waypoints;
   if (waypoints && waypoints.length >= 2) {
     const sorted = [...waypoints].sort((a, b) => a.order - b.order);
