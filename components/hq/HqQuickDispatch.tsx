@@ -82,7 +82,9 @@ import { useFleetAvailability } from '@/hooks/useFleetAvailability';
 import { validateDispatchInterval } from '@/utils/dispatchInterval';
 import { editedBookingIdentity, resolveQuickDispatchPlaces } from '@/utils/quickDispatchContinuity';
 import { driverDispatchSmsHref } from '@/utils/driverDispatchSms';
-import { hardDeleteHqSchedule } from '@/utils/hqScheduleHardDelete';
+import { hardDeleteHqSchedule, inspectHqScheduleDeletion } from '@/utils/hqScheduleHardDelete';
+import type { HqScheduleDeleteInspection, HqScheduleDeleteMode } from '@/utils/hqScheduleHardDelete';
+import { HqScheduleDeleteChoices } from '@/components/hq/ui/HqScheduleDeleteChoices';
 import { useHqDrivers } from '@/utils/useHqDrivers';
 
 export interface HqQuickDispatchProps {
@@ -488,6 +490,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   const [remindSuccess, setRemindSuccess] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteInspection, setDeleteInspection] = useState<HqScheduleDeleteInspection | null>(null);
+  const [deleteInspectError, setDeleteInspectError] = useState<string | null>(null);
+  const [deleteMode, setDeleteMode] = useState<HqScheduleDeleteMode>('schedule_only');
   const [deleteSucceeded, setDeleteSucceeded] = useState(false);
   const deleteLock = useRef(false);
   const bookingCancelled = initialBooking?.dispatchStatus === '취소' || deleteSucceeded;
@@ -589,8 +594,25 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isModal, isOpen, onClose]);
 
+  useEffect(() => {
+    if (!isDeleteConfirmOpen || !initialBooking) return;
+    const id = initialBooking.scheduleId || (initialBooking.id.startsWith('new_') ? '' : initialBooking.id);
+    if (!id) {
+      setDeleteInspectError('서버에 등록된 배차만 삭제할 수 있습니다.');
+      return;
+    }
+    let active = true;
+    setDeleteInspection(null);
+    setDeleteInspectError(null);
+    setDeleteMode('schedule_only');
+    inspectHqScheduleDeletion(id, 'booking')
+      .then(result => { if (active) setDeleteInspection(result); })
+      .catch(error => { if (active) setDeleteInspectError(error instanceof Error ? error.message : '연결 기록 확인 실패'); });
+    return () => { active = false; };
+  }, [isDeleteConfirmOpen, initialBooking?.scheduleId, initialBooking?.id]);
+
   const handleDeleteDispatch = async () => {
-    if (!initialBooking || isDeleting || isSubmitting || deleteLock.current) return;
+    if (!initialBooking || isDeleting || isSubmitting || deleteLock.current || !deleteInspection || deleteInspectError) return;
     const targetId = initialBooking.scheduleId || (initialBooking.id.startsWith('new_') ? '' : initialBooking.id);
     if (!targetId) {
       setErrorMsg('서버에 등록된 배차만 삭제할 수 있습니다.');
@@ -600,7 +622,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     setIsDeleting(true);
     setErrorMsg(null);
     try {
-      await hardDeleteHqSchedule(targetId, 'booking');
+      await hardDeleteHqSchedule(targetId, 'booking', undefined, deleteMode);
       setDeleteSucceeded(true);
       setIsDeleteConfirmOpen(false);
       haptics.success();
@@ -2639,13 +2661,16 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 <div className="space-y-1 rounded-xl bg-[#F8FAFC] border border-slate-100 p-3 text-[12px] leading-relaxed text-[#64748B]">
                   <div className="flex items-start gap-1.5">
                     <span className="shrink-0 text-slate-400 font-semibold">ⓘ</span>
-                    <span>운행일지나 정산 내역이 남아있는 배차는 안전하게 보관돼요.</span>
+                    <span>삭제한 배차는 달력과 기사 스케줄에서 사라져요.</span>
                   </div>
                   <div className="flex items-start gap-1.5 text-[#A34E45] font-medium">
                     <span className="shrink-0 font-semibold">ⓘ</span>
                     <span>한 번 삭제한 배차는 다시 되돌릴 수 없어요.</span>
                   </div>
                 </div>
+
+                {deleteInspectError && <p role="alert" className="rounded-[12px] bg-[#FFF4F2] p-3 text-[12px] text-[#A34E45]">{deleteInspectError}</p>}
+                {!deleteInspectError && <HqScheduleDeleteChoices inspection={deleteInspection} mode={deleteMode} onModeChange={setDeleteMode} />}
 
                 <div className="grid grid-cols-2 gap-2.5 pt-1">
                   <button
@@ -2658,7 +2683,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   </button>
                   <button
                     type="button"
-                    disabled={isDeleting || isSubmitting}
+                    disabled={isDeleting || isSubmitting || !deleteInspection || Boolean(deleteInspectError)}
                     onClick={handleDeleteDispatch}
                     className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#EF4444] px-3 text-sm font-semibold text-white hover:bg-red-600 transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
                   >
