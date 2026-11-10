@@ -160,6 +160,8 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   const [mobileDetailOpen, setMobileDetailOpen] = useState<boolean>(
     Boolean(urlEmailId || (urlStep && urlStep !== 'step1_extract'))
   );
+  // Opening a message always starts with the actual email, not an AI result.
+  const [mobileEmailView, setMobileEmailView] = useState<'source' | 'analysis'>('source');
   const emailListRef = useRef<HTMLDivElement>(null);
   const emailWorkflowRef = useRef<HTMLDivElement>(null);
   const scrollMobileTo = (target: 'list' | 'detail') => {
@@ -568,6 +570,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     haptics.lightTap();
     setSelectedEmailId(emailId);
     setMobileDetailOpen(true);
+    setMobileEmailView('source');
     scrollMobileTo('detail');
     setWorkflowStep('step1_extract');
     setDispatchError(null);
@@ -797,6 +800,9 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
         [currentSummary.id]: extracted,
       }));
       saveEmailDraft(extracted);
+      // AI output becomes the next mobile screen only after a valid success.
+      setMobileEmailView('analysis');
+      scrollMobileTo('detail');
 
       // Dynamically initialize vehicle slots based on AI extracted vehicle request (NO dummy vehicles!)
       const newSlots = parseVehicleSlotsFromRequestedClass(extracted.requestedVehicleClass);
@@ -1370,6 +1376,11 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                   isLoadingDetail={isLoadingDetail}
                   isExtractingAi={isExtractingAi}
                   onExtractWithAi={handleExtractWithAi}
+                  mobileView={mobileEmailView}
+                  onMobileViewChange={(view) => {
+                    setMobileEmailView(view);
+                    scrollMobileTo('detail');
+                  }}
                   onProceedToBooking={handleProceedToBooking}
                   onSaveModifiedDraft={() => {
                     showToast('수정된 예약 초안이 저장되었습니다.');
