@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation';
 import {
   Mail,
+  ArrowLeft,
   Search,
   RefreshCw,
   Plus,
@@ -152,6 +153,25 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     }
     return null;
   });
+
+  // Mobile is a list -> detail flow; desktop keeps the two-panel inbox.
+  // A selected cached email must NOT force the detail view on mobile:
+  // operators should start at the inbox unless they open a direct deep link.
+  const [mobileDetailOpen, setMobileDetailOpen] = useState<boolean>(
+    Boolean(urlEmailId || (urlStep && urlStep !== 'step1_extract'))
+  );
+  // Opening a message always starts with the actual email, not an AI result.
+  const [mobileEmailView, setMobileEmailView] = useState<'source' | 'analysis'>('source');
+  const emailListRef = useRef<HTMLDivElement>(null);
+  const emailWorkflowRef = useRef<HTMLDivElement>(null);
+  const scrollMobileTo = (target: 'list' | 'detail') => {
+    if (typeof window === 'undefined' || window.innerWidth >= 768) return;
+    window.requestAnimationFrame(() => {
+      (target === 'detail' ? emailWorkflowRef : emailListRef).current?.scrollIntoView({
+        block: 'start', behavior: 'auto',
+      });
+    });
+  };
 
   // 4. Email Detail Cache (Read-Only, hydrated from memory/session cache)
   const [emailDetails, setEmailDetails] = useState<Record<string, HqEmailDetail>>(() => {
@@ -549,6 +569,9 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   const handleSelectEmail = (emailId: string) => {
     haptics.lightTap();
     setSelectedEmailId(emailId);
+    setMobileDetailOpen(true);
+    setMobileEmailView('source');
+    scrollMobileTo('detail');
     setWorkflowStep('step1_extract');
     setDispatchError(null);
 
@@ -777,6 +800,9 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
         [currentSummary.id]: extracted,
       }));
       saveEmailDraft(extracted);
+      // AI output becomes the next mobile screen only after a valid success.
+      setMobileEmailView('analysis');
+      scrollMobileTo('detail');
 
       // Dynamically initialize vehicle slots based on AI extracted vehicle request (NO dummy vehicles!)
       const newSlots = parseVehicleSlotsFromRequestedClass(extracted.requestedVehicleClass);
@@ -1071,7 +1097,10 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
         {/* ========================================================= */}
         {/* Pinned Left Column: 이메일 목록                           */}
         {/* ========================================================= */}
-        <div className="flex min-h-[700px] w-full shrink-0 flex-col rounded-[23px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055)] md:w-80 lg:w-[320px] xl:w-[340px] md:sticky md:top-20 relative z-20">
+        <div
+          ref={emailListRef}
+          className={`${mobileDetailOpen ? 'hidden md:flex' : 'flex'} min-h-0 w-full shrink-0 scroll-mt-20 flex-col rounded-[23px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055)] md:min-h-[700px] md:w-80 lg:w-[320px] xl:w-[340px] md:sticky md:top-20 relative z-20`}
+        >
           {/* Header Row */}
           <div className="flex items-center justify-between rounded-t-[23px] bg-white px-4 py-4">
             <div className="relative group/email flex items-center gap-2 cursor-pointer">
@@ -1180,7 +1209,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
           </div>
 
           {/* Scrollable Email Cards List */}
-          <div className="max-h-[580px] flex-1 space-y-1.5 overflow-y-auto overscroll-contain rounded-b-[23px] px-3 pb-4">
+          <div className="max-h-[65dvh] flex-1 space-y-1.5 overflow-y-auto overscroll-contain rounded-b-[23px] px-3 pb-4 md:max-h-[580px]">
             {isLoadingInbox ? (
               <div className="p-12 text-center text-slate-400 space-y-2">
                 <RefreshCw className="w-7 h-7 mx-auto animate-spin text-[#1E60F3]" />
@@ -1207,7 +1236,16 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                   <div
                     key={item.id}
                     onClick={() => handleSelectEmail(item.id)}
-                    className={`group relative cursor-pointer rounded-[16px] p-3.5 transition-colors ${isSelected
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        handleSelectEmail(item.id);
+                      }
+                    }}
+                    aria-label={`${item.from.name || item.from.address} · ${item.subject} 메일 열기`}
+                    className={`group relative cursor-pointer rounded-[16px] p-3.5 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#1E60F3] ${isSelected
                       ? 'bg-[#F3F7FF] shadow-[0_3px_12px_rgba(35,49,78,0.05)]'
                       : 'hover:bg-[#FAFBFD]'
                       }`}
@@ -1276,7 +1314,25 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
         {/* ========================================================= */}
         {/* Dynamic Right Column: Sequential Multi-Step Workflow Card */}
         {/* ========================================================= */}
-        <div className="flex-1 min-w-0 w-full space-y-4">
+        <div
+          ref={emailWorkflowRef}
+          className={`${mobileDetailOpen ? 'block' : 'hidden md:block'} min-w-0 w-full flex-1 scroll-mt-20 space-y-4`}
+        >
+          <div className="md:hidden">
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                setMobileDetailOpen(false);
+                scrollMobileTo('list');
+              }}
+              className="inline-flex min-h-11 items-center gap-2 rounded-[13px] bg-white px-4 text-[13px] font-semibold text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.055)]"
+              aria-label="이메일 목록으로 돌아가기"
+            >
+              <ArrowLeft className="h-4 w-4" strokeWidth={1.8} />
+              메일 목록
+            </button>
+          </div>
           {dispatchMutation.hasPending && <button type="button" className="rounded-xl border border-blue-200 p-3 text-sm text-blue-700" onClick={async () => { try { const response = await dispatchMutation.retry(); const data = await response.json(); if (!response.ok || !data.ok) throw new Error(data.error || '저장 결과를 확인하지 못했습니다.'); window.location.reload(); } catch (error) { setDispatchError(error instanceof Error ? error.message : '저장 결과를 확인하지 못했습니다.'); } }}>이전 배차 저장 결과 확인</button>}
           {currentSummary && (
             <div className="overflow-hidden rounded-[22px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055)]">
@@ -1320,6 +1376,11 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                   isLoadingDetail={isLoadingDetail}
                   isExtractingAi={isExtractingAi}
                   onExtractWithAi={handleExtractWithAi}
+                  mobileView={mobileEmailView}
+                  onMobileViewChange={(view) => {
+                    setMobileEmailView(view);
+                    scrollMobileTo('detail');
+                  }}
                   onProceedToBooking={handleProceedToBooking}
                   onSaveModifiedDraft={() => {
                     showToast('수정된 예약 초안이 저장되었습니다.');

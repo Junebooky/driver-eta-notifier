@@ -1,13 +1,13 @@
 name: Email workflow UI regression
 on:
   push:
-    branches: [fix/email-workflow-review-assignment-20261109, fix/email-attachment-completeness-20261109, fix/email-attachment-date-review-20261109]
+    branches: [fix/email-workflow-review-assignment-20261109, fix/email-attachment-completeness-20261109, fix/email-attachment-date-review-20261109, fix/email-mobile-workflow-20261110]
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   email-ui:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
