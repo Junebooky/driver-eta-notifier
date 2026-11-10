@@ -139,7 +139,7 @@ try {
     await bookable.click();
     assert.equal(await dialog.count(),0);
     // Ensure Car1 and Car2 are visibly independent on both desktop and mobile.
-    await page.getByRole('button',{name:/Car 1 Car 2 독립 일정 테스트 메일 열기/}).click();
+    await page.goto(base+'/?demo=true&emailId=isolated-car-review');
     if (width===390) await page.getByRole('button',{name:'AI 분석 결과 보기'}).click();
     const routes=page.getByLabel('고객사 요청 차량별 전체 경로');
     await routes.waitFor();
