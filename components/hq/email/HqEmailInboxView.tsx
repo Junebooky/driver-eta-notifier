@@ -739,7 +739,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       if (currentDraft.tripType === 'cancellation') throw new Error('취소 요청은 배차관리에서 해당 예약을 확인한 뒤 직접 처리해 주세요.');
       // The client source, not a per-day "registration method" choice, drives
       // the full Car/date plan. Never overwrite possible existing bookings.
-      const items: Array<Record<string, unknown>> = buildEmailDispatchPlan(currentDraft, vehicleSlots, status);
+      const items = buildEmailDispatchPlan(currentDraft, vehicleSlots, status);
       if (currentDraft.savedScheduleIds) throw new Error('이미 저장된 이메일 요청입니다. 배차관리에서 변경한 뒤 다시 분석해 주세요.');
       const approvedItems = items.map(item => ({
         ...item,
