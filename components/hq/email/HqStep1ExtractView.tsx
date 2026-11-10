@@ -56,6 +56,8 @@ interface HqStep1ExtractViewProps {
   isLoadingDetail?: boolean;
   isExtractingAi?: boolean;
   onExtractWithAi: () => void;
+  mobileView?: 'source' | 'analysis';
+  onMobileViewChange?: (view: 'source' | 'analysis') => void;
   onProceedToBooking: () => void;
   onSaveModifiedDraft?: () => void;
   onUpdateDraft?: (updated: HqEmailExtractedDraft) => void;
@@ -80,6 +82,8 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   isLoadingDetail,
   isExtractingAi,
   onExtractWithAi,
+  mobileView = 'source',
+  onMobileViewChange,
   onProceedToBooking,
   onSaveModifiedDraft,
   onUpdateDraft,
@@ -105,9 +109,11 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
     setSourceEvidence(previous => ({
       emailId: emailSummary.id, address, query: first ? address : '', excerpt, revision: previous.revision + 1,
       message: isLoadingDetail ? '이메일 원문을 불러온 뒤 다시 확인해 주세요.'
-        : first ? `이메일 원문 ${matches.length}곳과 연결했습니다. 왼쪽 원문에서도 강조 표시합니다.`
+        : first ? `이메일 원문 ${matches.length}곳과 연결했습니다. 원문에서 강조 표시합니다.`
         : '이메일 본문에는 같은 문구가 없습니다. 아래 첨부 일정표의 원문 근거도 확인해 주세요.',
     }));
+    // Source evidence always brings mobile operators back to the actual source.
+    onMobileViewChange?.('source');
   };
   const currentEvidence = sourceEvidence.emailId === emailSummary.id ? sourceEvidence : null;
   // Show only evidence actually retained from the original Excel schedule, never AI-invented coordinates.
@@ -566,12 +572,24 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
       {/* 1. Left Sub-Column: Original Safe Email Viewer */}
-      <div className="lg:col-span-6 flex min-h-[640px] flex-col overflow-hidden rounded-[23px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055)]">
+      <div className={`${mobileView === 'source' ? 'flex' : 'hidden'} min-h-0 flex-col overflow-hidden rounded-[23px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055)] md:flex lg:col-span-6 lg:min-h-[640px]`}>
         {/* Email Header */}
         <div className="bg-white p-5">
-          <h2 className="text-[18px] font-bold leading-snug tracking-[-0.02em] text-[#17233B]">
-            {subject}
-          </h2>
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="min-w-0 break-words text-[17px] font-bold leading-snug tracking-[-0.02em] text-[#17233B] sm:text-[18px]">
+              {subject}
+            </h2>
+            <button
+              type="button"
+              onClick={() => extractedDraft ? onMobileViewChange?.('analysis') : onExtractWithAi()}
+              disabled={isExtractingAi || isLoadingDetail}
+              aria-label={extractedDraft ? 'AI 분석 결과 보기' : 'AI로 분석하기'}
+              className="inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-[13px] bg-[#F4F7FC] px-2.5 text-[12px] font-semibold text-[#1E60F3] transition-colors hover:bg-[#EAF1FF] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1E60F3] disabled:cursor-not-allowed disabled:opacity-50 md:hidden"
+            >
+              <img src="/images/icons/ai_email.png" alt="" aria-hidden="true" className="h-6 w-6 object-contain" />
+              <span>{extractedDraft ? '분석 결과' : isExtractingAi ? '분석 중' : 'AI 분석'}</span>
+            </button>
+          </div>
 
           <div className="mt-3 flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 font-extrabold text-xs flex items-center justify-center shrink-0 shadow-xs uppercase">
@@ -712,7 +730,15 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
       </div>
 
       {/* 2. Right Sub-Column: AI Extraction Card */}
-      <div className="relative lg:col-span-6 flex min-h-[640px] flex-col justify-between overflow-visible rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055)] sm:p-6">
+      <div className={`${mobileView === 'analysis' ? 'flex' : 'hidden'} relative min-h-0 flex-col justify-between overflow-visible rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055)] md:flex md:min-h-[300px] sm:p-6 lg:col-span-6 lg:min-h-[640px]`}>
+        <button
+          type="button"
+          onClick={() => onMobileViewChange?.('source')}
+          className="mb-4 inline-flex min-h-10 w-fit items-center gap-1.5 rounded-[12px] bg-[#F4F7FC] px-3 text-[12px] font-semibold text-[#4D607C] md:hidden"
+        >
+          <ChevronDown className="h-4 w-4 rotate-90" strokeWidth={1.8} />
+          메일 원문 보기
+        </button>
         {extractedDraft ? (
           <div className="space-y-4">
             {/* Header: Sparkles + Title + Refresh Button */}
@@ -1385,7 +1411,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
             <div className="group relative flex flex-col items-center cursor-pointer">
               {/* Speech Bubble - reveals on hover */}
               <div className="absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-[12px] bg-white px-3 py-2 text-[11px] font-medium text-[#4D607C] shadow-[0_8px_22px_rgba(35,49,78,0.1)] opacity-0 pointer-events-none group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-200 flex items-center gap-1.5 z-20">
-                <span>⚡ 3초만에 스케줄링 해드릴게요!</span>
+                <span>이메일 본문과 첨부파일을 함께 분석해요</span>
                 <div className="absolute -bottom-1 left-1/2 size-2.5 -translate-x-1/2 rotate-45 bg-white" />
               </div>
 
@@ -1403,16 +1429,16 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
               메일에서 예약 정보를 찾아낼까요?
             </h4>
             <p className="text-xs text-slate-500 max-w-sm leading-relaxed">
-              고객사, 담당자 연락처, 픽업 일정부터 목적지까지 AI가 한눈에 보기 쉽게 정리해 드려요.
+              이메일 본문과 Excel·PDF 일정표를 함께 분석하고, 배차 정보를 정리해 드려요.
             </p>
             <button
               type="button"
               onClick={onExtractWithAi}
               disabled={isExtractingAi || isLoadingDetail}
-              className="mt-3 px-5 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 hover:-translate-y-0.5 hover:shadow-md hover:shadow-blue-500/15 active:translate-y-0 active:scale-98 text-white text-sm font-extrabold shadow-2xs transition-all duration-150 cursor-pointer flex items-center gap-2 disabled:opacity-50"
+              className="mt-3 flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-[14px] bg-[#1E60F3] px-5 py-3 text-[14px] font-semibold text-white transition-colors hover:bg-[#1752D4] active:bg-[#164CC2] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             >
               <Sparkles className={`w-4 h-4 ${isExtractingAi ? 'animate-spin' : ''}`} />
-              <span>{isExtractingAi ? '예약 내용을 꼼꼼히 읽고 있어요...' : '3초 만에 예약 정보 채우기'}</span>
+              <span>{isExtractingAi ? '예약 내용을 분석하고 있어요...' : 'AI로 분석하기'}</span>
             </button>
             <p className="text-[11px] text-slate-400 pt-2">
               * 직접 누르실 때만 안전하게 분석이 시작됩니다.
