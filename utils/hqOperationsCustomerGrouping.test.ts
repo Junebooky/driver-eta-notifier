@@ -29,14 +29,14 @@ test('missing/generic customer labels must not combine unrelated drivers into on
   assert.ok(groups.every(group => group.customerScoped === false));
 });
 
-test('operations keeps the user-approved exact deletion dialog copy and actions', () => {
+test('operations keeps the updated deletion dialog copy and actions', () => {
   const file = readFileSync(new URL('../components/hq/operations/HqOperationsBoard.tsx', import.meta.url), 'utf8');
   assert.match(file, /setEventToDelete\(eventGroups\.find\(item => item\.id === group\.id\) \|\| group\)/);
   for (const phrase of [
     '이 행사를 삭제할까요?',
     '배차된 일정과 기사·차량 배정이 모두 취소돼요.',
     '한 번 삭제하면 다시 되돌릴 수 없어요.',
-    '운행일지나 정산 기록이 남아있는 예약은 안전하게 보관돼요.',
+    '배차는 목록에서 사라지고, 운행일지·경비·정산·차량 인수 기록은 보존돼요.',
     "'삭제 중…' : '삭제하기'",
     '>\n                취소\n',
   ]) assert.ok(file.includes(phrase), phrase);
