@@ -171,7 +171,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   const hasVehicleRoutes = Boolean(extractedDraft?.vehicleRoutes?.length);
   const actualStops = hasVehicleRoutes ? extractedDraft!.vehicleRoutes!.reduce((sum,route)=>sum+route.stops.length,0) : waypoints.length || 2;
   const actualDates = hasVehicleRoutes ? new Set(extractedDraft!.vehicleRoutes!.map(route=>route.date)).size : 0;
-  const unconfirmedPlaces = extractedDraft ? (hasVehicleRoutes ? extractedDraft.vehicleRoutes!.reduce((total,route)=>total+route.stops.filter(stop=>!isVerifiedEmailRouteStop(stop)).length,0) : getUnconfirmedEmailRouteStops(extractedDraft).length) : 0;
+  const unconfirmedPlaces = extractedDraft ? (hasVehicleRoutes ? extractedDraft.vehicleRoutes!.reduce((total,route)=>total+route.stops.filter(stop=>!isVerifiedEmailRouteStop({...stop,date:route.date,time:stop.time||'',isPoiConfirmed:Boolean(stop.isPoiConfirmed)})).length,0) : getUnconfirmedEmailRouteStops(extractedDraft).length) : 0;
 
   // Extract unique dates for multi-day itineraries
   const waypointDates = waypoints
