@@ -43,9 +43,11 @@ try {
     const page=await context.newPage(); const pageErrors=[]; page.on('pageerror',error=>pageErrors.push(error.message));
     await page.goto(base+'/?demo=true');
     if (width === 390) {
-      // Mobile starts at the inbox, not the off-screen detail card.
+      // Opening a message shows the original body and a small AI icon by the subject.
       assert.equal(await page.getByRole('button',{name:'AI로 분석하기'}).count(),0);
       await page.getByRole('button',{name:/모바일 AI 분석 버튼 테스트 메일 열기/}).click();
+      assert.ok(await page.getByText('11월 10일 오전 9시 호텔 픽업, 오후 5시 종료. 첨부파일 없음.').isVisible());
+      assert.equal(await page.getByRole('heading',{name:'AI가 추출한 예약 정보'}).count(),0);
       const trigger=page.getByRole('button',{name:'AI로 분석하기'});
       await trigger.waitFor();
       assert.ok(await trigger.isInViewport(), 'AI action must be visible without scrolling down past the email body');
@@ -61,24 +63,31 @@ try {
       await trigger.click();
       await page.getByRole('heading',{name:'AI가 추출한 예약 정보'}).waitFor();
       assert.equal(posted,1,'mobile action must make exactly one AI request');
+      await page.getByRole('button',{name:'메일 원문 보기'}).click();
+      assert.ok(await page.getByText('11월 10일 오전 9시 호텔 픽업, 오후 5시 종료. 첨부파일 없음.').isVisible());
+      await page.getByRole('button',{name:'AI 분석 결과 보기'}).click();
+      await page.getByRole('heading',{name:'AI가 추출한 예약 정보'}).waitFor();
       await page.screenshot({path:join(artifacts,'mobile-ai-extracted.png'),fullPage:true});
       await page.getByRole('button',{name:'이메일 목록으로 돌아가기'}).click();
       await page.getByRole('button',{name:/격리 검증용 예약 · 고객 제공 주소 메일 열기/}).click();
-      await page.getByRole('button',{name:'이메일 목록으로 돌아가기'}).waitFor();
+      assert.ok(await page.getByRole('button',{name:'AI 분석 결과 보기'}).isVisible());
+      await page.getByRole('button',{name:'AI 분석 결과 보기'}).click();
     }
     await page.locator('.hq-ui-badge[data-tone="warning"]').first().waitFor();
     assert.equal(await page.locator('.hq-ui-badge[data-tone="warning"]').first().evaluate(element=>getComputedStyle(element).backgroundColor),'rgb(255, 249, 241)','actual shared warning CSS must be loaded');
     await page.getByRole('status').filter({hasText:'본문과 첨부 2개를 함께 읽었습니다.'}).waitFor();
     const sourceButton=page.getByRole('button',{name:'고객 제공 주소 원문 확인: 서울시 강남구 테헤란로 123'});
     await sourceButton.click();
-    await page.getByText('고객 제공 주소와 일치하는 원문 2곳을 표시했습니다.',{exact:false}).waitFor();
+    await page.getByText('이메일 원문 2곳과 연결했습니다. 원문에서 강조 표시합니다.',{exact:true}).first().waitFor();
     assert.equal(await page.locator('mark.hq-ui-source-match').count(),2);
     assert.equal(await page.locator('mark.hq-ui-source-match').first().textContent(),'서울시 강남구 테헤란로 123');
     await page.screenshot({path:join(artifacts,`source-${width}.png`),fullPage:true});
+    if (width === 390) await page.getByRole('button',{name:'AI 분석 결과 보기'}).click();
     await page.getByRole('button',{name:'고객 제공 주소 원문 확인: 원문에 없는 별도 첨부 주소'}).click();
-    await page.getByText('이메일 본문에서 일치하는 주소를 찾지 못했습니다.',{exact:false}).waitFor();
+    await page.getByText('이메일 본문에는 같은 문구가 없습니다. 아래 첨부 일정표의 원문 근거도 확인해 주세요.',{exact:true}).first().waitFor();
     assert.equal(await page.locator('mark.hq-ui-source-match').count(),0);
     assert.ok(await page.locator('.hq-ui-badge[data-tone="warning"]').count()>=3);
+    if (width === 390) await page.getByRole('button',{name:'AI 분석 결과 보기'}).click();
     await page.getByRole('button',{name:'예약 확정',exact:true}).click();
     await page.getByText('첨부파일의 확인 필요 날짜를 원본과 비교한 뒤 검토 완료를 눌러 주세요.',{exact:true}).waitFor();
     assert.equal(await page.locator('[data-hq-reveal]').count(),0);
