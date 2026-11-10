@@ -26,7 +26,7 @@ test('existing booking details retain every working action and use requested sim
   assert.match(info, /handleSubmit\('unassigned'\)/);
   assert.match(info, /handleSubmit\('published'\)/);
   assert.match(info, /handleDeleteDispatch/);
-  assert.match(info, /hardDeleteHqSchedule\(targetId, 'booking'\)/);
+  assert.match(info, /hardDeleteHqSchedule\(targetId, 'booking', undefined, deleteMode\)/);
   assert.match(info, /initialBooking \? '변경 내용 저장' : '예약만 등록'/);
   assert.match(info, /initialBooking \? '배차 확정' : '바로 배차'/);
   assert.ok(info.includes('배차 삭제'));

@@ -26,7 +26,9 @@ import { OperationStatus } from '@/app/api/schedules/operation-status/route';
 import { CustomerNotificationTrigger } from '@/types/hq';
 import { ensureClientAuth } from '@/utils/cockpitClientAuth';
 import { haptics } from '@/utils/haptics';
-import { hardDeleteHqSchedule } from '@/utils/hqScheduleHardDelete';
+import { hardDeleteHqSchedule, inspectHqScheduleDeletion } from '@/utils/hqScheduleHardDelete';
+import type { HqScheduleDeleteInspection, HqScheduleDeleteMode } from '@/utils/hqScheduleHardDelete';
+import { HqScheduleDeleteChoices } from '@/components/hq/ui/HqScheduleDeleteChoices';
 import { groupOperationsByCustomer } from '@/utils/hqOperationsCustomerGroups';
 
 export interface HqOperationsBoardProps {
@@ -470,6 +472,8 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
   const [eventToDelete, setEventToDelete] = useState<EventGroup | null>(null);
   const [deletingEvent, setDeletingEvent] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteInspection, setDeleteInspection] = useState<HqScheduleDeleteInspection | null>(null);
+  const [deleteMode, setDeleteMode] = useState<HqScheduleDeleteMode>('schedule_only');
 
   // Filter & Search states
   const [activeTab, setActiveTab] = useState<'all' | 'running' | 'closed'>('all');
@@ -631,9 +635,25 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
     }));
   };
 
+  useEffect(() => {
+    const target = eventToDelete;
+    if (!target?.schedules?.length) return;
+    let active = true;
+    setDeleteInspection(null);
+    setDeleteMode('schedule_only');
+    setDeleteError(null);
+    inspectHqScheduleDeletion(
+      target.schedules[0].id,
+      target.customerScoped ? 'customer' : 'event',
+      target.schedules.map(item => item.id),
+    ).then(result => { if (active) setDeleteInspection(result); })
+     .catch(error => { if (active) setDeleteError(error instanceof Error ? error.message : '삭제 대상 기록 확인 실패'); });
+    return () => { active = false; };
+  }, [eventToDelete]);
+
   const confirmDeleteEvent = async () => {
     const target = eventToDelete;
-    if (!target || deletingEvent || !target.schedules.length) return;
+    if (!target || deletingEvent || !target.schedules.length || !deleteInspection || deleteError) return;
     setDeletingEvent(true);
     setDeleteError(null);
     try {
@@ -642,7 +662,8 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
       await hardDeleteHqSchedule(
         target.schedules[0].id,
         target.customerScoped ? 'customer' : 'event',
-        target.schedules.map(item => item.id)
+        target.schedules.map(item => item.id),
+        deleteMode
       );
       setEventToDelete(null);
       setSelectedEventInfo(null);
@@ -1390,8 +1411,14 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
 
             <div className="rounded-xl bg-[#F8FAFC] border border-slate-100 p-3 text-[12px] leading-relaxed text-[#64748B] flex items-start gap-1.5">
               <span className="shrink-0 text-slate-400 font-semibold">ⓘ</span>
-              <span>운행일지나 정산 기록이 남아있는 예약은 안전하게 보관돼요.</span>
+              <span>배차는 목록에서 사라지고, 선택한 범위에 따라 관련 기록 보존 여부가 결정돼요.</span>
             </div>
+
+            {!deleteError && <HqScheduleDeleteChoices
+              inspection={deleteInspection}
+              mode={deleteMode}
+              onModeChange={setDeleteMode}
+            />}
 
             {deleteError && (
               <p role="alert" className="rounded-xl bg-[#FFF4F2] p-3 text-[12px] text-[#A34E45]">
@@ -1410,7 +1437,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               </button>
               <button
                 type="button"
-                disabled={deletingEvent}
+                disabled={deletingEvent || !deleteInspection || Boolean(deleteError)}
                 onClick={() => void confirmDeleteEvent()}
                 className="h-11 rounded-xl bg-[#EF4444] text-sm font-semibold text-white hover:bg-red-600 transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
               >
