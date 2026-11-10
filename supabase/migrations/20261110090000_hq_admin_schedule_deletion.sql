@@ -54,7 +54,7 @@ BEGIN
   END IF;
 
   SELECT count(*) INTO v_total FROM cockpit.schedules
-    WHERE id = ANY(p_ids) AND coalesce(org_id,v_org) = v_org AND status <> 'deleted';
+    WHERE id = ANY(p_ids) AND coalesce(org_id,v_org) = v_org AND status IS DISTINCT FROM 'deleted';
   IF v_total <> cardinality(p_ids) THEN
     RAISE EXCEPTION 'DELETE_TARGET_CHANGED' USING ERRCODE = '40001';
   END IF;
