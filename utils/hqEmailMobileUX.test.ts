@@ -21,12 +21,20 @@ test('mobile inbox opens the selected email immediately instead of stacking it b
   assert.match(inbox,/onExtractWithAi=\{handleExtractWithAi\}/);
 });
 
-test('mobile email detail shows one clear AI scheduling action above the email source, leaving desktop columns unchanged',()=>{
-  assert.match(extract,/order-2 flex min-h-0[\s\S]*?lg:order-1 lg:col-span-6/);
-  assert.match(extract,/order-1 flex min-h-\[300px\][\s\S]*?lg:order-2 lg:col-span-6/);
-  assert.match(extract,/onClick=\{onExtractWithAi\}/);
+test('mobile email opens original body with AI icon in subject header, then switches to draft result',()=>{
+  assert.match(inbox,/\[mobileEmailView, setMobileEmailView\]/);
+  assert.match(inbox,/setMobileEmailView\('source'\)/);
+  assert.match(inbox,/setMobileEmailView\('analysis'\)/);
+  assert.match(inbox,/mobileView=\{mobileEmailView\}/);
+  assert.match(inbox,/onMobileViewChange=/);
+  assert.match(extract,/mobileView === 'source' \? 'flex' : 'hidden'/);
+  assert.match(extract,/mobileView === 'analysis' \? 'flex' : 'hidden'/);
+  assert.match(extract,/md:flex lg:col-span-6 lg:min-h-\[640px\]/);
+  assert.match(extract,/aria-label=\{extractedDraft \? 'AI 분석 결과 보기' : 'AI로 분석하기'\}/);
+  assert.match(extract,/onClick=\{\(\) => extractedDraft \? onMobileViewChange\?\.\('analysis'\) : onExtractWithAi\(\)\}/);
   assert.match(extract,/disabled=\{isExtractingAi \|\| isLoadingDetail\}/);
-  assert.match(extract,/AI로 분석하기/);
+  assert.match(extract,/메일 원문 보기/);
+  assert.match(extract,/onMobileViewChange\?\.\('source'\)/);
   assert.match(extract,/Excel·PDF 일정표를 함께 분석/);
-  assert.match(extract,/min-h-12 w-full[\s\S]*?sm:w-auto/);
+  assert.match(extract,/onClick=\{onExtractWithAi\}/);
 });
