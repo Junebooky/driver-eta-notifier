@@ -90,6 +90,10 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   const [error, setError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const currentRequest = useRef(0);
+  // Keep the shared HQ modal's focus trap stable while form values change.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const closeModal = React.useCallback(() => onCloseRef.current(), []);
 
   const vehicle = useMemo(
     () => availableVehicles.find(v => v.uuid === selectedVehicleId) || availableVehicles[0] || null,
@@ -440,7 +444,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
       title="배차카드 자동 생성"
       subtitle="기사 정보 한 번 입력 · 차량별 PC·모바일 카드 생성"
       icon={<span className="flex size-10 shrink-0 items-center justify-center rounded-[14px] bg-[#EEF3FF] text-[#1E60F3]"><UserRound className="size-5" /></span>}
-      onClose={onClose}
+      onClose={closeModal}
       className="max-w-[1180px]! w-full"
       footer={
         <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -449,7 +453,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
             <Download className="size-4" /> 파일 다운로드 <ChevronDown className={'size-4 transition-transform ' + (downloadsOpen ? 'rotate-180' : '')} />
           </HqButton>
           <div className="flex w-full gap-2 sm:w-auto">
-            <HqButton variant="subtle" onClick={onClose} className="flex-1 sm:flex-none">닫기</HqButton>
+            <HqButton variant="subtle" onClick={closeModal} className="flex-1 sm:flex-none">닫기</HqButton>
             <HqButton variant="primary" className="min-w-0 flex-[2] sm:flex-none" loading={busy}
               disabled={!isComplete || !dbReady || !summaryLoaded || busy || photoUploading || previewLoading || (generationMode === 'missing' && missingVehicles.length === 0)}
               onClick={() => {
