@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { VIP_REAL_VEHICLES } from './vehicleData';
 import { resolveDispatchCardPhotos, dispatchCardVehicleLabel } from '@/lib/dispatchCards/dispatchCardAssets';
 import { DISPATCH_CARD_DIMENSIONS } from '@/lib/dispatchCards/renderDispatchCard';
@@ -43,4 +45,24 @@ test('dispatch card builder: only verified vehicle photos may be used', () => {
 test('dispatch card exports match approved original formats', () => {
   assert.deepEqual(DISPATCH_CARD_DIMENSIONS.pc, { width: 2000, height: 1500 });
   assert.deepEqual(DISPATCH_CARD_DIMENSIONS.mobile, { width: 1080, height: 1920 });
+});
+
+test('all mapped uploaded assets exist and contain WebP bytes', () => {
+  const mappedVehicles = VIP_REAL_VEHICLES.filter(v => resolveDispatchCardPhotos(v) !== null);
+  const paths = new Set<string>();
+  for (const vehicle of mappedVehicles) {
+    const photos = resolveDispatchCardPhotos(vehicle);
+    assert.ok(photos);
+    paths.add(photos.exterior);
+    paths.add(photos.interiorOne);
+    paths.add(photos.interiorTwo);
+  }
+  assert.equal(paths.size, 6, 'Expected exactly the six user-uploaded images.');
+  for (const urlPath of paths) {
+    const file = join(process.cwd(), 'public', urlPath.replace(/^\//, ''));
+    const bytes = readFileSync(file);
+    assert.ok(bytes.length > 100_000, file + ': unexpectedly small');
+    assert.equal(bytes.toString('ascii', 0, 4), 'RIFF', file + ': missing RIFF header');
+    assert.equal(bytes.toString('ascii', 8, 12), 'WEBP', file + ': not a WebP image');
+  }
 });
