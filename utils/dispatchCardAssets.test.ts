@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import manifest from '@/lib/dispatchCards/dispatchCardAssetManifest.json';
+
+const availableImageSets: Record<string, { exterior: string; interiorOne: string; interiorTwo: string }> = manifest;
 import { VIP_REAL_VEHICLES } from './vehicleData';
 import { dispatchCardModelFolder, resolveDispatchCardPhotos } from '@/lib/dispatchCards/dispatchCardAssets';
 import { DISPATCH_CARD_DIMENSIONS } from '@/lib/dispatchCards/renderDispatchCard';
@@ -33,7 +35,7 @@ test('new-model mapping is ready for Carnival 5336 and vehicle-specific override
   assert.ok(carnival);
   assert.equal(dispatchCardModelFolder(carnival), 'carnival_high');
   // Until an actual complete photo set is uploaded, it must remain unavailable.
-  if (!manifest['carnival_high']) assert.equal(resolveDispatchCardPhotos(carnival), null);
+  if (!availableImageSets['carnival_high']) assert.equal(resolveDispatchCardPhotos(carnival), null);
 });
 
 test('all advertised image triplets physically exist as WebP', () => {
