@@ -33,6 +33,10 @@ const WHITE = '#F2F0EC';
 const DARK = '#161616';
 const FONT = 'Arial, "Noto Sans KR", sans-serif';
 
+// Keep the VIP chauffeur portrait framed on the face rather than the shoulders.
+// The original square profile photo is enlarged to completely fill both vertical frames.
+export const DISPATCH_PORTRAIT_CROP = { zoom: 118, focusY: 0.35 } as const;
+
 async function loadImage(src: string): Promise<HTMLImageElement> {
   // Resolve private profile proxy and same-origin vehicle assets to blobs.
   // Never draw a remote image onto the canvas without a safe CORS response.
@@ -63,9 +67,11 @@ function photoFrame(
   rect: Rect,
   placement: CardPlacement | undefined,
   contain = false,
+  backgroundColor?: string,
+  focusY = 0.5,
 ) {
   ctx.save();
-  ctx.fillStyle = contain ? '#FFFFFF' : '#252525';
+  ctx.fillStyle = backgroundColor ?? (contain ? '#FFFFFF' : '#252525');
   ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
   ctx.beginPath();
   ctx.rect(rect.x, rect.y, rect.w, rect.h);
@@ -78,7 +84,7 @@ function photoFrame(
   const dw = img.naturalWidth * fit * zoom;
   const dh = img.naturalHeight * fit * zoom;
   const dx = rect.x + (rect.w - dw) / 2 + (placement?.x || 0) * rect.w / 100;
-  const dy = rect.y + (rect.h - dh) / 2 + (placement?.y || 0) * rect.h / 100;
+  const dy = rect.y + (rect.h - dh) * focusY + (placement?.y || 0) * rect.h / 100;
 
   ctx.drawImage(img, dx, dy, dw, dh);
   ctx.restore();
@@ -185,7 +191,8 @@ function drawPortraitInfo(
 ) {
   if (input.orientation === 'pc') {
     line(ctx, 1127, 287, 1127, 1155, GOLD_LINE, 1.7);
-    photoFrame(ctx, image, { x: 1326, y: 288, w: 430, h: 537 }, undefined, true);
+    photoFrame(ctx, image, { x: 1326, y: 288, w: 430, h: 537 },
+      { zoom: DISPATCH_PORTRAIT_CROP.zoom, x: 0, y: 0 }, false, '#FFFFFF', DISPATCH_PORTRAIT_CROP.focusY);
     const rows = [
       ['Driver Name', input.name],
       ['Position', input.position],
@@ -199,7 +206,8 @@ function drawPortraitInfo(
       drawText(ctx, value, 1492, y, 26, WHITE, 380);
     });
   } else {
-    photoFrame(ctx, image, { x: 75, y: 1218, w: 297, h: 370 }, undefined, true);
+    photoFrame(ctx, image, { x: 75, y: 1218, w: 297, h: 370 },
+      { zoom: DISPATCH_PORTRAIT_CROP.zoom, x: 0, y: 0 }, false, '#FFFFFF', DISPATCH_PORTRAIT_CROP.focusY);
     const rows = [
       ['Name', input.name],
       ['Position', input.position],
