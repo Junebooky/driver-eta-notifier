@@ -28,6 +28,7 @@ import {
 import { haptics } from '@/utils/haptics';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 import { useHqFleetRegistry } from '@/hooks/useHqFleetRegistry';
+import { HqDispatchCardBuilderModal } from './HqDispatchCardBuilderModal';
 
 export interface HqDriverAssetManagerModalProps {
   isOpen: boolean;
@@ -66,6 +67,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
     driverId: string; vehiclePlate: string; label: string;
   } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isAutoBuilderOpen, setIsAutoBuilderOpen] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{
     type: 'success' | 'warning' | 'error';
     text: string;
@@ -387,13 +389,20 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
               </h2>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              disabled={!activeDriver || fleet.loading || Boolean(fleet.error)}
+              onClick={() => setIsAutoBuilderOpen(true)}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-[11px] bg-[#1E60F3] px-3 text-[11px] font-semibold text-white disabled:opacity-40"
+            >
+              <Sparkles className="size-3.5" /> 자동 생성
+            </button>
+            <button type="button" onClick={onClose} aria-label="닫기"
+              className="flex size-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Top Bar: Driver Select ONLY (Decoupled from vehicle) */}
@@ -1022,6 +1031,15 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
           </button>
         </div>
       </div>
+      {isAutoBuilderOpen && activeDriver && (
+        <HqDispatchCardBuilderModal
+          isOpen={isAutoBuilderOpen}
+          driver={activeDriver}
+          vehicles={fleet.vehicles}
+          onClose={() => setIsAutoBuilderOpen(false)}
+          onAssetUpdated={() => { void fetchBundle(true); onAssetUpdated?.(); }}
+        />
+      )}
       {pendingDelete && (
         <div className="absolute inset-0 z-[90] flex items-center justify-center bg-[#17233B]/25 p-4"
           role="presentation">
