@@ -652,7 +652,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
               {portraitSettingsLoaded
                 ? portraitDirty
                   ? '미저장 변경사항이 있습니다. 카드 등록·다운로드 시에도 자동 저장됩니다.'
-                  : '기사별 설정 저장됨 · PC·모바일 및 모든 차량에 공통 적용'
+                  : '기사별 설정 저장됨 · 이후 만드는 PC·모바일 카드에 공통 적용 (기존 등록 카드는 유지)'
                 : '기사별 사진 설정 불러오는 중…'}
             </p>
           </HqCard>
