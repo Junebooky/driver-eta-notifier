@@ -2,8 +2,8 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ArrowLeft, CheckCircle2, Download, ImagePlus, Loader2,
-  Monitor, Smartphone, SlidersHorizontal, UserRound, X,
+  CheckCircle2, Download, ImagePlus, Loader2,
+  Monitor, Smartphone, SlidersHorizontal, UserRound, ChevronDown,
 } from 'lucide-react';
 import type { HqDriverSummary } from '@/types/driverHq';
 import type { VipRealVehicle } from '@/utils/vehicleData';
@@ -21,6 +21,9 @@ import {
   type DispatchCardRenderInput,
 } from '@/lib/dispatchCards/renderDispatchCard';
 import { zipSync } from 'fflate';
+import { HqButton, HqCard, HqInput, HqSelect, HqSegmentedTabs } from '@/components/hq/ui';
+import { HqModal } from '@/components/hq/ui/HqModal';
+import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
 
 interface Props {
   isOpen: boolean;
@@ -72,6 +75,8 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   const [savedCards, setSavedCards] = useState<CardSummary>({});
   const [summaryLoaded, setSummaryLoaded] = useState(false);
   const [generationMode, setGenerationMode] = useState<GenerationMode>('missing');
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [downloadsOpen, setDownloadsOpen] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoLoading, setPhotoLoading] = useState(false);
   const [orientation, setOrientation] = useState<CardOrientation>('pc');
@@ -159,6 +164,8 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     setSavedCards({});
     setSummaryLoaded(false);
     setGenerationMode('missing');
+    setAdvancedOpen(false);
+    setDownloadsOpen(false);
     void loadSavedCards()
       .then(summary => {
         if (!cancelled) {
@@ -427,190 +434,233 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-[#17233B]/35 p-2 backdrop-blur-[3px] sm:p-5" role="presentation">
-      <div className="flex max-h-[94vh] w-full max-w-[1180px] flex-col overflow-hidden rounded-[23px] bg-[#F8FAFD] shadow-[0_28px_80px_rgba(20,35,60,0.22)]" role="dialog" aria-modal="true" aria-label="배차카드 자동 생성">
-        <div className="flex shrink-0 items-center justify-between bg-white px-5 py-4 sm:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <button type="button" onClick={onClose} aria-label="이전 화면" className="flex size-9 items-center justify-center rounded-[12px] bg-[#F2F5F9] text-[#6A7B91] hover:bg-[#E9EDF5]">
-              <ArrowLeft size={17}/>
-            </button>
-            <div>
-              <h2 className="text-[17px] font-bold tracking-[-.03em] text-[#17233B]">배차카드 자동 생성</h2>
-              <p className="text-[11px] text-[#75849A]">기사 정보 한 번 입력 · 차량별 PC·모바일 카드 생성</p>
-            </div>
+    <HqModal
+      isOpen={isOpen}
+      title="배차카드 자동 생성"
+      subtitle="기사 정보 한 번 입력 · 차량별 PC·모바일 카드 생성"
+      icon={<span className="flex size-10 shrink-0 items-center justify-center rounded-[14px] bg-[#EEF3FF] text-[#1E60F3]"><UserRound className="size-5" /></span>}
+      onClose={onClose}
+      className="max-w-[1180px]! w-full"
+      footer={
+        <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <HqButton variant="secondary" onClick={() => setDownloadsOpen(value => !value)}
+            disabled={!isComplete || busy} aria-expanded={downloadsOpen} className="w-full sm:w-auto">
+            <Download className="size-4" /> 파일 다운로드 <ChevronDown className={'size-4 transition-transform ' + (downloadsOpen ? 'rotate-180' : '')} />
+          </HqButton>
+          <div className="flex w-full gap-2 sm:w-auto">
+            <HqButton variant="subtle" onClick={onClose} className="flex-1 sm:flex-none">닫기</HqButton>
+            <HqButton variant="primary" className="min-w-0 flex-[2] sm:flex-none" loading={busy}
+              disabled={!isComplete || !dbReady || !summaryLoaded || busy || photoUploading || previewLoading || (generationMode === 'missing' && missingVehicles.length === 0)}
+              onClick={() => {
+                if (generationMode !== 'all' || window.confirm('준비된 모든 차량의 기존 카드를 새 버전으로 교체할까요?')) {
+                  void saveAllToAssetLibrary();
+                }
+              }}>
+              {busy ? (progress || '저장 중…') : (
+                <><CheckCircle2 className="size-4" />{generationMode === 'missing' ? '미생성 카드만 등록' : generationMode === 'selected' ? '선택 차량 등록' : '전체 카드 재생성'}</>
+              )}
+            </HqButton>
           </div>
-          <button type="button" onClick={onClose} aria-label="닫기" className="flex size-9 items-center justify-center rounded-[12px] text-[#91A0B1] hover:bg-[#F3F6FA]"><X size={19}/></button>
         </div>
-
-        <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-4 lg:grid-cols-[340px_minmax(0,1fr)] lg:overflow-hidden lg:p-5">
-          <div className="space-y-4 lg:overflow-y-auto lg:pr-1">
-            <section className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(27,45,77,.045)]">
-              <h3 className="mb-4 flex items-center gap-2 text-[14px] font-bold text-[#21344D]"><UserRound size={16} className="text-[#1E60F3]"/> 기사 정보</h3>
-              <div className="mb-4 flex items-center gap-3">
-                <div className="flex size-[92px] shrink-0 items-center justify-center overflow-hidden rounded-[15px] bg-[#F3F5F8]">
-                  {photoUrl ? <img src={photoUrl} alt="기사 프로필" className="h-full w-full object-contain"/> : <UserRound size={29} className="text-[#A0ACBB]"/>}
-                </div>
-                <div className="min-w-0 space-y-2">
-                  <p className="text-[11px] leading-relaxed text-[#73839A]">흰색 배경 없이 정면·어깨까지 담긴 투명 PNG를 권장해요.</p>
-                  <input ref={fileRef} className="hidden" type="file" accept="image/png,image/jpeg,image/webp" onChange={event => {
+      }
+    >
+      <div className="grid min-w-0 gap-5 lg:grid-cols-[340px_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-4">
+          <HqCard className="p-4 sm:p-5">
+            <h3 className="mb-4 flex items-center gap-2 text-[14px] font-semibold text-[#21344D]">
+              <UserRound className="size-4 text-[#1E60F3]" /> 기사 정보
+            </h3>
+            <div className="mb-5 flex items-center gap-3">
+              <div className="flex size-[92px] shrink-0 items-center justify-center overflow-hidden rounded-[15px] bg-[#F5F7FA]">
+                {photoUrl ? <img src={photoUrl} alt="기사 프로필" className="size-full object-contain" /> :
+                  <UserRound className="size-7 text-[#A0ACBB]" />}
+              </div>
+              <div className="min-w-0 space-y-2">
+                <p className="text-[12px] leading-relaxed text-[#73839A]">정면·어깨까지 나온 투명 PNG 사진을 권장합니다.</p>
+                <input ref={fileRef} className="hidden" type="file" accept="image/png,image/jpeg,image/webp"
+                  onChange={event => {
                     const file = event.target.files?.[0];
                     if (file) void handleProfileFile(file);
                     event.target.value = '';
-                  }}/>
-                  <button type="button" disabled={photoUploading || photoLoading || busy} onClick={() => fileRef.current?.click()} className="inline-flex min-h-9 items-center gap-1.5 rounded-[11px] bg-[#EDF3FF] px-3 text-[11px] font-semibold text-[#1E60F3] disabled:opacity-50">
-                    {photoUploading || photoLoading ? <Loader2 size={13} className="animate-spin"/> : <ImagePlus size={14}/>}
-                    {photoUrl ? '사진 변경' : '사진 업로드'}
-                  </button>
-                </div>
+                  }} />
+                <HqButton variant="secondary" size="sm" disabled={photoUploading || photoLoading || busy}
+                  onClick={() => fileRef.current?.click()}>
+                  {photoUploading || photoLoading ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
+                  {photoUrl ? '사진 변경' : '사진 업로드'}
+                </HqButton>
               </div>
-              <div className="space-y-3">
-                {([
-                  { label: '기사 성명', value: name, onChange: setName, placeholder: '기사 이름' },
-                  { label: '직책', value: position, onChange: setPosition, placeholder: '예: 실장 / Department Manager' },
-                  { label: '전화번호', value: phone, onChange: setPhone, placeholder: '예: +82 10 1234 5678' },
-                ] as const).map(field =>
-                  <label key={field.label} className="block space-y-1.5">
-                    <span className="text-[11px] font-semibold text-[#526680]">{field.label}</span>
-                    <input value={field.value} onChange={e => field.onChange(e.target.value)} placeholder={field.placeholder} maxLength={90}
-                      className="h-11 w-full rounded-[12px] bg-[#F6F8FB] px-3 text-[13px] text-[#1D3048] outline-none focus:ring-2 focus:ring-[#1E60F3]/20"/>
-                  </label>,
-                )}
-              </div>
-              <p className="mt-3 text-[10px] leading-relaxed text-[#8B98A9]">입력한 이름·직책·전화번호는 이번 카드 생성에 적용됩니다. 기사 원본 DB 정보는 변경하지 않습니다.</p>
-            </section>
+            </div>
+            <div className="space-y-3">
+              {([
+                { label: '기사 성명', value: name, onChange: setName, placeholder: '기사 이름' },
+                { label: '직책', value: position, onChange: setPosition, placeholder: '예: 실장 / Department Manager' },
+                { label: '전화번호', value: phone, onChange: setPhone, placeholder: '예: +82 10 1234 5678' },
+              ] as const).map(field => (
+                <label key={field.label} className="block space-y-1.5">
+                  <span className="text-[12px] font-medium text-[#526680]">{field.label}</span>
+                  <HqInput value={field.value} onChange={event => field.onChange(event.target.value)}
+                    placeholder={field.placeholder} maxLength={90} />
+                </label>
+              ))}
+            </div>
+            <p className="mt-3 text-[11px] leading-relaxed text-[#8492A4]">
+              기사 정보 수정은 생성할 카드에만 적용되며 기사 원본 정보는 바뀌지 않습니다.
+            </p>
+          </HqCard>
 
-            <section className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(27,45,77,.045)]">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-[14px] font-bold text-[#21344D]">차량 선택</h3>
-                <span className="text-[11px] font-semibold text-[#1E60F3]">{availableVehicles.length}대 이미지 연결</span>
-              </div>
-              <select value={vehicle?.uuid || ''} onChange={event => setSelectedVehicleId(event.target.value)} disabled={!availableVehicles.length || busy}
-                className="h-11 w-full rounded-[12px] bg-[#F6F8FB] px-3 text-[12px] text-[#24374F] outline-none focus:ring-2 focus:ring-[#1E60F3]/20">
-                {availableVehicles.length === 0 && <option value="">이미지가 연결된 차량 없음</option>}
-                {availableVehicles.map(item => <option key={item.uuid} value={item.uuid}>{item.plate} · {item.modelShort}</option>)}
-              </select>
-              <p className="mt-2 text-[10px] leading-relaxed text-[#8491A4]">
-                사진 3장이 준비된 차량만 표시합니다. 차량별 폴더가 있으면 공통 모델 사진보다 우선합니다.
-              </p>
-              <div className="mt-2 rounded-[11px] bg-[#F5F7FB] px-3 py-2 text-[11px] text-[#66788F]">
-                {summaryLoaded ? ('미생성 차량 ' + missingVehicles.length + '대 / 준비된 차량 ' + availableVehicles.length + '대') : '기존 배차카드 확인 중…'}
-                {vehicle && summaryLoaded && (
-                  <span className="mt-1 block">
-                    선택 차량: PC {currentCardStatus?.pc ? '등록됨' : '미등록'} · 모바일 {currentCardStatus?.mobile ? '등록됨' : '미등록'}
-                  </span>
-                )}
-              </div>
-              {!dbReady && <p role="alert" className="mt-2 rounded-[10px] bg-[#FFF1EB] px-3 py-2 text-[11px] text-[#A85B47]">배차카드 자산 DB 준비가 필요합니다. 미리보기·다운로드는 가능하지만 서버 등록은 차단됩니다.</p>}
-            </section>
+          <HqCard className="p-4 sm:p-5">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="text-[14px] font-semibold text-[#21344D]">차량 선택</h3>
+              <span className="text-[12px] text-[#73839A]">사진 연결 {availableVehicles.length}대</span>
+            </div>
+            <HqSelect aria-label="미리보기 차량 선택" value={vehicle?.uuid || ''}
+              onChange={event => setSelectedVehicleId(event.target.value)}
+              disabled={!availableVehicles.length || busy}>
+              {availableVehicles.length === 0 && <option value="">이미지가 준비된 차량 없음</option>}
+              {availableVehicles.map(item => <option key={item.uuid} value={item.uuid}>{item.plate} · {item.modelShort}</option>)}
+            </HqSelect>
+            <p className="mt-3 text-[11px] leading-relaxed text-[#8492A4]">
+              외관 1장·실내 2장이 준비된 차량만 표시됩니다. 차량별 전용 사진이 공통 모델 사진보다 우선합니다.
+            </p>
+            <div className="mt-3 rounded-[12px] bg-[#F7F9FC] p-3 text-[12px] leading-relaxed text-[#526680]">
+              {summaryLoaded
+                ? '추가 생성 필요 ' + missingVehicles.length + '대 · 사진 준비 ' + availableVehicles.length + '대'
+                : '저장된 배차카드 확인 중…'}
+              {vehicle && summaryLoaded && <p className="mt-1 text-[#73839A]">
+                선택 차량: PC {currentCardStatus?.pc ? '등록됨' : '미등록'} · 모바일 {currentCardStatus?.mobile ? '등록됨' : '미등록'}
+              </p>}
+            </div>
+            {!dbReady && (
+              <HqInlineFeedback tone="error" message="배차카드 DB 준비가 필요합니다. 미리보기·다운로드는 가능하지만 서버 등록은 차단됩니다." className="mt-3" />
+            )}
+          </HqCard>
 
-            <section className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(27,45,77,.045)]">
-              <h3 className="mb-3 flex items-center gap-2 text-[14px] font-bold text-[#21344D]"><SlidersHorizontal size={16} className="text-[#1E60F3]"/> 이미지 위치 조정</h3>
-              <div className="mb-3 flex gap-1 rounded-[11px] bg-[#F4F6F9] p-1">
-                {([
-                  ['exterior', '외관'], ['interiorOne', '실내 1'], ['interiorTwo', '실내 2'],
-                ] as const).map(([key, label]) =>
-                  <button type="button" key={key} onClick={() => setPhotoKind(key)}
-                    className={'min-h-9 flex-1 rounded-[9px] text-[11px] font-semibold ' + (photoKind === key ? 'bg-white text-[#1E60F3] shadow-sm' : 'text-[#74849A]')}>
-                    {label}
-                  </button>,
-                )}
-              </div>
+          <HqCard className="p-4 sm:p-5">
+            <h3 className="mb-3 flex items-center gap-2 text-[14px] font-semibold text-[#21344D]">
+              <SlidersHorizontal className="size-4 text-[#1E60F3]" /> 이미지 위치 조정
+            </h3>
+            <HqSegmentedTabs aria-label="조정할 차량 이미지" value={photoKind}
+              onValueChange={value => setPhotoKind(value as CardPhotoKind)}
+              tabs={[
+                { id: 'exterior', label: '외관' },
+                { id: 'interiorOne', label: '실내 1' },
+                { id: 'interiorTwo', label: '실내 2' },
+              ]} />
+            <div className="mt-4 space-y-3">
               {([
                 ['zoom', '크기', 80, 150, '%'],
                 ['x', '좌우', -20, 20, '%'],
                 ['y', '상하', -20, 20, '%'],
-              ] as const).map(([key, label, min, max, suffix]) =>
-                <label key={key} className="mb-3 block">
-                  <span className="mb-1 flex justify-between text-[11px] text-[#62738A]"><span>{label}</span><strong>{currentPlacement[key]}{suffix}</strong></span>
-                  <input type="range" min={min} max={max} value={currentPlacement[key]} disabled={!vehicle || busy} onChange={e => updatePlacement(key, Number(e.target.value))}
-                    className="w-full accent-[#1E60F3]"/>
-                </label>,
-              )}
-              <button type="button" onClick={() => {
+              ] as const).map(([key, label, min, max, suffix]) => (
+                <label key={key} className="block">
+                  <span className="mb-1 flex justify-between text-[12px] text-[#62738A]">
+                    <span>{label}</span><strong className="font-semibold">{currentPlacement[key]}{suffix}</strong>
+                  </span>
+                  <input type="range" min={min} max={max} value={currentPlacement[key]}
+                    disabled={!vehicle || busy} onChange={event => updatePlacement(key, Number(event.target.value))}
+                    className="w-full accent-[#1E60F3]" />
+                </label>
+              ))}
+            </div>
+            <HqButton variant="ghost" size="sm" className="mt-2" disabled={!vehicle || busy}
+              onClick={() => {
                 if (!vehicle) return;
-                setPerVehiclePlacements(prev => ({ ...prev, [vehicle.uuid]: { ...prev[vehicle.uuid], [photoKind]: DEFAULT_PLACEMENT } }));
-              }} className="text-[11px] font-medium text-[#6D7D91] underline underline-offset-2">선택 이미지 초기화</button>
-              <p className="mt-2 text-[10px] text-[#8995A5]">위치 조정은 이번 생성에 적용되며 다른 관리자 기기에는 저장되지 않습니다.</p>
-            </section>
-          </div>
+                setPerVehiclePlacements(previous => ({
+                  ...previous,
+                  [vehicle.uuid]: { ...previous[vehicle.uuid], [photoKind]: DEFAULT_PLACEMENT },
+                }));
+              }}>
+              선택 이미지 초기화
+            </HqButton>
+            <p className="mt-2 text-[11px] text-[#8492A4]">이번 생성에만 적용되며 다른 관리자 기기에는 저장되지 않습니다.</p>
+          </HqCard>
+        </div>
 
-          <div className="flex min-h-[480px] flex-col overflow-hidden rounded-[18px] bg-white shadow-[0_4px_18px_rgba(27,45,77,.045)] lg:min-h-0">
-            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-5">
+        <div className="min-w-0 space-y-4">
+          <HqCard className="overflow-hidden">
+            <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
               <div>
-                <h3 className="text-[14px] font-bold text-[#21344D]">완성 카드 미리보기</h3>
-                <p className="text-[10px] text-[#8491A4]">등록 이미지와 입력한 기사 정보가 그대로 PNG에 출력됩니다.</p>
+                <h3 className="text-[14px] font-semibold text-[#21344D]">완성 카드 미리보기</h3>
+                <p className="mt-1 text-[11px] text-[#8492A4]">PC·모바일 규격을 선택해 완성된 이미지를 확인하세요.</p>
               </div>
-              <div className="inline-flex rounded-[12px] bg-[#F3F6FA] p-1">
-                <button type="button" onClick={() => setOrientation('pc')} className={'flex min-h-9 items-center gap-1 rounded-[9px] px-3 text-[11px] font-semibold ' + (orientation === 'pc' ? 'bg-white text-[#1E60F3] shadow-sm' : 'text-[#8390A2]')}><Monitor size={14}/> PC</button>
-                <button type="button" onClick={() => setOrientation('mobile')} className={'flex min-h-9 items-center gap-1 rounded-[9px] px-3 text-[11px] font-semibold ' + (orientation === 'mobile' ? 'bg-white text-[#1E60F3] shadow-sm' : 'text-[#8390A2]')}><Smartphone size={14}/> 모바일</button>
-              </div>
+              <HqSegmentedTabs aria-label="배차카드 미리보기 규격" value={orientation}
+                onValueChange={value => setOrientation(value as CardOrientation)}
+                tabs={[
+                  { id: 'pc', label: <><Monitor className="size-4" /> PC</> },
+                  { id: 'mobile', label: <><Smartphone className="size-4" /> 모바일</> },
+                ]} />
             </div>
-
-            <div className="flex min-h-[320px] flex-1 items-center justify-center overflow-auto bg-[#EEF1F5] p-4 sm:p-6">
-              {previewLoading && <div role="status" className="flex items-center gap-2 text-[12px] text-[#66778B]"><Loader2 size={17} className="animate-spin"/> 카드 생성 중…</div>}
-              {!previewLoading && previewUrl && isComplete && <img src={previewUrl} alt={vehicle?.plate + ' 배차카드 ' + orientation + ' 미리보기'}
-                className="max-h-[65vh] max-w-full object-contain shadow-[0_14px_40px_rgba(15,25,45,.17)]"/>}
-              {!previewLoading && (!isComplete || !previewUrl) &&
-                <div className="max-w-xs space-y-2 text-center text-[#8492A3]">
-                  <ImagePlus className="mx-auto" size={35} strokeWidth={1.4}/>
+            <div className="flex min-h-[280px] items-center justify-center bg-[#F5F7FA] p-4 sm:min-h-[430px] sm:p-6">
+              {previewLoading && <div role="status" className="flex items-center gap-2 text-[12px] text-[#66778B]">
+                <Loader2 className="size-4 animate-spin" /> 카드 생성 중…
+              </div>}
+              {!previewLoading && previewUrl && isComplete && (
+                <img src={previewUrl} alt={vehicle?.plate + ' 배차카드 ' + orientation + ' 미리보기'}
+                  className="max-h-[55vh] max-w-full object-contain shadow-[0_12px_32px_rgba(15,25,45,.14)]" />
+              )}
+              {!previewLoading && (!isComplete || !previewUrl) && (
+                <div className="space-y-2 px-2 text-center text-[#8492A4]">
+                  <ImagePlus className="mx-auto size-8" strokeWidth={1.5} />
                   <p className="text-[13px] font-semibold text-[#54657A]">기사 사진·성명·직책·전화번호를 입력해 주세요.</p>
-                  <p className="text-[11px]">사진이 저장되면 선택한 차량의 PC·모바일 카드가 자동으로 만들어집니다.</p>
-                </div>}
+                  <p className="text-[12px]">입력이 완료되면 선택한 차량 카드가 미리보기로 표시됩니다.</p>
+                </div>
+              )}
             </div>
+          </HqCard>
 
-            {(error || message) && (
-              <p role={error ? 'alert' : 'status'} className={'mx-4 mt-3 rounded-[11px] px-3 py-2 text-[11px] ' + (error ? 'bg-[#FFF0EE] text-[#A3544E]' : 'bg-[#F1F7FF] text-[#466B9F]')}>
-                {error || message}
-              </p>
-            )}
-            <div className="border-t border-[#F1F3F7] bg-white px-4 py-3 sm:px-5">
-              <p className="mb-2 text-[11px] font-semibold text-[#526680]">배차카드 생성 방식</p>
-              <div className="grid grid-cols-3 gap-1.5">
-                {([
-                  ['missing', '미생성만 추가'],
-                  ['selected', '선택 차량'],
-                  ['all', '전체 재생성'],
-                ] as const).map(([mode, label]) => (
-                  <button key={mode} type="button" disabled={busy} onClick={() => setGenerationMode(mode)}
-                    aria-pressed={generationMode === mode}
-                    className={'min-h-10 rounded-[10px] px-2 text-[11px] font-semibold ' +
-                      (generationMode === mode ? 'bg-[#EAF1FF] text-[#1E60F3]' : 'bg-[#F5F7FA] text-[#71829B]')}>
-                    {label}
-                  </button>
-                ))}
+          {(error || message) && (
+            <HqInlineFeedback tone={error ? 'error' : 'success'} message={error || message} />
+          )}
+
+          <HqCard className="p-4 sm:p-5">
+            <button type="button" className="flex min-h-10 w-full items-center justify-between text-left"
+              onClick={() => setAdvancedOpen(value => !value)} aria-expanded={advancedOpen}>
+              <span className="text-[13px] font-semibold text-[#526680]">
+                {generationMode === 'missing' ? '저장 범위 · 미생성 카드만 추가' : generationMode === 'selected' ? '저장 범위 · 선택 차량' : '저장 범위 · 전체 재생성'}
+              </span>
+              <ChevronDown className={'size-4 text-[#8492A4] transition-transform ' + (advancedOpen ? 'rotate-180' : '')} />
+            </button>
+            <p className="mt-1 text-[11px] leading-relaxed text-[#8492A4]">
+              {generationMode === 'missing'
+                ? '기존에 등록된 PC·모바일 카드는 보존하고 없는 카드만 추가합니다.'
+                : generationMode === 'selected'
+                  ? '선택한 차량의 PC·모바일 카드를 새 버전으로 저장합니다.'
+                  : '이미지 준비된 모든 차량의 카드를 새 버전으로 다시 생성합니다.'}
+            </p>
+            {advancedOpen && (
+              <div className="mt-4 border-t border-[#EEF1F6] pt-4">
+                <HqSegmentedTabs aria-label="배차카드 저장 범위" value={generationMode}
+                  onValueChange={value => setGenerationMode(value as GenerationMode)}
+                  tabs={[
+                    { id: 'missing', label: '미생성만 추가' },
+                    { id: 'selected', label: '선택 차량' },
+                    { id: 'all', label: '전체 재생성' },
+                  ]} />
+                {generationMode === 'all' && (
+                  <HqInlineFeedback tone="error" message="전체 재생성은 기존 카드의 활성 버전을 교체합니다. 저장 전에 한 번 더 확인합니다." className="mt-3" />
+                )}
               </div>
-              <p className="mt-2 text-[10px] leading-relaxed text-[#8491A4]">
-                {generationMode === 'missing'
-                  ? '기본값: 기존 PC·모바일 카드는 보존하고 비어 있는 카드만 추가합니다.'
-                  : generationMode === 'selected'
-                    ? '선택한 차량의 PC·모바일 카드를 새 버전으로 저장합니다.'
-                    : '주의: 이미지가 준비된 모든 차량의 기존 카드를 새 버전으로 교체합니다.'}
-              </p>
-            </div>
-            <div className="flex flex-wrap justify-end gap-2 bg-white p-4 sm:px-5">
-              <button type="button" onClick={onClose} className="min-h-11 rounded-[12px] bg-[#F3F5F8] px-4 text-[12px] font-semibold text-[#67788D]">닫기</button>
-              <button type="button" disabled={!isComplete || busy || photoUploading || previewLoading} onClick={() => void downloadSingle()}
-                className="inline-flex min-h-11 items-center gap-2 rounded-[12px] bg-[#EBF1FF] px-4 text-[12px] font-bold text-[#1E60F3] disabled:opacity-40">
-                <Download size={15}/> 선택한 카드 PNG
-              </button>
-              <button type="button" disabled={!isComplete || !dbReady || !summaryLoaded || busy || photoUploading || previewLoading || (generationMode === 'missing' && missingVehicles.length === 0)}
-                onClick={() => { if (generationMode !== 'all' || window.confirm('준비된 모든 차량의 기존 카드를 새 버전으로 교체할까요?')) void saveAllToAssetLibrary(); }}
-                className="inline-flex min-h-11 items-center gap-2 rounded-[12px] bg-[#1E60F3] px-4 text-[12px] font-bold text-white disabled:opacity-40">
-                {busy ? <Loader2 size={15} className="animate-spin"/> : <CheckCircle2 size={15}/>}
-                {busy ? (progress || '저장 중…') : generationMode === 'missing' ? '미생성 카드만 등록' : generationMode === 'selected' ? '선택 차량 등록' : '전체 카드 재생성'}
-              </button>
-              <button type="button" disabled={!isComplete || busy || photoUploading || previewLoading} onClick={() => void downloadAll()}
-                className="inline-flex min-h-11 items-center gap-2 rounded-[12px] bg-[#1E60F3] px-4 text-[12px] font-bold text-white disabled:opacity-40">
-                {busy ? <Loader2 size={15} className="animate-spin"/> : <CheckCircle2 size={15}/>}
-                {busy ? (progress || '생성 중…') : '준비된 전체 차량 ZIP'}
-              </button>
-            </div>
-          </div>
+            )}
+          </HqCard>
+
+          {downloadsOpen && (
+            <HqCard className="p-4 sm:p-5">
+              <h3 className="mb-3 text-[13px] font-semibold text-[#526680]">파일 다운로드</h3>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <HqButton variant="secondary" onClick={() => void downloadSingle()}
+                  disabled={!isComplete || busy || photoUploading || previewLoading} className="w-full sm:w-auto">
+                  <Download className="size-4" /> 선택한 {orientation === 'pc' ? 'PC' : '모바일'} 카드 PNG
+                </HqButton>
+                <HqButton variant="secondary" onClick={() => void downloadAll()}
+                  disabled={!isComplete || busy || photoUploading || previewLoading} className="w-full sm:w-auto">
+                  <Download className="size-4" /> 준비된 차량 전체 ZIP
+                </HqButton>
+              </div>
+            </HqCard>
+          )}
         </div>
       </div>
-    </div>
+    </HqModal>
   );
 };
