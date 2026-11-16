@@ -21,6 +21,11 @@ import {
   type DispatchCardRenderInput,
 } from '@/lib/dispatchCards/renderDispatchCard';
 import { zipSync } from 'fflate';
+import {
+  DEFAULT_DISPATCH_PORTRAIT_PLACEMENT,
+  PORTRAIT_CROP_LIMITS,
+  normalizePortraitPlacement,
+} from '@/lib/dispatchCards/portraitCrop';
 import { HqButton, HqCard, HqInput, HqSelect, HqSegmentedTabs } from '@/components/hq/ui';
 import { HqModal } from '@/components/hq/ui/HqModal';
 import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
@@ -71,6 +76,10 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   const [phone, setPhone] = useState(driver.phone || '');
   const [photoUrl, setPhotoUrl] = useState('');
   const [photoStored, setPhotoStored] = useState(false);
+  const [portraitPlacement, setPortraitPlacement] = useState<CardPlacement>({ ...DEFAULT_DISPATCH_PORTRAIT_PLACEMENT });
+  const [portraitSavedPlacement, setPortraitSavedPlacement] = useState<CardPlacement>({ ...DEFAULT_DISPATCH_PORTRAIT_PLACEMENT });
+  const [portraitSettingsLoaded, setPortraitSettingsLoaded] = useState(false);
+  const [portraitSaving, setPortraitSaving] = useState(false);
   const [dbReady, setDbReady] = useState(true);
   const [savedCards, setSavedCards] = useState<CardSummary>({});
   const [summaryLoaded, setSummaryLoaded] = useState(false);
@@ -90,6 +99,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   const [error, setError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const currentRequest = useRef(0);
+  const portraitRequest = useRef(0);
   // Keep the shared HQ modal's focus trap stable while form values change.
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -107,8 +117,11 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   const currentCardStatus = vehicle ? savedCards[vehicle.uuid] : undefined;
   const placements = vehicle ? (perVehiclePlacements[vehicle.uuid] || {}) : {};
   const currentPlacement = placements[photoKind] || DEFAULT_PLACEMENT;
+  const portraitDirty = portraitPlacement.zoom !== portraitSavedPlacement.zoom ||
+    portraitPlacement.x !== portraitSavedPlacement.x ||
+    portraitPlacement.y !== portraitSavedPlacement.y;
   const isComplete = Boolean(
-    photoStored && photoUrl && name.trim() && position.trim() && phone.trim() && vehicle && photos,
+    portraitSettingsLoaded && photoStored && photoUrl && name.trim() && position.trim() && phone.trim() && vehicle && photos,
   );
 
   useEffect(() => {
@@ -185,6 +198,55 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, driver.id]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const id = ++portraitRequest.current;
+    setPortraitSettingsLoaded(false);
+    setPortraitPlacement({ ...DEFAULT_DISPATCH_PORTRAIT_PLACEMENT });
+    setPortraitSavedPlacement({ ...DEFAULT_DISPATCH_PORTRAIT_PLACEMENT });
+    void fetch('/api/hq/drivers/assets/portrait?driverId=' + encodeURIComponent(driver.id), {
+      cache: 'no-store',
+    })
+      .then(async response => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.ok !== true) {
+          throw new Error(data.error || '기사 사진 구도를 불러오지 못했습니다.');
+        }
+        if (portraitRequest.current !== id) return;
+        const placement = normalizePortraitPlacement(data.placement);
+        setPortraitPlacement(placement);
+        setPortraitSavedPlacement(placement);
+        setPortraitSettingsLoaded(true);
+      })
+      .catch(error => {
+        if (portraitRequest.current === id) {
+          setError(error instanceof Error ? error.message : '기사 사진 구도 조회 실패');
+        }
+      });
+    return () => { ++portraitRequest.current; };
+  }, [isOpen, driver.id]);
+
+  /** The same settings are stored once per chauffeur, not once per vehicle. */
+  async function persistPortraitPlacement(): Promise<void> {
+    if (!portraitSettingsLoaded) throw new Error('기사 사진 구도를 먼저 불러와야 합니다.');
+    if (!portraitDirty) return;
+    setPortraitSaving(true);
+    try {
+      const response = await fetch('/api/hq/drivers/assets/portrait', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ driverId: driver.id, placement: portraitPlacement }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.ok !== true) {
+        throw new Error(result.error || '기사 사진 구도 저장 실패');
+      }
+      setPortraitSavedPlacement(normalizePortraitPlacement(result.placement));
+    } finally {
+      setPortraitSaving(false);
+    }
+  }
+
   async function handleProfileFile(file: File) {
     if (!IMAGE_TYPES.has(file.type) || file.size > MAX_PHOTO_BYTES) {
       setError('PNG·JPG·WebP 이미지만 업로드할 수 있습니다. 최대 10MB입니다.');
@@ -247,6 +309,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
       plate: currentVehicle.plate,
       model: dispatchCardVehicleLabel(currentVehicle),
       photoUrl,
+      portraitPlacement,
       photos: assets,
       orientation: variant,
       placements: perVehiclePlacements[currentVehicle.uuid] || {},
@@ -288,7 +351,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     };
     // Only values used by rendering, including position adjustments, trigger preview updates.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, isComplete, vehicle?.uuid, orientation, name, position, phone, photoUrl, perVehiclePlacements]);
+  }, [isOpen, isComplete, vehicle?.uuid, orientation, name, position, phone, photoUrl, portraitPlacement, perVehiclePlacements]);
 
   const updatePlacement = (key: keyof CardPlacement, value: number) => {
     if (!vehicle) return;
@@ -309,6 +372,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     setBusy(true);
     setError('');
     try {
+      await persistPortraitPlacement();
       const canvas = await renderDispatchCard(buildInput(vehicle, orientation));
       const blob = await cardCanvasToPng(canvas);
       downloadBlob(blob, 'VIP_' + cleanFilename(name) + '_' + cleanFilename(vehicle.plate) + '_' + orientation + '.png');
@@ -328,6 +392,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     const entries: Record<string, Uint8Array> = {};
     const failures: string[] = [];
     try {
+      await persistPortraitPlacement();
       for (let i = 0; i < availableVehicles.length; i++) {
         const item = availableVehicles[i];
         setProgress((i + 1) + ' / ' + availableVehicles.length + '대 생성 중 · ' + item.plate);
@@ -370,6 +435,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     let skippedCount = 0;
     const failures: string[] = [];
     try {
+      await persistPortraitPlacement();
       // Always refresh immediately before the batch. The server also rejects
       // writes to an existing slot when skipIfExists=true.
       const latest = await loadSavedCards();
@@ -449,13 +515,13 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
       footer={
         <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <HqButton variant="secondary" onClick={() => setDownloadsOpen(value => !value)}
-            disabled={!isComplete || busy} aria-expanded={downloadsOpen} className="w-full sm:w-auto">
+            disabled={!isComplete || busy || portraitSaving} aria-expanded={downloadsOpen} className="w-full sm:w-auto">
             <Download className="size-4" /> 파일 다운로드 <ChevronDown className={'size-4 transition-transform ' + (downloadsOpen ? 'rotate-180' : '')} />
           </HqButton>
           <div className="flex w-full gap-2 sm:w-auto">
             <HqButton variant="subtle" onClick={closeModal} className="flex-1 sm:flex-none">닫기</HqButton>
             <HqButton variant="primary" className="min-w-0 flex-[2] sm:flex-none" loading={busy}
-              disabled={!isComplete || !dbReady || !summaryLoaded || busy || photoUploading || previewLoading || (generationMode === 'missing' && missingVehicles.length === 0)}
+              disabled={!isComplete || !dbReady || !summaryLoaded || busy || portraitSaving || photoUploading || previewLoading || (generationMode === 'missing' && missingVehicles.length === 0)}
               onClick={() => {
                 if (generationMode !== 'all' || window.confirm('준비된 모든 차량의 기존 카드를 새 버전으로 교체할까요?')) {
                   void saveAllToAssetLibrary();
@@ -510,6 +576,58 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
             </div>
             <p className="mt-3 text-[11px] leading-relaxed text-[#8492A4]">
               기사 정보 수정은 생성할 카드에만 적용되며 기사 원본 정보는 바뀌지 않습니다.
+            </p>
+          </HqCard>
+
+          <HqCard className="p-4 sm:p-5">
+            <h3 className="mb-1 flex items-center gap-2 text-[14px] font-semibold text-[#21344D]">
+              <SlidersHorizontal className="size-4 text-[#1E60F3]" /> 기사 사진 구도
+            </h3>
+            <p className="mb-4 text-[11px] leading-relaxed text-[#8492A4]">
+              기사마다 얼굴 크기가 달라도 맞출 수 있어요. 오른쪽 실제 배차카드를 보면서 조절하세요.
+            </p>
+            <div className="space-y-4">
+              {([
+                ['zoom', '얼굴 확대', PORTRAIT_CROP_LIMITS.zoom.min, PORTRAIT_CROP_LIMITS.zoom.max, '%'],
+                ['x', '좌우 위치', PORTRAIT_CROP_LIMITS.x.min, PORTRAIT_CROP_LIMITS.x.max, '%'],
+                ['y', '상하 위치', PORTRAIT_CROP_LIMITS.y.min, PORTRAIT_CROP_LIMITS.y.max, '%'],
+              ] as const).map(([key, label, min, max, suffix]) => (
+                <label key={key} className="block">
+                  <span className="mb-1.5 flex justify-between text-[12px] text-[#62738A]">
+                    <span>{label}</span><strong className="font-semibold">{portraitPlacement[key]}{suffix}</strong>
+                  </span>
+                  <input type="range" min={min} max={max} step={1}
+                    aria-label={'기사 사진 ' + label} value={portraitPlacement[key]}
+                    disabled={!portraitSettingsLoaded || busy || portraitSaving}
+                    onChange={event => setPortraitPlacement(current => ({
+                      ...current, [key]: Number(event.target.value),
+                    }))}
+                    className="w-full accent-[#1E60F3]" />
+                </label>
+              ))}
+            </div>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+              <HqButton variant="ghost" size="sm" disabled={!portraitSettingsLoaded || busy || portraitSaving}
+                onClick={() => setPortraitPlacement({ ...DEFAULT_DISPATCH_PORTRAIT_PLACEMENT })}>
+                기본 구도 복원
+              </HqButton>
+              <HqButton variant={portraitDirty ? 'primary' : 'secondary'} size="sm"
+                disabled={!portraitSettingsLoaded || !portraitDirty || busy || portraitSaving}
+                loading={portraitSaving}
+                onClick={() => {
+                  void persistPortraitPlacement()
+                    .then(() => setMessage('기사 사진 구도를 저장했습니다. 이후 새 차량 카드에도 동일하게 적용됩니다.'))
+                    .catch(err => setError(err instanceof Error ? err.message : '사진 구도 저장 실패'));
+                }}>
+                구도 저장
+              </HqButton>
+            </div>
+            <p className="mt-3 text-[11px] leading-relaxed text-[#8492A4]">
+              {portraitSettingsLoaded
+                ? portraitDirty
+                  ? '미저장 변경사항이 있습니다. 카드 등록·다운로드 시에도 자동 저장됩니다.'
+                  : '기사별 설정 저장됨 · PC·모바일 및 모든 차량에 공통 적용'
+                : '기사별 사진 설정 불러오는 중…'}
             </p>
           </HqCard>
 
@@ -653,11 +771,11 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
               <h3 className="mb-3 text-[13px] font-semibold text-[#526680]">파일 다운로드</h3>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <HqButton variant="secondary" onClick={() => void downloadSingle()}
-                  disabled={!isComplete || busy || photoUploading || previewLoading} className="w-full sm:w-auto">
+                  disabled={!isComplete || busy || portraitSaving || photoUploading || previewLoading} className="w-full sm:w-auto">
                   <Download className="size-4" /> 선택한 {orientation === 'pc' ? 'PC' : '모바일'} 카드 PNG
                 </HqButton>
                 <HqButton variant="secondary" onClick={() => void downloadAll()}
-                  disabled={!isComplete || busy || photoUploading || previewLoading} className="w-full sm:w-auto">
+                  disabled={!isComplete || busy || portraitSaving || photoUploading || previewLoading} className="w-full sm:w-auto">
                   <Download className="size-4" /> 준비된 차량 전체 ZIP
                 </HqButton>
               </div>
