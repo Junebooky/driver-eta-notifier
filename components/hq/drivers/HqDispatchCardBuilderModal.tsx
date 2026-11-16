@@ -25,6 +25,7 @@ import {
   DEFAULT_DISPATCH_PORTRAIT_PLACEMENT,
   PORTRAIT_CROP_LIMITS,
   normalizePortraitPlacement,
+  calculatePortraitCrop,
 } from '@/lib/dispatchCards/portraitCrop';
 import { HqButton, HqCard, HqInput, HqSelect, HqSegmentedTabs } from '@/components/hq/ui';
 import { HqModal } from '@/components/hq/ui/HqModal';
@@ -80,6 +81,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   const [portraitSavedPlacement, setPortraitSavedPlacement] = useState<CardPlacement>({ ...DEFAULT_DISPATCH_PORTRAIT_PLACEMENT });
   const [portraitSettingsLoaded, setPortraitSettingsLoaded] = useState(false);
   const [portraitSaving, setPortraitSaving] = useState(false);
+  const [portraitImageDimensions, setPortraitImageDimensions] = useState({ width: 800, height: 800 });
   const [dbReady, setDbReady] = useState(true);
   const [savedCards, setSavedCards] = useState<CardSummary>({});
   const [summaryLoaded, setSummaryLoaded] = useState(false);
@@ -117,6 +119,11 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   const currentCardStatus = vehicle ? savedCards[vehicle.uuid] : undefined;
   const placements = vehicle ? (perVehiclePlacements[vehicle.uuid] || {}) : {};
   const currentPlacement = placements[photoKind] || DEFAULT_PLACEMENT;
+  const smallPortraitFrame = { x: 0, y: 0, w: 150, h: 187.5 };
+  const smallPortraitCrop = calculatePortraitCrop(
+    portraitImageDimensions.width, portraitImageDimensions.height,
+    smallPortraitFrame, portraitPlacement,
+  );
   const portraitDirty = portraitPlacement.zoom !== portraitSavedPlacement.zoom ||
     portraitPlacement.x !== portraitSavedPlacement.x ||
     portraitPlacement.y !== portraitSavedPlacement.y;
@@ -584,8 +591,27 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
               <SlidersHorizontal className="size-4 text-[#1E60F3]" /> 기사 사진 구도
             </h3>
             <p className="mb-4 text-[11px] leading-relaxed text-[#8492A4]">
-              기사마다 얼굴 크기가 달라도 맞출 수 있어요. 오른쪽 실제 배차카드를 보면서 조절하세요.
+              기사마다 얼굴 크기가 달라도 맞출 수 있어요. 미리보기와 오른쪽 완성 카드를 보면서 조절하세요.
             </p>
+            {photoUrl && (
+              <div className="mb-4 flex items-center gap-4 rounded-[14px] bg-[#F7F9FC] p-3">
+                <div className="relative shrink-0 overflow-hidden bg-white" style={{ width: 150, height: 187.5 }}>
+                  <img src={photoUrl} alt="조정 중인 기사 사진의 실시간 크롭 미리보기"
+                    onLoad={event => setPortraitImageDimensions({
+                      width: event.currentTarget.naturalWidth,
+                      height: event.currentTarget.naturalHeight,
+                    })}
+                    style={{
+                      position: 'absolute', left: smallPortraitCrop.x, top: smallPortraitCrop.y,
+                      width: smallPortraitCrop.w, height: smallPortraitCrop.h,
+                      maxWidth: 'none', maxHeight: 'none',
+                    }} />
+                </div>
+                <p className="min-w-0 text-[11px] leading-relaxed text-[#73839A]">
+                  기사 얼굴을 확인하면서 확대하고 위치를 옮겨보세요. 실제 배차카드와 같은 비율로 표시합니다.
+                </p>
+              </div>
+            )}
             <div className="space-y-4">
               {([
                 ['zoom', '얼굴 확대', PORTRAIT_CROP_LIMITS.zoom.min, PORTRAIT_CROP_LIMITS.zoom.max, '%'],
