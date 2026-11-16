@@ -94,7 +94,8 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
 
   useEffect(() => {
     if (!isOpen) return;
-    setSelectedVehicleId(availableVehicles[0]?.uuid || '');
+    setSelectedVehicleId(previous => availableVehicles.some(v => v.uuid === previous)
+      ? previous : (availableVehicles[0]?.uuid || ''));
   }, [isOpen, driver.id, availableVehicles]);
 
   useEffect(() => {
@@ -174,6 +175,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     } catch (err) {
       if (currentRequest.current === id) {
         setPhotoStored(false);
+        setPhotoUrl('');
         setError(err instanceof Error ? err.message : '사진 업로드 실패');
       }
     } finally {
@@ -428,6 +430,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
               <p className="mt-2 text-[10px] leading-relaxed text-[#8491A4]">
                 현재 등록된 스타리아 공통 사진과 1458호 전용 스프린터 사진만 사용합니다. 다른 스프린터의 실내를 복제하지 않습니다.
               </p>
+              {!dbReady && <p role="alert" className="mt-2 rounded-[10px] bg-[#FFF1EB] px-3 py-2 text-[11px] text-[#A85B47]">배차카드 자산 DB 준비가 필요합니다. 미리보기·다운로드는 가능하지만 서버 등록은 차단됩니다.</p>}
             </section>
 
             <section className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(27,45,77,.045)]">
