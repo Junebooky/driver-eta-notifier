@@ -320,7 +320,11 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
         try {
           for (const variant of ['pc', 'mobile'] as const) {
             const canvas = await renderDispatchCard(buildInput(item, variant));
-            const blob = await cardCanvasToPng(canvas);
+            // Keep downloadable originals as PNG, but store a compact WebP
+            // copy for the existing HQ asset library and faster customer views.
+            const blob = await new Promise<Blob>((resolve, reject) =>
+              canvas.toBlob(result => result ? resolve(result) : reject(new Error('WebP 변환 실패')), 'image/webp', 0.9),
+            );
             const form = new FormData();
             form.set('assetType', 'info');
             form.set('driverId', driver.id);
@@ -331,7 +335,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
             form.set('variant', variant);
             form.set('width', String(canvas.width));
             form.set('height', String(canvas.height));
-            form.set('file', blob, 'dispatch_' + cleanFilename(item.plate) + '_' + variant + '.png');
+            form.set('file', blob, 'dispatch_' + cleanFilename(item.plate) + '_' + variant + '.webp');
             const response = await fetch('/api/hq/drivers/assets/upload', { method: 'POST', body: form });
             const result = await response.json().catch(() => ({}));
             if (!response.ok || result.ok !== true) {
