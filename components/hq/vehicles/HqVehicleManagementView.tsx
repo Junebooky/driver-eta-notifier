@@ -77,8 +77,8 @@ export function getVehicleThumb(v: VipRealVehicle): string {
 // Specific vehicle tips strictly following verified real data
 // ONLY 193호 5336 has verified specs from user-provided cockpit mockup.
 // All other 19 vehicles must remain "미확인 (관리자 확인 필요)" to prevent false operational assurances.
-function getVehicleTips(v: VipRealVehicle) {
-  if (v.plateShort === '5336') {
+function getVehicleTips(v?: VipRealVehicle | null) {
+  if (v?.plateShort === '5336') {
     return {
       isVerified: true,
       frontCharging: 'USB 총 3개 (상세 규격 미확인)',
@@ -497,13 +497,16 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
 
   // Fail-Closed Day Status Resolver: calculates exact status for a specific vehicle on a given date (Point 3)
   const getVehicleDayStatus = useCallback(
-    (v: VipRealVehicle, targetDateIso: string): { status: AvailabilityDayStatus; detail?: string } => {
+    (v: VipRealVehicle | undefined, targetDateIso: string): { status: AvailabilityDayStatus; detail?: string } => {
       // 1. Fail-closed: while loading or error
       if (availabilityState === 'loading') {
         return { status: '확인 중...', detail: '가용성 서버 조회 중' };
       }
       if (availabilityState === 'error') {
         return { status: '확인 불가', detail: availabilityError || '서버 오류' };
+      }
+      if (!v) {
+        return { status: '미확인', detail: '선택된 차량 없음' };
       }
 
       // 2. Server/local maintenance override or data
