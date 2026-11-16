@@ -1,4 +1,5 @@
 import type { DispatchCardPhotoSet } from './dispatchCardAssets';
+import { calculatePortraitCrop, DEFAULT_DISPATCH_PORTRAIT_PLACEMENT } from './portraitCrop';
 
 export type CardOrientation = 'pc' | 'mobile';
 export type CardPhotoKind = 'exterior' | 'interiorOne' | 'interiorTwo';
@@ -16,6 +17,7 @@ export interface DispatchCardRenderInput {
   plate: string;
   model: string;
   photoUrl: string;
+  portraitPlacement?: CardPlacement;
   photos: DispatchCardPhotoSet;
   orientation: CardOrientation;
   placements?: CardPhotoPlacements;
@@ -32,10 +34,6 @@ const GOLD_LINE = '#8E7C60';
 const WHITE = '#F2F0EC';
 const DARK = '#161616';
 const FONT = 'Arial, "Noto Sans KR", sans-serif';
-
-// Keep the VIP chauffeur portrait framed on the face rather than the shoulders.
-// The original square profile photo is enlarged to completely fill both vertical frames.
-export const DISPATCH_PORTRAIT_CROP = { zoom: 118, focusY: 0.35 } as const;
 
 async function loadImage(src: string): Promise<HTMLImageElement> {
   // Resolve private profile proxy and same-origin vehicle assets to blobs.
@@ -91,6 +89,30 @@ function photoFrame(
   ctx.strokeStyle = GOLD_LINE;
   ctx.lineWidth = 2;
   ctx.strokeRect(rect.x + 1, rect.y + 1, rect.w - 2, rect.h - 2);
+}
+
+/** Face-first crop uses the same saved setting for every car and both card sizes. */
+function drawPortraitFrame(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  frame: Rect,
+  placement?: CardPlacement,
+) {
+  const crop = calculatePortraitCrop(
+    img.naturalWidth, img.naturalHeight, frame,
+    placement || { ...DEFAULT_DISPATCH_PORTRAIT_PLACEMENT },
+  );
+  ctx.save();
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(frame.x, frame.y, frame.w, frame.h);
+  ctx.beginPath();
+  ctx.rect(frame.x, frame.y, frame.w, frame.h);
+  ctx.clip();
+  ctx.drawImage(img, crop.x, crop.y, crop.w, crop.h);
+  ctx.restore();
+  ctx.strokeStyle = GOLD_LINE;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(frame.x + 1, frame.y + 1, frame.w - 2, frame.h - 2);
 }
 
 function drawText(
@@ -191,8 +213,7 @@ function drawPortraitInfo(
 ) {
   if (input.orientation === 'pc') {
     line(ctx, 1127, 287, 1127, 1155, GOLD_LINE, 1.7);
-    photoFrame(ctx, image, { x: 1326, y: 288, w: 430, h: 537 },
-      { zoom: DISPATCH_PORTRAIT_CROP.zoom, x: 0, y: 0 }, false, '#FFFFFF', DISPATCH_PORTRAIT_CROP.focusY);
+    drawPortraitFrame(ctx, image, { x: 1326, y: 288, w: 430, h: 537 }, input.portraitPlacement);
     const rows = [
       ['Driver Name', input.name],
       ['Position', input.position],
@@ -206,8 +227,7 @@ function drawPortraitInfo(
       drawText(ctx, value, 1492, y, 26, WHITE, 380);
     });
   } else {
-    photoFrame(ctx, image, { x: 75, y: 1218, w: 297, h: 370 },
-      { zoom: DISPATCH_PORTRAIT_CROP.zoom, x: 0, y: 0 }, false, '#FFFFFF', DISPATCH_PORTRAIT_CROP.focusY);
+    drawPortraitFrame(ctx, image, { x: 75, y: 1218, w: 297, h: 370 }, input.portraitPlacement);
     const rows = [
       ['Name', input.name],
       ['Position', input.position],
