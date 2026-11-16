@@ -69,6 +69,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
   } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isAutoBuilderOpen, setIsAutoBuilderOpen] = useState(false);
+  const [isManualUploadOpen, setIsManualUploadOpen] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{
     type: 'success' | 'warning' | 'error';
     text: string;
@@ -348,6 +349,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
   ) => {
     e.preventDefault();
     e.stopPropagation();
+    if (assetType === 'info' && !isManualUploadOpen) return;
     if (assetType === 'profile') setIsDraggingProfile(false);
     else if (variant === 'pc') setIsDraggingPc(false);
     else if (variant === 'mobile') setIsDraggingMobile(false);
@@ -750,7 +752,15 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
               </div>
             </div>
 
-            {/* Grid 2 Cards: PC Widescreen & True 9:16 Minimal Line Mobile Wireframe */}
+            <div className="flex items-center justify-between gap-3 rounded-[13px] bg-white px-3 py-2 shadow-[0_3px_10px_rgba(35,49,78,0.035)]">
+              <span className="text-[11px] leading-relaxed text-[#73839D]">PC·모바일 카드는 자동 생성에서 등록할 수 있습니다.</span>
+              <HqButton type="button" size="sm" variant="subtle" className="shrink-0"
+                aria-expanded={isManualUploadOpen} onClick={() => setIsManualUploadOpen(value => !value)}>
+                {isManualUploadOpen ? '직접 업로드 닫기' : '고급 · 직접 업로드'}
+              </HqButton>
+            </div>
+
+            {/* Read-only previews stay visible; manual upload is an explicit advanced action. */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Card A: PC Info (Horizontal 16:9) */}
               <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col justify-between shadow-2xs h-full">
@@ -758,7 +768,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                   <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                     <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
                       <img src="/images/icons/pc.png" alt="PC" className="w-4 h-4 object-contain" />
-                      <span>PC용 가로 카드 (16:9)</span>
+                      <span>PC용 가로 카드 (4:3)</span>
                     </span>
                     {bundle?.pcInfo ? (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-[#1E60F3] text-xs font-semibold">
@@ -778,10 +788,10 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                 {/* Vertically centered Preview Area */}
                 <div className="my-auto py-3 flex-1 flex flex-col justify-center">
                   <div
-                    role="button"
-                    tabIndex={0}
+                    role={isManualUploadOpen ? 'button' : undefined}
+                    tabIndex={isManualUploadOpen ? 0 : undefined}
                     onClick={() => {
-                      if (!bundle?.pcInfo && isDbReady && !isUploading) {
+                      if (isManualUploadOpen && !bundle?.pcInfo && isDbReady && !isUploading) {
                         pcInputRef.current?.click();
                       }
                     }}
@@ -801,7 +811,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                       setIsDraggingPc(false);
                     }}
                     onDrop={(e) => handleDropFile(e, 'info', 'pc')}
-                    className={`w-full aspect-video rounded-xl overflow-hidden border transition-all flex items-center justify-center relative group cursor-pointer ${isDraggingPc
+                    className={`w-full aspect-[4/3] rounded-xl overflow-hidden border transition-all flex items-center justify-center relative group ${isManualUploadOpen ? 'cursor-pointer' : 'cursor-default'} ${isDraggingPc
                       ? 'border-2 border-dashed border-[#1E60F3] bg-blue-50/60 ring-2 ring-blue-300'
                       : 'border-slate-200 bg-white hover:border-blue-400'
                       }`}
@@ -811,7 +821,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                         <img
                           src={bundle.pcInfo.signedUrl}
                           alt="PC Info"
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-contain"
                         />
                         <a
                           href={bundle.pcInfo.signedUrl}
@@ -840,8 +850,8 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                   )}
                 </div>
 
-                {/* PC Card Actions */}
-                <div className="flex items-center gap-2 pt-2 border-t border-slate-100 shrink-0">
+                {/* Advanced manual PC upload: hidden during the normal auto-create flow. */}
+                {isManualUploadOpen && <div className="flex items-center gap-2 pt-2 border-t border-slate-100 shrink-0">
                   <input
                     ref={pcInputRef}
                     type="file"
@@ -879,7 +889,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}
-                </div>
+                </div>}
               </div>
 
               {/* Card B: Mobile Info (Minimal Line Wireframe matching PC preview) */}
@@ -908,10 +918,10 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                 {/* Vertically centered Preview Area */}
                 <div className="my-auto py-3 flex-1 flex flex-col items-center justify-center">
                   <div
-                    role="button"
-                    tabIndex={0}
+                    role={isManualUploadOpen ? 'button' : undefined}
+                    tabIndex={isManualUploadOpen ? 0 : undefined}
                     onClick={() => {
-                      if (!bundle?.mobileInfo && isDbReady && !isUploading) {
+                      if (isManualUploadOpen && !bundle?.mobileInfo && isDbReady && !isUploading) {
                         mobileInputRef.current?.click();
                       }
                     }}
@@ -931,7 +941,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                       setIsDraggingMobile(false);
                     }}
                     onDrop={(e) => handleDropFile(e, 'info', 'mobile')}
-                    className={`w-32 sm:w-36 aspect-[9/16] rounded-2xl border transition-all bg-white relative overflow-hidden flex flex-col group cursor-pointer ${isDraggingMobile
+                    className={`w-32 sm:w-36 aspect-[9/16] rounded-2xl border transition-all bg-white relative overflow-hidden flex flex-col group ${isManualUploadOpen ? 'cursor-pointer' : 'cursor-default'} ${isDraggingMobile
                       ? 'border-2 border-dashed border-[#1E60F3] bg-blue-50/60 ring-2 ring-blue-300'
                       : 'border-slate-200 shadow-2xs hover:border-blue-400'
                       }`}
@@ -943,7 +953,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                           <img
                             src={bundle.mobileInfo.signedUrl}
                             alt="Mobile Info"
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain"
                           />
                           <a
                             href={bundle.mobileInfo.signedUrl}
@@ -974,8 +984,8 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                   )}
                 </div>
 
-                {/* Mobile Card Actions */}
-                <div className="flex items-center gap-2 pt-2 border-t border-slate-100 shrink-0">
+                {/* Advanced manual mobile upload. */}
+                {isManualUploadOpen && <div className="flex items-center gap-2 pt-2 border-t border-slate-100 shrink-0">
                   <input
                     ref={mobileInputRef}
                     type="file"
@@ -1013,7 +1023,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}
-                </div>
+                </div>}
               </div>
             </div>
           </div>
