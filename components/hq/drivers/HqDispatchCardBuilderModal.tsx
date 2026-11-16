@@ -66,6 +66,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   const [phone, setPhone] = useState(driver.phone || '');
   const [photoUrl, setPhotoUrl] = useState('');
   const [photoStored, setPhotoStored] = useState(false);
+  const [dbReady, setDbReady] = useState(true);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoLoading, setPhotoLoading] = useState(false);
   const [orientation, setOrientation] = useState<CardOrientation>('pc');
@@ -115,6 +116,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
         const data = await response.json();
         if (!response.ok || data.ok !== true) throw new Error(data.error || '기사 프로필 조회 실패');
         if (currentRequest.current !== id) return;
+        setDbReady(data.isDbReady !== false);
         if (data.profile?.filePath) {
           setPhotoUrl(getPhotoPreviewUrl(data.profile.filePath));
           setPhotoStored(true);
@@ -302,6 +304,58 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     }
   };
 
+  // Registers generated files through the EXISTING admin-only asset endpoint.
+  // This is separate from SMS/email dispatch and never marks a card as sent.
+  const saveAllToAssetLibrary = async () => {
+    if (!isComplete || !dbReady || busy) return;
+    setBusy(true);
+    setError('');
+    setMessage('');
+    let storedPairs = 0;
+    const failures: string[] = [];
+    try {
+      for (let i = 0; i < availableVehicles.length; i++) {
+        const item = availableVehicles[i];
+        setProgress((i + 1) + ' / ' + availableVehicles.length + '대 등록 중 · ' + item.plate);
+        try {
+          for (const variant of ['pc', 'mobile'] as const) {
+            const canvas = await renderDispatchCard(buildInput(item, variant));
+            const blob = await cardCanvasToPng(canvas);
+            const form = new FormData();
+            form.set('assetType', 'info');
+            form.set('driverId', driver.id);
+            form.set('driverName', name.trim());
+            form.set('vehicleId', item.uuid);
+            form.set('vehiclePlate', item.plate);
+            form.set('vehicleModel', item.model);
+            form.set('variant', variant);
+            form.set('width', String(canvas.width));
+            form.set('height', String(canvas.height));
+            form.set('file', blob, 'dispatch_' + cleanFilename(item.plate) + '_' + variant + '.png');
+            const response = await fetch('/api/hq/drivers/assets/upload', { method: 'POST', body: form });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || result.ok !== true) {
+              throw new Error(result.error || '안내 카드 서버 저장 실패');
+            }
+          }
+          storedPairs++;
+        } catch (err) {
+          failures.push(item.plate + ' (' + (err instanceof Error ? err.message : '오류') + ')');
+        }
+      }
+      if (storedPairs === 0) throw new Error('저장 완료된 PC·모바일 카드 쌍이 없습니다.');
+      setMessage(storedPairs + '대의 PC·모바일 배차카드를 비공개 서버에 등록했습니다. 고객에게 자동 발송되지는 않습니다.');
+      if (failures.length) setError('부분 실패 — ' + failures.join(' / '));
+      onAssetUpdated?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '배차카드 서버 저장 실패');
+      if (storedPairs > 0) onAssetUpdated?.();
+    } finally {
+      setBusy(false);
+      setProgress('');
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -437,6 +491,11 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
               <button type="button" disabled={!isComplete || busy || photoUploading || previewLoading} onClick={() => void downloadSingle()}
                 className="inline-flex min-h-11 items-center gap-2 rounded-[12px] bg-[#EBF1FF] px-4 text-[12px] font-bold text-[#1E60F3] disabled:opacity-40">
                 <Download size={15}/> 선택한 카드 PNG
+              </button>
+              <button type="button" disabled={!isComplete || !dbReady || busy || photoUploading || previewLoading} onClick={() => void saveAllToAssetLibrary()}
+                className="inline-flex min-h-11 items-center gap-2 rounded-[12px] bg-[#1E60F3] px-4 text-[12px] font-bold text-white disabled:opacity-40">
+                {busy ? <Loader2 size={15} className="animate-spin"/> : <CheckCircle2 size={15}/>}
+                {busy ? (progress || '저장 중…') : '전체 배차카드 등록'}
               </button>
               <button type="button" disabled={!isComplete || busy || photoUploading || previewLoading} onClick={() => void downloadAll()}
                 className="inline-flex min-h-11 items-center gap-2 rounded-[12px] bg-[#1E60F3] px-4 text-[12px] font-bold text-white disabled:opacity-40">
