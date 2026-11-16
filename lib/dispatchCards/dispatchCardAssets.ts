@@ -1,47 +1,51 @@
 import type { VipRealVehicle } from '@/utils/vehicleData';
+import manifest from './dispatchCardAssetManifest.json';
 
-/**
- * Public, version-controlled vehicle photos ONLY. Never put driver portraits
- * here: those remain in the existing private cockpit-assets bucket.
- *
- * Actual file names uploaded on integration HEAD e312082:
- * - staria: exterior, interior_01, interior_02
- * - sprinter_519/1458: exterior, interior_02, interior_03
- * A missing car must never silently borrow a different vehicle's interior.
- */
+/** Only build-verified, public vehicle images. Never commit private driver photos. */
 export interface DispatchCardPhotoSet {
   exterior: string;
   interiorOne: string;
   interiorTwo: string;
   source: 'model' | 'vehicle';
 }
+type Car = Pick<VipRealVehicle, 'category' | 'model' | 'plate' | 'plateShort'>;
+const sets: Record<string, Omit<DispatchCardPhotoSet, 'source'>> = manifest;
 
-const ROOT = '/images/dispatch_cards/vehicles';
-
-export function resolveDispatchCardPhotos(
-  vehicle: Pick<VipRealVehicle, 'category' | 'model' | 'plate' | 'plateShort'>,
-): DispatchCardPhotoSet | null {
-  if (vehicle.category === 'staria') {
-    const folder = `${ROOT}/staria`;
-    return {
-      exterior: `${folder}/exterior.webp`,
-      interiorOne: `${folder}/interior_01.webp`,
-      interiorTwo: `${folder}/interior_02.webp`,
-      source: 'model',
-    };
+/** Resolve the DB vehicle to a human-friendly, stable image folder name. */
+export function dispatchCardModelFolder(vehicle: Car): string {
+  const model = vehicle.model.toLowerCase();
+  if (vehicle.category === 'staria') return 'staria';
+  if (vehicle.category === 'sprinter') {
+    if (model.includes('519')) return 'sprinter_519';
+    if (model.includes('319')) return 'sprinter_319';
   }
-
-  if (vehicle.category === 'sprinter' && vehicle.model.includes('519') && vehicle.plateShort === '1458') {
-    const folder = `${ROOT}/sprinter_519/1458`;
-    return {
-      exterior: `${folder}/exterior.webp`,
-      interiorOne: `${folder}/interior_02.webp`,
-      interiorTwo: `${folder}/interior_03.webp`,
-      source: 'vehicle',
-    };
+  if (vehicle.category === 'carnival') {
+    return /하이|high/.test(model) ? 'carnival_high' : 'carnival';
   }
+  if (vehicle.category === 'genesis') {
+    if (model.includes('gv80')) return 'gv80';
+    if (/g90l|lwb|롱휠/.test(model)) return 'g90_lwb';
+    if (/리무진|limousine/.test(model)) return 'g90_limousine';
+    if (model.includes('g90')) return 'g90';
+  }
+  if (vehicle.category === 's_class' && model.includes('560')) return 's560';
+  // New models with a Latin model name can work without adding more code.
+  const modelSlug = model.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return modelSlug || vehicle.category.replace(/[^a-z0-9_-]/gi, '');
+}
 
-  return null;
+export function resolveDispatchCardPhotos(vehicle: Car): DispatchCardPhotoSet | null {
+  const folder = dispatchCardModelFolder(vehicle);
+  const fullPlate = vehicle.plate.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9가-힣]/g, '');
+  const keys = [folder + '/' + fullPlate, folder + '/' + vehicle.plateShort];
+  for (const key of keys) {
+    const found = sets[key];
+    if (found) return { ...found, source: 'vehicle' };
+  }
+  // Sprinter 519 interiors differ by vehicle: never share a generic model image.
+  if (folder === 'sprinter_519') return null;
+  const common = sets[folder];
+  return common ? { ...common, source: 'model' } : null;
 }
 
 export function dispatchCardVehicleLabel(vehicle: Pick<VipRealVehicle, 'modelShort' | 'model'>): string {
