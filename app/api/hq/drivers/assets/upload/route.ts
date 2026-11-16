@@ -6,6 +6,7 @@ import {
   checkDriverAssetDbReady,
   createSignedAssetUrl,
   getDriverProfileStoragePath,
+  getDriverVehicleInfoAsset,
   getDriverVehicleInfoStoragePath,
   normalizeExtension,
   saveDriverProfileAsset,
@@ -182,6 +183,15 @@ export async function POST(req: NextRequest) {
       }
 
       const effVehicle = await resolveRegisteredFleetVehicle(vehicleIdParam || vehiclePlate || '');
+
+      // A missing-only generation must not replace a card that was already
+      // registered, including one saved after the browser last refreshed.
+      if (formData.get('skipIfExists') === 'true') {
+        const existing = await getDriverVehicleInfoAsset(driverId, effVehicle.uuid, variant, org);
+        if (existing) {
+          return NextResponse.json({ ok: true, skipped: true, asset: existing });
+        }
+      }
 
       let nextVersion = 1;
       try {
