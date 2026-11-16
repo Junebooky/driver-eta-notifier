@@ -1,0 +1,12 @@
+{
+  "sprinter_519/1458": {
+    "exterior": "/images/dispatch_cards/vehicles/sprinter_519/1458/exterior.webp",
+    "interiorOne": "/images/dispatch_cards/vehicles/sprinter_519/1458/interior_02.webp",
+    "interiorTwo": "/images/dispatch_cards/vehicles/sprinter_519/1458/interior_03.webp"
+  },
+  "staria": {
+    "exterior": "/images/dispatch_cards/vehicles/staria/exterior.webp",
+    "interiorOne": "/images/dispatch_cards/vehicles/staria/interior_01.webp",
+    "interiorTwo": "/images/dispatch_cards/vehicles/staria/interior_02.webp"
+  }
+}
