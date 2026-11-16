@@ -54,6 +54,20 @@ export async function GET(req: NextRequest) {
 
     const org = auth.session.org || 'vip_limousine_korea';
 
+    if (type === 'summary') {
+      // Only disclose records for the requested driver; driver-role access is
+      // already constrained above to the authenticated driver's own ID.
+      const vehicleAssetSummary = dbCheck.isReady
+        ? await getDriverVehicleAssetSummary(driverId, org)
+        : {};
+      return NextResponse.json({
+        ok: true,
+        isDbReady: dbCheck.isReady,
+        dbReason: dbCheck.reason,
+        vehicleAssetSummary,
+      });
+    }
+
     if (type === 'profile') {
       const profile = await getDriverProfileAsset(driverId, org);
       return NextResponse.json({
