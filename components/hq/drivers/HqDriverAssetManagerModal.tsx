@@ -27,6 +27,7 @@ import {
 } from '@/utils/vehicleData';
 import { haptics } from '@/utils/haptics';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
+import { HqButton } from '@/components/hq/ui';
 import { useHqFleetRegistry } from '@/hooks/useHqFleetRegistry';
 import { HqDispatchCardBuilderModal } from './HqDispatchCardBuilderModal';
 
@@ -390,14 +391,14 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
+            <HqButton
+              variant="primary"
+              size="sm"
               disabled={!activeDriver || fleet.loading || Boolean(fleet.error)}
               onClick={() => setIsAutoBuilderOpen(true)}
-              className="inline-flex min-h-9 items-center gap-1.5 rounded-[11px] bg-[#1E60F3] px-3 text-[11px] font-semibold text-white disabled:opacity-40"
             >
-              <Sparkles className="size-3.5" /> 자동 생성
-            </button>
+              <Sparkles className="size-3.5" /> 배차카드 자동 생성
+            </HqButton>
             <button type="button" onClick={onClose} aria-label="닫기"
               className="flex size-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600">
               <X className="w-5 h-5" />
