@@ -33,6 +33,8 @@ interface Props {
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const DEFAULT_PLACEMENT: CardPlacement = { zoom: 100, x: 0, y: 0 };
+type CardSummary = Record<string, { pc: boolean; mobile: boolean }>;
+type GenerationMode = 'missing' | 'selected' | 'all';
 
 function cleanFilename(value: string) {
   return value.trim().replace(/[^a-zA-Z0-9가-힣_-]+/g, '_').slice(0, 55) || 'driver';
@@ -67,6 +69,9 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   const [photoUrl, setPhotoUrl] = useState('');
   const [photoStored, setPhotoStored] = useState(false);
   const [dbReady, setDbReady] = useState(true);
+  const [savedCards, setSavedCards] = useState<CardSummary>({});
+  const [summaryLoaded, setSummaryLoaded] = useState(false);
+  const [generationMode, setGenerationMode] = useState<GenerationMode>('missing');
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoLoading, setPhotoLoading] = useState(false);
   const [orientation, setOrientation] = useState<CardOrientation>('pc');
@@ -86,6 +91,11 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     [availableVehicles, selectedVehicleId],
   );
   const photos = vehicle ? resolveDispatchCardPhotos(vehicle) : null;
+  const missingVehicles = availableVehicles.filter(item => {
+    const saved = savedCards[item.uuid];
+    return !saved?.pc || !saved?.mobile;
+  });
+  const currentCardStatus = vehicle ? savedCards[vehicle.uuid] : undefined;
   const placements = vehicle ? (perVehiclePlacements[vehicle.uuid] || {}) : {};
   const currentPlacement = placements[photoKind] || DEFAULT_PLACEMENT;
   const isComplete = Boolean(
@@ -131,6 +141,38 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
       });
     return () => { ++currentRequest.current; };
   }, [isOpen, driver.id, driver.name, driver.phone]);
+
+  async function loadSavedCards(): Promise<CardSummary> {
+    const response = await fetch(
+      '/api/hq/drivers/assets?driverId=' + encodeURIComponent(driver.id) + '&type=summary',
+      { cache: 'no-store' },
+    );
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.ok !== true) throw new Error(data.error || '저장된 배차카드 조회 실패');
+    if (data.isDbReady === false) throw new Error('배차카드 DB 준비가 필요합니다.');
+    return (data.vehicleAssetSummary || {}) as CardSummary;
+  }
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    setSavedCards({});
+    setSummaryLoaded(false);
+    setGenerationMode('missing');
+    void loadSavedCards()
+      .then(summary => {
+        if (!cancelled) {
+          setSavedCards(summary);
+          setSummaryLoaded(true);
+        }
+      })
+      .catch(err => {
+        if (!cancelled) setError(err instanceof Error ? err.message : '기존 카드 조회 실패');
+      });
+    return () => { cancelled = true; };
+    // Fetch only when the selected driver or dialog changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, driver.id]);
 
   async function handleProfileFile(file: File) {
     if (!IMAGE_TYPES.has(file.type) || file.size > MAX_PHOTO_BYTES) {
@@ -306,24 +348,40 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     }
   };
 
-  // Registers generated files through the EXISTING admin-only asset endpoint.
-  // This is separate from SMS/email dispatch and never marks a card as sent.
+  // Stored cards are never changed by the default 'missing' mode. Explicit
+  // selected/all modes are the only way to intentionally create new versions.
   const saveAllToAssetLibrary = async () => {
-    if (!isComplete || !dbReady || busy) return;
+    if (!isComplete || !dbReady || busy || !summaryLoaded) return;
     setBusy(true);
     setError('');
     setMessage('');
-    let storedPairs = 0;
+    let generatedCount = 0;
+    let skippedCount = 0;
     const failures: string[] = [];
     try {
-      for (let i = 0; i < availableVehicles.length; i++) {
-        const item = availableVehicles[i];
-        setProgress((i + 1) + ' / ' + availableVehicles.length + '대 등록 중 · ' + item.plate);
-        try {
-          for (const variant of ['pc', 'mobile'] as const) {
+      // Always refresh immediately before the batch. The server also rejects
+      // writes to an existing slot when skipIfExists=true.
+      const latest = await loadSavedCards();
+      setSavedCards(latest);
+      const targets = generationMode === 'selected'
+        ? (vehicle ? [vehicle] : [])
+        : generationMode === 'missing'
+          ? availableVehicles.filter(item => !latest[item.uuid]?.pc || !latest[item.uuid]?.mobile)
+          : availableVehicles;
+      if (targets.length === 0) {
+        setMessage('추가 생성할 미등록 차량 카드가 없습니다. 기존 배차카드는 그대로 유지됩니다.');
+        return;
+      }
+      for (let i = 0; i < targets.length; i++) {
+        const item = targets[i];
+        setProgress((i + 1) + ' / ' + targets.length + '대 등록 중 · ' + item.plate);
+        for (const variant of ['pc', 'mobile'] as const) {
+          if (generationMode === 'missing' && latest[item.uuid]?.[variant]) {
+            skippedCount++;
+            continue;
+          }
+          try {
             const canvas = await renderDispatchCard(buildInput(item, variant));
-            // Keep downloadable originals as PNG, but store a compact WebP
-            // copy for the existing HQ asset library and faster customer views.
             const blob = await new Promise<Blob>((resolve, reject) =>
               canvas.toBlob(result => result ? resolve(result) : reject(new Error('WebP 변환 실패')), 'image/webp', 0.9),
             );
@@ -337,25 +395,32 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
             form.set('variant', variant);
             form.set('width', String(canvas.width));
             form.set('height', String(canvas.height));
+            if (generationMode === 'missing') form.set('skipIfExists', 'true');
             form.set('file', blob, 'dispatch_' + cleanFilename(item.plate) + '_' + variant + '.webp');
             const response = await fetch('/api/hq/drivers/assets/upload', { method: 'POST', body: form });
             const result = await response.json().catch(() => ({}));
             if (!response.ok || result.ok !== true) {
-              throw new Error(result.error || '안내 카드 서버 저장 실패');
+              throw new Error(result.error || '배차카드 서버 저장 실패');
             }
+            if (result.skipped) skippedCount++;
+            else generatedCount++;
+          } catch (err) {
+            failures.push(item.plate + ' / ' + variant + ' (' +
+              (err instanceof Error ? err.message : '오류') + ')');
           }
-          storedPairs++;
-        } catch (err) {
-          failures.push(item.plate + ' (' + (err instanceof Error ? err.message : '오류') + ')');
         }
       }
-      if (storedPairs === 0) throw new Error('저장 완료된 PC·모바일 카드 쌍이 없습니다.');
-      setMessage(storedPairs + '대의 PC·모바일 배차카드를 비공개 서버에 등록했습니다. 고객에게 자동 발송되지는 않습니다.');
-      if (failures.length) setError('부분 실패 — ' + failures.join(' / '));
-      onAssetUpdated?.();
+      try {
+        setSavedCards(await loadSavedCards());
+      } catch (err) {
+        setError('저장 후 카드 목록 갱신에 실패했습니다. 화면을 다시 열어 확인해 주세요.');
+      }
+      if (generatedCount > 0) onAssetUpdated?.();
+      setMessage('PC·모바일 카드 ' + generatedCount + '장 저장 완료 · 기존 카드 ' +
+        skippedCount + '장 유지. 고객에게 자동 발송되지 않습니다.');
+      if (failures.length) setError('일부 생성 실패 — ' + failures.join(' / '));
     } catch (err) {
-      setError(err instanceof Error ? err.message : '배차카드 서버 저장 실패');
-      if (storedPairs > 0) onAssetUpdated?.();
+      setError(err instanceof Error ? err.message : '배차카드 저장 실패');
     } finally {
       setBusy(false);
       setProgress('');
@@ -428,8 +493,16 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
                 {availableVehicles.map(item => <option key={item.uuid} value={item.uuid}>{item.plate} · {item.modelShort}</option>)}
               </select>
               <p className="mt-2 text-[10px] leading-relaxed text-[#8491A4]">
-                현재 등록된 스타리아 공통 사진과 1458호 전용 스프린터 사진만 사용합니다. 다른 스프린터의 실내를 복제하지 않습니다.
+                사진 3장이 준비된 차량만 표시합니다. 차량별 폴더가 있으면 공통 모델 사진보다 우선합니다.
               </p>
+              <div className="mt-2 rounded-[11px] bg-[#F5F7FB] px-3 py-2 text-[11px] text-[#66788F]">
+                {summaryLoaded ? ('미생성 차량 ' + missingVehicles.length + '대 / 준비된 차량 ' + availableVehicles.length + '대') : '기존 배차카드 확인 중…'}
+                {vehicle && summaryLoaded && (
+                  <span className="mt-1 block">
+                    선택 차량: PC {currentCardStatus?.pc ? '등록됨' : '미등록'} · 모바일 {currentCardStatus?.mobile ? '등록됨' : '미등록'}
+                  </span>
+                )}
+              </div>
               {!dbReady && <p role="alert" className="mt-2 rounded-[10px] bg-[#FFF1EB] px-3 py-2 text-[11px] text-[#A85B47]">배차카드 자산 DB 준비가 필요합니다. 미리보기·다운로드는 가능하지만 서버 등록은 차단됩니다.</p>}
             </section>
 
@@ -493,16 +566,41 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
                 {error || message}
               </p>
             )}
+            <div className="border-t border-[#F1F3F7] bg-white px-4 py-3 sm:px-5">
+              <p className="mb-2 text-[11px] font-semibold text-[#526680]">배차카드 생성 방식</p>
+              <div className="grid grid-cols-3 gap-1.5">
+                {([
+                  ['missing', '미생성만 추가'],
+                  ['selected', '선택 차량'],
+                  ['all', '전체 재생성'],
+                ] as const).map(([mode, label]) => (
+                  <button key={mode} type="button" disabled={busy} onClick={() => setGenerationMode(mode)}
+                    aria-pressed={generationMode === mode}
+                    className={'min-h-10 rounded-[10px] px-2 text-[11px] font-semibold ' +
+                      (generationMode === mode ? 'bg-[#EAF1FF] text-[#1E60F3]' : 'bg-[#F5F7FA] text-[#71829B]')}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-[10px] leading-relaxed text-[#8491A4]">
+                {generationMode === 'missing'
+                  ? '기본값: 기존 PC·모바일 카드는 보존하고 비어 있는 카드만 추가합니다.'
+                  : generationMode === 'selected'
+                    ? '선택한 차량의 PC·모바일 카드를 새 버전으로 저장합니다.'
+                    : '주의: 이미지가 준비된 모든 차량의 기존 카드를 새 버전으로 교체합니다.'}
+              </p>
+            </div>
             <div className="flex flex-wrap justify-end gap-2 bg-white p-4 sm:px-5">
               <button type="button" onClick={onClose} className="min-h-11 rounded-[12px] bg-[#F3F5F8] px-4 text-[12px] font-semibold text-[#67788D]">닫기</button>
               <button type="button" disabled={!isComplete || busy || photoUploading || previewLoading} onClick={() => void downloadSingle()}
                 className="inline-flex min-h-11 items-center gap-2 rounded-[12px] bg-[#EBF1FF] px-4 text-[12px] font-bold text-[#1E60F3] disabled:opacity-40">
                 <Download size={15}/> 선택한 카드 PNG
               </button>
-              <button type="button" disabled={!isComplete || !dbReady || busy || photoUploading || previewLoading} onClick={() => void saveAllToAssetLibrary()}
+              <button type="button" disabled={!isComplete || !dbReady || !summaryLoaded || busy || photoUploading || previewLoading || (generationMode === 'missing' && missingVehicles.length === 0)}
+                onClick={() => { if (generationMode !== 'all' || window.confirm('준비된 모든 차량의 기존 카드를 새 버전으로 교체할까요?')) void saveAllToAssetLibrary(); }}
                 className="inline-flex min-h-11 items-center gap-2 rounded-[12px] bg-[#1E60F3] px-4 text-[12px] font-bold text-white disabled:opacity-40">
                 {busy ? <Loader2 size={15} className="animate-spin"/> : <CheckCircle2 size={15}/>}
-                {busy ? (progress || '저장 중…') : '전체 배차카드 등록'}
+                {busy ? (progress || '저장 중…') : generationMode === 'missing' ? '미생성 카드만 등록' : generationMode === 'selected' ? '선택 차량 등록' : '전체 카드 재생성'}
               </button>
               <button type="button" disabled={!isComplete || busy || photoUploading || previewLoading} onClick={() => void downloadAll()}
                 className="inline-flex min-h-11 items-center gap-2 rounded-[12px] bg-[#1E60F3] px-4 text-[12px] font-bold text-white disabled:opacity-40">
