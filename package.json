@@ -9,7 +9,10 @@
     "lint": "eslint",
     "test": "node scripts/run-tests.mjs",
     "test:db": "node --require ./scripts/test-safety.cjs --import tsx tests/dispatch-postgres.integration.ts && node --require ./scripts/test-safety.cjs --import tsx tests/hq-admin-delete-postgres.integration.ts",
-    "test:http": "node scripts/smoke-http.mjs"
+    "test:http": "node scripts/smoke-http.mjs",
+    "predev": "node scripts/generate-dispatch-card-manifest.mjs",
+    "prebuild": "node scripts/generate-dispatch-card-manifest.mjs",
+    "pretest": "node scripts/generate-dispatch-card-manifest.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.23.0",
