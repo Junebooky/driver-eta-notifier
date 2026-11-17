@@ -28,6 +28,7 @@ import {
   calculatePortraitCrop,
 } from '@/lib/dispatchCards/portraitCrop';
 import { HqButton, HqCard, HqInput, HqSelect, HqSegmentedTabs } from '@/components/hq/ui';
+import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 import { HqModal } from '@/components/hq/ui/HqModal';
 import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
 import { CHAUFFEUR_POSITION_OPTIONS, formatBilingualChauffeurName, getEnglishPosition, validateDispatchCardProfile, type ChauffeurPositionCode } from '@/lib/dispatchCards/chauffeurIdentity';
@@ -597,16 +598,23 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
                     inputMode={field.label === '전화번호' ? 'tel' : 'text'} />
                 </label>
               ))}
-              <label className="block space-y-1.5">
-                <span className="text-[12px] font-medium text-[#526680]">직책</span>
-                <HqSelect value={positionCode} onChange={event => setPositionCode(event.target.value as ChauffeurPositionCode | '')}
-                  aria-label="기사 직책 선택">
-                  <option value="">직책 선택</option>
-                  {CHAUFFEUR_POSITION_OPTIONS.map(option => (
-                    <option key={option.value} value={option.value}>{option.label} ({option.english})</option>
-                  ))}
-                </HqSelect>
-              </label>
+              <div className="space-y-1.5">
+                <span className="block text-[12px] font-medium text-[#526680]">직책</span>
+                <HqSearchSelect
+                  label="기사 직책 선택"
+                  value={positionCode}
+                  onChange={next => setPositionCode(next as ChauffeurPositionCode | '')}
+                  placeholder="직책 선택"
+                  emptyLabel="선택하지 않음"
+                  size="md"
+                  options={CHAUFFEUR_POSITION_OPTIONS.map(option => ({
+                    value: option.value,
+                    label: option.label,
+                    subtitle: option.english,
+                  }))}
+                  disabled={busy || portraitSaving}
+                />
+              </div>
             </div>
             <p className="mt-3 text-[11px] leading-relaxed text-[#8492A4]">
               카드에는 이름을 한·영 한 줄로, 직책은 영어로 표시합니다. 원본 기사 계정 정보는 바꾸지 않습니다.
