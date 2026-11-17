@@ -534,7 +534,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
       isOpen={isOpen}
       title="배차카드 만들기"
       subtitle="기사 정보 한 번으로 모든 차량 카드 완성"
-      icon={<span className="flex size-10 shrink-0 items-center justify-center rounded-[14px] bg-[#EEF3FF] text-[#1E60F3]"><UserRound className="size-5" /></span>}
+      icon={<img src="/images/icons/drivers/icon_profile_card.png" alt="" aria-hidden="true" draggable={false} className="size-10 shrink-0 object-contain" />}
       onClose={closeModal}
       className="max-w-[1180px]! w-full"
       footer={
