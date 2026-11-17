@@ -607,6 +607,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
                   onChange={next => setPositionCode(next as ChauffeurPositionCode | '')}
                   placeholder="직책 선택"
                   emptyLabel="선택하지 않음"
+                  searchable={false}
                   size="md"
                   options={CHAUFFEUR_POSITION_OPTIONS.map(option => ({
                     value: option.value,
