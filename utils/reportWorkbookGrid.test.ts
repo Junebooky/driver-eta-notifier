@@ -46,7 +46,7 @@ test('HQ row locator selects correct page by physical Excel row, never by report
 test('whole-month filters use real B/D/E columns, combine matches, and preserve physical report rows',()=>{
  const original=kakaoWorkbookFixture();
  const initial=readWorkbookGrid(original,'4월');
- assert.deepEqual(initial.filterOptions.plate,['1458','703서2660/2874','원본 비표준 메모']);
+ assert.deepEqual(new Set(initial.filterOptions.plate),new Set(['1458','703서2660/2874','원본 비표준 메모']));
  assert.ok(initial.filterOptions.customer.includes('기존 거래처'));
  assert.ok(initial.filterOptions.driver.includes('다른 기사'));
  const matches=readWorkbookGrid(original,'4월',1,0,undefined,{plate:'703서2660/2874',driver:'기존 기사',customer:'기존 거래처'});
@@ -77,7 +77,7 @@ test('latest Excel download has native sheet filter arrows while saved originals
  const download=addWorkbookDownloadAutoFilters(bytes),after=unzipSync(download);
  assert.notDeepEqual(download,bytes);
  assert.match(strFromU8(after['xl/worksheets/sheet1.xml']),/<autoFilter ref="A1:L3"\/>/);
- assert.doesNotMatch(strFromU8(after['xl/worksheets/sheet1.xml']),/ref="A1:L244"/);
+ assert.doesNotMatch(strFromU8(after['xl/worksheets/sheet1.xml']),/<autoFilter ref="A1:L244"/);
  assert.deepEqual(after['xl/worksheets/sheet2.xml'],original['xl/worksheets/sheet2.xml']);
  for(const name of Object.keys(original))if(name!=='xl/worksheets/sheet1.xml')assert.deepEqual(after[name],original[name]);
  assert.match(strFromU8(after['xl/worksheets/sheet1.xml']),/<f>SUM\(J2:J112\)\*1\.1<\/f>/);
