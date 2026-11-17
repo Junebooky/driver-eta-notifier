@@ -351,8 +351,6 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
 
       if (assetType === 'profile') await refreshProfile(activeDriver.id);
       else await refreshSummary(activeDriver.id);
-      if (pendingDelete.type === 'profile') await refreshProfile(pendingDelete.driverId);
-      else await refreshSummary(pendingDelete.driverId);
       await fetchBundle(true);
       onAssetUpdated?.();
     } catch (err: any) {
@@ -397,6 +395,8 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
       haptics.success();
       setPendingDelete(null);
       setStatusMessage({ type: 'success', text: `${pendingDelete.label}이 삭제되었습니다.` });
+      if (pendingDelete.type === 'profile') await refreshProfile(pendingDelete.driverId);
+      else await refreshSummary(pendingDelete.driverId);
       await fetchBundle(true);
       onAssetUpdated?.();
     } catch (error) {
