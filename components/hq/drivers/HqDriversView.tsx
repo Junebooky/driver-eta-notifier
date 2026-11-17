@@ -8,7 +8,7 @@ import { Plus, X, User, Phone, MapPin, Check, Loader2, AlertTriangle, ShieldAler
 import { useHqDrivers } from '@/utils/useHqDrivers';
 import { HqAdminLoginModal } from '@/components/hq/auth/HqAdminLoginModal';
 import { haptics } from '@/utils/haptics';
-import { formatPhoneNumber } from '@/utils/formatters';
+import { formatKoreanMobileInternationalInput, KOREA_MOBILE_PREFIX, normalizeKoreanMobileNumber } from '@/utils/koreanInternationalPhone';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 
 export interface HqDriversViewProps {
@@ -66,7 +66,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
 
   // New Driver Form State
   const [newName, setNewName] = useState('');
-  const [newPhone, setNewPhone] = useState('');
+  const [newPhone, setNewPhone] = useState(KOREA_MOBILE_PREFIX);
   const [newAffiliation, setNewAffiliation] = useState<'employed' | 'freelance'>('employed');
   const [newResidence, setNewResidence] = useState('서울 (강남)');
   const [isEnglish, setIsEnglish] = useState(false);
@@ -96,6 +96,11 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
   const handleCreateDriver = async (e?: React.FormEvent, allowDuplicate = false) => {
     if (e) e.preventDefault();
     if (!newName.trim()) return;
+    const cleanPhone = normalizeKoreanMobileNumber(newPhone);
+    if (!cleanPhone) {
+      setCreateError('휴대폰 번호를 입력해 주세요. 예: 01063488726 → +82-10-6348-8726');
+      return;
+    }
 
     setIsSubmitting(true);
     setCreateError(null);
@@ -107,7 +112,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
       const res = await createDriver(
         {
           name: newName.trim(),
-          phone: newPhone.trim(),
+          phone: cleanPhone,
           affiliationType: newAffiliation,
           residence: newResidence.trim(),
           englishAvailable: isEnglish,
@@ -119,7 +124,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
         haptics.success();
         setIsAddModalOpen(false);
         setNewName('');
-        setNewPhone('');
+        setNewPhone(KOREA_MOBILE_PREFIX);
         setIsEnglish(false);
         setDuplicateInfo(null);
         setCreateError(null);
@@ -310,9 +315,9 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
                   type="tel"
                   required
                   value={newPhone}
-                  onChange={(e) => setNewPhone(formatPhoneNumber(e.target.value))}
-                  placeholder="예: 010-1234-5678"
-                  maxLength={13}
+                  onChange={(e) => setNewPhone(formatKoreanMobileInternationalInput(e.target.value))}
+                  placeholder="+82-10-1234-5678"
+                  maxLength={24}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:ring-2 focus:ring-[#1E60F3] transition-all font-mono"
                 />
               </div>
