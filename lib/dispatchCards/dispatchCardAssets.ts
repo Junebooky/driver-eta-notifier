@@ -1,4 +1,4 @@
-import type { VipRealVehicle } from '@/utils/vehicleData';
+import { findVipVehicle, type VipRealVehicle } from '@/utils/vehicleData';
 import manifest from './dispatchCardAssetManifest.json';
 
 /** Only build-verified, public vehicle images. Never commit private driver photos. */
@@ -48,11 +48,31 @@ export function resolveDispatchCardPhotos(vehicle: Car): DispatchCardPhotoSet | 
   return common ? { ...common, source: 'model' } : null;
 }
 
-export function dispatchCardVehicleLabel(vehicle: Pick<VipRealVehicle, 'modelShort' | 'model'>): string {
-  const name = vehicle.modelShort || vehicle.model;
-  if (/스타리아/.test(name)) return 'Staria Limousine';
-  if (/스프린터/.test(name)) return name.replace(/스프린터/g, 'Sprinter');
-  if (/카니발/.test(name)) return name.replace(/카니발/g, 'Carnival');
-  if (/제네시스/.test(name)) return name.replace(/제네시스/g, 'GENESIS');
-  return name.replace(/벤츠/g, 'Mercedes-Benz');
+/** Public-facing English name and verified seat count, used in both PNG layouts. */
+export function dispatchCardVehicleLabel(
+  vehicle: Pick<VipRealVehicle, 'modelShort' | 'model'> &
+    Partial<Pick<VipRealVehicle, 'plate' | 'capacity'>>,
+): string {
+  // The canonical plate record takes priority over stale DB model/capacity data.
+  const canonical = vehicle.plate ? findVipVehicle(vehicle.plate) : undefined;
+  const name = (canonical?.modelShort || vehicle.modelShort || vehicle.model).trim();
+  let model = name;
+
+  if (/스프린터|sprinter/i.test(name)) {
+    const variant = name.match(/\b(319|519)\s*CDI\b/i);
+    model = variant ? `Mercedes-Benz Sprinter ${variant[1]} CDI` :
+      name.replace(/^(?:벤츠|메르세데스-벤츠|Mercedes-Benz)?\s*스프린터/i, 'Mercedes-Benz Sprinter');
+  } else if (/스타리아/.test(name)) {
+    model = 'Staria Limousine';
+  } else if (/카니발/.test(name)) {
+    model = name.replace(/카니발/g, 'Carnival');
+  } else if (/제네시스/.test(name)) {
+    model = name.replace(/제네시스/g, 'GENESIS');
+  } else {
+    model = name.replace(/벤츠|메르세데스-벤츠/g, 'Mercedes-Benz');
+  }
+
+  const capacity = canonical?.capacity || vehicle.capacity || '';
+  const count = capacity.match(/(\d+)\s*(?:인승|seats?)/i)?.[1];
+  return count ? `${model} · ${count} Seats` : model;
 }
