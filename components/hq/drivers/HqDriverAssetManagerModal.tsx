@@ -14,6 +14,7 @@ import {
 import { HqDriverSummary } from '@/types/driverHq';
 import {
   DriverVehicleAssetBundle,
+  DriverProfileAsset,
 } from '@/types/driverVehicleAsset';
 import {
   resolveVehicleEntity,
@@ -50,6 +51,8 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
   const [vehicleSearchQuery, setVehicleSearchQuery] = useState<string>('');
 
   const [bundle, setBundle] = useState<DriverVehicleAssetBundle | null>(null);
+  // The driver's portrait does not depend on which vehicle is selected.
+  const [profileAsset, setProfileAsset] = useState<DriverProfileAsset | null>(null);
   const [vehicleAssetSummary, setVehicleAssetSummary] = useState<Record<string, { pc: boolean; mobile: boolean }>>({});
   const [isDbReady, setIsDbReady] = useState<boolean>(true);
   const [dbNotice, setDbNotice] = useState<string | null>(null);
@@ -74,6 +77,8 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
   const pcInputRef = useRef<HTMLInputElement>(null);
   const mobileInputRef = useRef<HTMLInputElement>(null);
   const bundleRequestSequence = useRef(0);
+  const profileRequestSequence = useRef(0);
+  const summaryRequestSequence = useRef(0);
 
   // Match caller selection, but never resurrect archived or browser-only cars.
   useEffect(() => {
@@ -144,7 +149,64 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
     return Object.values(vehicleAssetSummary).filter((s) => s.pc && s.mobile).length;
   }, [vehicleAssetSummary]);
 
-  // Load bundle whenever driver or vehicle selection changes
+  // Profile and fleet summary are driver-level data; fetch once per modal open
+  // or driver change and only refresh explicitly after an asset update.
+  async function refreshProfile(driverId: string) {
+    const sequence = ++profileRequestSequence.current;
+    try {
+      const response = await fetch(
+        `/api/hq/drivers/assets?driverId=${encodeURIComponent(driverId)}&type=profile`,
+        { cache: 'no-store' },
+      );
+      const result = await response.json();
+      if (sequence !== profileRequestSequence.current) return;
+      if (!response.ok || !result.ok) throw new Error(result.error || '기사 사진 조회 실패');
+      setProfileAsset(result.profile || null);
+    } catch (error) {
+      if (sequence === profileRequestSequence.current) {
+        setStatusMessage({ type: 'error',
+          text: error instanceof Error ? error.message : '기사 사진 조회 실패' });
+      }
+    }
+  }
+
+  async function refreshSummary(driverId: string) {
+    const sequence = ++summaryRequestSequence.current;
+    try {
+      const response = await fetch(
+        `/api/hq/drivers/assets?driverId=${encodeURIComponent(driverId)}&type=summary`,
+        { cache: 'no-store' },
+      );
+      const result = await response.json();
+      if (sequence !== summaryRequestSequence.current) return;
+      if (!response.ok || !result.ok) throw new Error(result.error || '배차카드 현황 조회 실패');
+      setVehicleAssetSummary(result.vehicleAssetSummary || {});
+      setIsDbReady(result.isDbReady !== false);
+      setDbNotice(result.isDbReady === false
+        ? result.dbReason || 'DB 자산 매핑 적용 대기 중' : null);
+    } catch (error) {
+      if (sequence === summaryRequestSequence.current) {
+        setStatusMessage({ type: 'error',
+          text: error instanceof Error ? error.message : '배차카드 현황 조회 실패' });
+      }
+    }
+  }
+
+  useEffect(() => {
+    ++profileRequestSequence.current;
+    ++summaryRequestSequence.current;
+    setProfileAsset(null);
+    setVehicleAssetSummary({});
+    if (!isOpen || !activeDriver?.id) return;
+    void refreshProfile(activeDriver.id);
+    void refreshSummary(activeDriver.id);
+    return () => {
+      ++profileRequestSequence.current;
+      ++summaryRequestSequence.current;
+    };
+  }, [isOpen, activeDriver?.id]);
+
+  // Vehicle selection retrieves ONLY the two card assets (not the portrait).
   const fetchBundle = async (preserveNotice = false) => {
     if (!activeDriver?.id || !assetVehicleReady) {
       setBundle(null);
@@ -155,30 +217,37 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
     setBundle(null);
     if (!preserveNotice) setStatusMessage(null);
     try {
-      const vPlate = activeVehicle.plate;
       const res = await fetch(
-        `/api/hq/drivers/assets?driverId=${encodeURIComponent(activeDriver.id)}&vehiclePlate=${encodeURIComponent(vPlate)}&type=bundle`
+        `/api/hq/drivers/assets?driverId=${encodeURIComponent(activeDriver.id)}&vehicleId=${encodeURIComponent(activeVehicle.uuid)}&type=info`,
+        { cache: 'no-store' },
       );
       const json = await res.json();
       if (requestId !== bundleRequestSequence.current) return;
       if (res.ok && json.ok) {
-        setBundle(json.bundle);
-        if (json.vehicleAssetSummary) {
-          setVehicleAssetSummary(json.vehicleAssetSummary);
-        }
-        if (json.isDbReady === false) {
-          setIsDbReady(false);
-          setDbNotice(json.dbReason || 'DB 자산 매핑 마이그레이션 적용 대기 중');
-        } else {
-          setIsDbReady(true);
-          setDbNotice(null);
-        }
+        const pcInfo = json.pcInfo || null;
+        const mobileInfo = json.mobileInfo || null;
+        setBundle({
+          driverId: activeDriver.id,
+          driverName: activeDriver.name,
+          vehicleId: activeVehicle.uuid,
+          vehiclePlate: activeVehicle.plate,
+          vehicleModel: activeVehicle.model,
+          profile: null, // Rendered separately from profileAsset, never reset on car selection.
+          pcInfo,
+          mobileInfo,
+          isReadyForCustomerDispatch: Boolean(pcInfo || mobileInfo),
+          isFullyComplete: Boolean(pcInfo && mobileInfo),
+        });
+        setIsDbReady(json.isDbReady !== false);
+        setDbNotice(json.isDbReady === false
+          ? json.dbReason || 'DB 자산 매핑 적용 대기 중' : null);
       } else {
-        setStatusMessage({ type: 'error', text: json.error || '자료 조회 실패' });
+        setStatusMessage({ type: 'error', text: json.error || '차량별 카드 조회 실패' });
       }
-    } catch (err: any) {
+    } catch (error) {
       if (requestId === bundleRequestSequence.current) {
-        setStatusMessage({ type: 'error', text: err?.message || '네트워크 오류' });
+        setStatusMessage({ type: 'error',
+          text: error instanceof Error ? error.message : '네트워크 오류' });
       }
     } finally {
       if (requestId === bundleRequestSequence.current) setIsLoading(false);
@@ -192,8 +261,8 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
       ++bundleRequestSequence.current;
       setBundle(null);
     }
-  }, [isOpen, activeDriver?.id, activeVehicle.plate, assetVehicleReady]);
-
+    return () => { ++bundleRequestSequence.current; };
+  }, [isOpen, activeDriver?.id, activeVehicle.uuid, assetVehicleReady]);
   if (!isOpen) return null;
 
   // File Upload Handler
@@ -280,6 +349,10 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
         });
       }
 
+      if (assetType === 'profile') await refreshProfile(activeDriver.id);
+      else await refreshSummary(activeDriver.id);
+      if (pendingDelete.type === 'profile') await refreshProfile(pendingDelete.driverId);
+      else await refreshSummary(pendingDelete.driverId);
       await fetchBundle(true);
       onAssetUpdated?.();
     } catch (err: any) {
@@ -423,7 +496,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
 
           {/* Quick Summary Chips for Driver */}
           <div className="flex shrink-0 items-center gap-2 self-end pt-1 sm:self-center sm:pt-4">
-            <HqBadge>{bundle?.profile ? '프로필 등록됨' : '프로필 미등록'}</HqBadge>
+            <HqBadge>{profileAsset ? '프로필 등록됨' : '프로필 미등록'}</HqBadge>
             <HqBadge>카드 {completedVehiclesCount}/{fleet.vehicles.length} 등록</HqBadge>
           </div>
         </div>
@@ -457,7 +530,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                   고객 알림톡과 모바일 명함에 표시돼요
                 </p>
               </div>
-              <HqBadge>{bundle?.profile ? '등록 완료' : '미등록'}</HqBadge>
+              <HqBadge>{profileAsset ? '등록 완료' : '미등록'}</HqBadge>
             </div>
 
             <div
@@ -482,9 +555,9 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                 : 'shadow-[0_3px_12px_rgba(35,49,78,.025)]'
                 }`}
             >
-              {bundle?.profile?.signedUrl ? (
+              {profileAsset?.signedUrl ? (
                 <img
-                  src={bundle.profile.signedUrl}
+                  src={profileAsset.signedUrl}
                   alt={activeDriver?.name || '기사 프로필'}
                   className="size-20 shrink-0 rounded-[14px] bg-white object-contain"
                 />
@@ -499,7 +572,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                 <div className="text-[12px] font-semibold text-[#24374F]">
                   {activeDriver?.name} 기사님
                 </div>
-                {!bundle?.profile && (
+                {!profileAsset && (
                   <p className="text-[10.5px] text-slate-400">
                     1:1 정방형 권장 · 최대 10MB
                   </p>
@@ -527,11 +600,11 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                     <Upload className="w-3.5 h-3.5" />
                   )}
                   <span>
-                    {bundle?.profile ? '사진 교체' : '사진 등록'}
+                    {profileAsset ? '사진 교체' : '사진 등록'}
                   </span>
                 </HqButton>
 
-                {bundle?.profile && (
+                {profileAsset && (
                   <button
                     type="button"
                     onClick={() => handleDeleteAsset('profile')}
@@ -910,7 +983,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
           driver={activeDriver}
           vehicles={fleet.vehicles}
           onClose={() => setIsAutoBuilderOpen(false)}
-          onAssetUpdated={() => { void fetchBundle(true); onAssetUpdated?.(); }}
+          onAssetUpdated={() => { void fetchBundle(true); if (activeDriver) void refreshSummary(activeDriver.id); onAssetUpdated?.(); }}
         />
       )}
       {pendingDelete && (
