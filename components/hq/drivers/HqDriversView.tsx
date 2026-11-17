@@ -98,7 +98,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
     if (!newName.trim()) return;
     const cleanPhone = normalizeKoreanMobileNumber(newPhone);
     if (!cleanPhone) {
-      setCreateError('휴대폰 번호를 입력해 주세요. 예: 01063488726 → +82-10-6348-8726');
+      setCreateError({ message: '휴대폰 번호를 입력해 주세요. 예: 01063488726 → +82-10-6348-8726' });
       return;
     }
 
