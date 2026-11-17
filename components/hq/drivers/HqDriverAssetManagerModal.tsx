@@ -27,7 +27,8 @@ import {
 } from '@/utils/vehicleData';
 import { haptics } from '@/utils/haptics';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
-import { HqButton } from '@/components/hq/ui';
+import { HqBadge, HqButton, HqCard, HqInput, HqSegmentedTabs } from '@/components/hq/ui';
+import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
 import { useHqFleetRegistry } from '@/hooks/useHqFleetRegistry';
 import { HqDispatchCardBuilderModal } from './HqDispatchCardBuilderModal';
 
@@ -126,12 +127,12 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
 
   // Counts reflect registered active vehicles, not an obsolete fixed stock list.
   const categoryTabs = useMemo(() => ([
-    { key: 'all', label: '전체', icon: Car },
-    { key: 'sprinter', label: '스프린터', icon: Bus },
-    { key: 'staria', label: '스타리아', icon: Truck },
-    { key: 'carnival', label: '카니발', icon: Truck },
-    { key: 'genesis', label: '제네시스', icon: Car },
-    { key: 's_class', label: 'S-클래스', icon: Car },
+    { key: 'all', label: '전체' },
+    { key: 'sprinter', label: '스프린터' },
+    { key: 'staria', label: '스타리아' },
+    { key: 'carnival', label: '카니발' },
+    { key: 'genesis', label: '제네시스' },
+    { key: 's_class', label: 'S-클래스' },
   ]).map(tab => ({
     ...tab, count: tab.key === 'all'
       ? fleet.vehicles.length : fleet.vehicles.filter(vehicle => vehicle.category === tab.key).length,
@@ -378,16 +379,16 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#17233B]/25 animate-in fade-in duration-200">
-      <div className="w-full max-w-4xl bg-white rounded-[21px] shadow-[0_20px_52px_rgba(35,49,78,0.12)] overflow-hidden flex flex-col max-h-[88vh]">
+    <div className="hq-ui-modal-backdrop z-[60] animate-in fade-in duration-200">
+      <div role="dialog" aria-modal="true" aria-label="기사 프로필 및 배차 카드" className="hq-ui-modal-surface relative flex w-full max-w-4xl flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
+        <div className="flex shrink-0 items-center justify-between gap-3 bg-white px-5 py-5 sm:px-6">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#1E60F3] flex items-center justify-center font-bold">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-[14px] bg-[#EEF3FF] text-[#1E60F3]">
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base font-black text-slate-900">
+              <h2 className="text-[19px] font-bold tracking-[-.03em] text-[#17233B]">
                 기사 프로필 및 배차 카드
               </h2>
             </div>
@@ -409,12 +410,9 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
         </div>
 
         {/* Top Bar: Driver Select ONLY (Decoupled from vehicle) */}
-        <div className="p-4 bg-[#F9FAFD] shrink-0 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="flex shrink-0 flex-col items-stretch justify-between gap-3 bg-[#FAFBFD] px-5 py-4 sm:flex-row sm:items-center sm:px-6">
           <div className="flex-1 min-w-0">
-            <label className="block text-[11px] font-black text-slate-700 mb-1.5 flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-[#1E60F3]" />
-              <span>기사 선택</span>
-            </label>
+            <label className="mb-1.5 block text-[12px] font-semibold text-[#526680]">기사 선택</label>
             <HqSearchSelect
               label="배차 카드 관리 기사 선택"
               value={selectedDriverId}
@@ -431,20 +429,9 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
           </div>
 
           {/* Quick Summary Chips for Driver */}
-          <div className="flex items-center gap-2 self-end sm:self-center shrink-0 pt-1 sm:pt-4">
-            <span
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border flex items-center gap-1 ${bundle?.profile
-                ? 'bg-slate-100 text-slate-700 border-slate-200'
-                : 'bg-slate-100 text-slate-500 border-slate-200'
-                }`}
-            >
-              <User className="w-3 h-3" />
-              {bundle?.profile ? '프로필 등록됨' : '프로필 미등록'}
-            </span>
-            <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-200 flex items-center gap-1">
-              <Car className="w-3 h-3" />
-              카드 {completedVehiclesCount}/{fleet.vehicles.length} 등록
-            </span>
+          <div className="flex shrink-0 items-center gap-2 self-end pt-1 sm:self-center sm:pt-4">
+            <HqBadge>{bundle?.profile ? '프로필 등록됨' : '프로필 미등록'}</HqBadge>
+            <HqBadge>카드 {completedVehiclesCount}/{fleet.vehicles.length} 등록</HqBadge>
           </div>
         </div>
 
@@ -466,7 +453,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
         )}
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto bg-[#FAFBFD] p-4 sm:p-6">
           {fleet.error && (
             <div role="alert" className="rounded-[14px] bg-[#FFF5F3] p-3 text-[12px] text-[#A85950]">
               차량 등록부 연결 실패: {fleet.error}. 차량 안내 카드 업로드를 차단했습니다.
@@ -478,13 +465,10 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
             </div>
           )}
           {/* Section 1: Driver Profile Photo (Independent 1-photo per driver) */}
-          <div className="bg-slate-50/70 rounded-2xl border border-slate-200/90 p-4 space-y-3">
+          <HqCard className="space-y-3 p-4 sm:p-5">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                  <User className="w-4 h-4 text-[#1E60F3]" />
-                  <span>기사 프로필</span>
-                </h3>
+                <h3 className="text-[14px] font-semibold text-[#21344D]">기사 프로필</h3>
                 <p className="text-[11px] text-slate-500">
                   고객 알림톡과 모바일 명함에 표시돼요
                 </p>
@@ -589,16 +573,13 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                 )}
               </div>
             </div>
-          </div>
+          </HqCard>
 
           {/* Section 2: Driver × Vehicle Info (PC horizontal & Mobile vertical) */}
-          <div className="bg-slate-50/70 rounded-2xl border border-slate-200/90 p-4 space-y-4">
+          <HqCard className="space-y-4 p-4 sm:p-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                  <Car className="w-4 h-4 text-[#1E60F3]" />
-                  <span>차량별 배차 카드</span>
-                </h3>
+                <h3 className="text-[14px] font-semibold text-[#21344D]">차량별 배차 카드</h3>
                 <p className="text-[11px] text-slate-500">
                   해당 차량 운행 시 고객에게 전달되는 전용 카드예요
                 </p>
@@ -623,48 +604,24 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
             </div>
 
             {/* Visual Vehicle Selector with Category Filter Tabs & Plate Chips */}
-            <div className="bg-white rounded-xl border border-slate-200 p-3 space-y-3 shadow-2xs">
+            <div className="space-y-3 rounded-[16px] bg-[#FAFBFD] p-3">
               <div className="flex items-center justify-between gap-2.5">
                 {/* Category Filter Tabs with no wrapping truncation */}
-                <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
-                  {categoryTabs.map((cat) => {
-                    const isSelected = selectedCategory === cat.key;
-                    const IconComp = cat.icon;
-                    return (
-                      <button
-                        key={cat.key}
-                        type="button"
-                        onClick={() => {
-                          haptics.selection();
-                          setSelectedCategory(cat.key);
-                        }}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${isSelected
-                          ? 'bg-[#1E60F3] text-white shadow-2xs'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900'
-                          }`}
-                      >
-                        <IconComp className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-white' : 'text-slate-500'}`} />
-                        <span className="whitespace-nowrap shrink-0">{cat.label}</span>
-                        <span
-                          className={`text-[10px] px-1.5 py-0.2 rounded-full font-black shrink-0 ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-200/70 text-slate-600'
-                            }`}
-                        >
-                          {cat.count}
-                        </span>
-                      </button>
-                    );
-                  })}
+                <div className="min-w-0 flex-1">
+                  <HqSegmentedTabs aria-label="차량 분류" value={selectedCategory}
+                    onValueChange={value => { haptics.selection(); setSelectedCategory(value); }}
+                    tabs={categoryTabs.map(cat => ({ id: cat.key, label: cat.label, count: cat.count }))} />
                 </div>
 
                 {/* Quick Vehicle Plate Search */}
                 <div className="relative w-36 sm:w-44 shrink-0">
                   <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
-                  <input
+                  <HqInput
                     type="text"
                     value={vehicleSearchQuery}
                     onChange={(e) => setVehicleSearchQuery(e.target.value)}
                     placeholder="차량번호나 차종 검색"
-                    className="w-full pl-8 pr-7 py-1 text-xs border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:border-[#1E60F3] placeholder:text-slate-400"
+                    className="pl-8 pr-7 text-[12px]"
                   />
                   {vehicleSearchQuery && (
                     <button
@@ -679,7 +636,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
               </div>
 
               {/* Vehicle Selection Cards Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2 max-h-48 overflow-y-auto p-1 bg-slate-50/60 rounded-xl border border-slate-200/70">
+              <div className="grid max-h-48 grid-cols-2 gap-2 overflow-y-auto rounded-[13px] bg-[#F7F9FC] p-2 sm:grid-cols-4 md:grid-cols-5">
                 {filteredVehicles.map((v) => {
                   const isSelected = selectedVehiclePlate === v.plate;
                   const thumb = getVehicleImage(v);
@@ -696,9 +653,9 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                         haptics.selection();
                         setSelectedVehiclePlate(v.plate);
                       }}
-                      className={`p-2 rounded-xl text-left transition-all border flex flex-col justify-between gap-1.5 cursor-pointer relative group ${isSelected
-                        ? 'ring-2 ring-[#1E60F3] border-[#1E60F3] bg-blue-50/30 shadow-xs'
-                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80'
+                      className={`group relative flex flex-col justify-between gap-1.5 rounded-[13px] p-2 text-left transition-all ${isSelected
+                        ? 'bg-[#F3F7FF] ring-1 ring-[#1E60F3]/50 shadow-[0_3px_9px_rgba(30,96,243,.07)]'
+                        : 'bg-white shadow-[0_3px_12px_rgba(35,49,78,.045)] hover:bg-[#F9FBFF]'
                         }`}
                     >
                       <div className="flex items-center justify-between gap-1">
@@ -737,7 +694,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
               </div>
 
               {/* Active Vehicle Status Bar (Cleaned from duplicate brand name) */}
-              <div className="px-3 py-2 bg-blue-50/50 rounded-lg border border-blue-100 flex items-center justify-between text-xs">
+              <div className="flex items-center justify-between rounded-[12px] bg-white px-3 py-3 text-xs shadow-[0_3px_10px_rgba(35,49,78,.035)]">
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] font-black text-[#1E60F3] uppercase tracking-wider">
                     현재 선택 차량:
@@ -763,11 +720,10 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
             {/* Read-only previews stay visible; manual upload is an explicit advanced action. */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Card A: PC Info (Horizontal 16:9) */}
-              <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col justify-between shadow-2xs h-full">
+              <div className="flex h-full flex-col justify-between rounded-[16px] bg-white p-4 shadow-[0_4px_16px_rgba(35,49,78,.05)]">
                 <div>
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex items-center justify-between pb-2">
                     <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-                      <img src="/images/icons/pc.png" alt="PC" className="w-4 h-4 object-contain" />
                       <span>PC용 가로 카드 (4:3)</span>
                     </span>
                     {bundle?.pcInfo ? (
@@ -893,11 +849,10 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
               </div>
 
               {/* Card B: Mobile Info (Minimal Line Wireframe matching PC preview) */}
-              <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col justify-between shadow-2xs h-full">
+              <div className="flex h-full flex-col justify-between rounded-[16px] bg-white p-4 shadow-[0_4px_16px_rgba(35,49,78,.05)]">
                 <div>
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex items-center justify-between pb-2">
                     <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-                      <img src="/images/icons/mobile.png" alt="Mobile" className="w-4 h-4 object-contain" />
                       <span>모바일용 세로 카드 (9:16)</span>
                     </span>
                     {bundle?.mobileInfo ? (
@@ -1026,11 +981,11 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                 </div>}
               </div>
             </div>
-          </div>
+          </HqCard>
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-400 shrink-0">
+        <div className="flex shrink-0 items-center justify-between bg-white px-5 py-4 text-xs text-[#73839D] sm:px-6">
           <span className="hidden sm:inline">등록된 카드는 고객 알림톡과 차량 상세 화면에 실시간으로 반영돼요.</span>
           <span className="sm:hidden">실시간 고객 배차 연동</span>
           <button
