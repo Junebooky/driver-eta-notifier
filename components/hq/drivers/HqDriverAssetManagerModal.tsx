@@ -988,6 +988,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
           vehicles={fleet.vehicles}
           onClose={() => setIsAutoBuilderOpen(false)}
           onAssetUpdated={() => { void fetchBundle(true); if (activeDriver) void refreshSummary(activeDriver.id); onAssetUpdated?.(); }}
+          onProfileUpdated={() => { if (activeDriver) void refreshProfile(activeDriver.id); onAssetUpdated?.(); }}
         />
       )}
       {pendingDelete && (
