@@ -1,9 +1,13 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {ChevronDown,ChevronUp,ChevronLeft,ChevronRight,Expand,Minimize2,FileSpreadsheet,Pencil,Save,X,ArrowUpDown,ZoomIn,ZoomOut,MessageSquareText} from 'lucide-react';
+import {ChevronDown,ChevronUp,ChevronLeft,ChevronRight,Expand,Minimize2,FileSpreadsheet,Pencil,Save,X,ArrowUpDown,ZoomIn,ZoomOut,MessageSquareText,Filter,RotateCcw} from 'lucide-react';
+import {HqSearchSelect} from './ui/HqSearchSelect';
 export type ReportExcelFocus={year:number;sheet:string;row:number;requestId:number};
 type Row={row:number;cells:string[];locked:string[]};
-type Grid={version:string;year:number;filename:string;month:string;months:string[];total:number;offset:number;limit:number;rows:Row[];columns:string[];linkedRows:number[]};
+type Grid={version:string;year:number;filename:string;month:string;months:string[];total:number;unfilteredTotal:number;filterOptions:{plate:string[];driver:string[];customer:string[]};offset:number;limit:number;rows:Row[];columns:string[];linkedRows:number[]};
+type FilterKey='plate'|'driver'|'customer';
+type SortKey=''|'B'|'D'|'E';
+const blankFilters=()=>({plate:'',driver:'',customer:''});
 type SourceLink={year:number;month:string;row:number;version:string};
 type OriginalSource={year:number;month:string;row:number;rawMessage:string;driver:string;customer:string;plate:string;submittedAt:string};
 const sourceLinkKey=(target:SourceLink)=>[target.year,target.version,target.month,target.row].join('/');
@@ -13,6 +17,11 @@ const headers=['날짜','차량번호','차종','거래처','운전자','타임'
 export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onCommitted:()=>Promise<void>;focus?:ReportExcelFocus|null}){
  const [open,setOpen]=useState(false),[month,setMonth]=useState(''),[grid,setGrid]=useState<Grid|null>(null);
  const [offset,setOffset]=useState(0);
+ const [filters,setFilters]=useState(blankFilters);
+ const [sortBy,setSortBy]=useState<SortKey>('');
+ const [sortDirection,setSortDirection]=useState<'asc'|'desc'>('asc');
+ const changeFilter=(key:FilterKey,value:string)=>{setOffset(0);setEdit(null);setFilters(current=>({...current,[key]:value}));};
+ const resetFilters=()=>{setOffset(0);setFilters(blankFilters());setSortBy('');setSortDirection('asc');};
  const [navigateTo,setNavigateTo]=useState<ReportExcelFocus|null>(null);
  const [highlightedRow,setHighlightedRow]=useState<number|null>(null);
  const [flashSequence,setFlashSequence]=useState(0);
@@ -78,7 +87,7 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
  useEffect(()=>{
   if(!focus||focus.year!==year)return;
   queueMicrotask(()=>{
-   setOpen(true);setMonth(focus.sheet);setEdit(null);setError('');
+   setOpen(true);setMonth(focus.sheet);setEdit(null);setError('');resetFilters();
    setNavigateTo(focus);
   });
  },[focus,year]);
@@ -95,6 +104,10 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
   if(target)params.set('month',target);
   params.set('offset',String(focusRow===undefined?offset:0));
   if(focusRow!==undefined)params.set('focusRow',String(focusRow));
+  else {
+   for(const key of ['plate','driver','customer'] as const)if(filters[key])params.set(key,filters[key]);
+   if(sortBy){params.set('sortBy',sortBy);params.set('sortDirection',sortDirection);}
+  }
   const r=await fetch('/api/hq/report-workbook?'+params,{cache:'no-store'});
   const data=await r.json();
   if(!r.ok)throw Error(data.error||'Excel을 불러올 수 없습니다.');
@@ -103,7 +116,7 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
    setOffset(data.offset);setHighlightedRow(focusRow);setFlashSequence(count=>count+1);
    setNavigateTo(null);
   }
- },[year,offset,dismissSource]);
+ },[year,offset,dismissSource,filters.plate,filters.driver,filters.customer,sortBy,sortDirection]);
  useEffect(()=>{
   if(!open)return;
   if(navigateTo&&navigateTo.sheet!==month)return;
@@ -270,9 +283,60 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
     </div>
    </div>
    <div role="tablist" aria-label="월별 시트" className="flex max-w-full gap-1.5 overflow-x-auto pb-1">
-    {grid?.months.map(name=><button type="button" role="tab" aria-selected={month===name} key={name} onClick={()=>{setEdit(null);setError('');setHighlightedRow(null);setNavigateTo(null);setOffset(0);setMonth(name);}}
+    {grid?.months.map(name=><button type="button" role="tab" aria-selected={month===name} key={name} onClick={()=>{setEdit(null);setError('');setHighlightedRow(null);setNavigateTo(null);resetFilters();setMonth(name);}}
      className={'shrink-0 rounded-xl px-3 py-2 text-xs font-semibold '+(month===name?'bg-[#1E60F3] text-white':'bg-[#F2F4F6] text-[#6F809A]')}>{name}</button>)}
    </div>
+   {grid&&<div aria-label="Excel 열 필터 및 정렬" className="relative z-[40] flex min-w-0 flex-wrap items-center gap-2.5 rounded-2xl bg-[#F7F9FC] p-2.5 sm:p-3">
+    <span className="inline-flex shrink-0 items-center gap-1.5 px-1 text-[12px] font-semibold text-[#657892]"><Filter size={14}/>필터</span>
+    <div className="grid min-w-0 flex-[3] basis-[520px] grid-cols-1 gap-2 sm:grid-cols-3">
+     {([
+      {key:'plate',label:'차량번호',options:grid.filterOptions?.plate??[]},
+      {key:'driver',label:'운전자명',options:grid.filterOptions?.driver??[]},
+      {key:'customer',label:'거래처명',options:grid.filterOptions?.customer??[]},
+     ] as const).map(item=><div key={item.key} className="min-w-0">
+      <HqSearchSelect
+       size="sm"
+       label={item.label+' 필터'}
+       placeholder={item.label+' 전체'}
+       emptyLabel="전체 보기"
+       value={filters[item.key]}
+       onChange={value=>changeFilter(item.key,value)}
+       options={item.options.map(value=>({value,label:value}))}
+      />
+     </div>)}
+    </div>
+    <div className="flex min-w-0 flex-1 basis-[200px] items-center gap-2">
+     <div className="min-w-0 flex-1">
+      <HqSearchSelect
+       size="sm"
+       label="Excel 정렬 기준"
+       placeholder="기본 순서"
+       emptyLabel="기본 순서"
+       searchable={false}
+       value={sortBy}
+       onChange={value=>{setOffset(0);setEdit(null);setSortBy(value as SortKey);}}
+       options={[
+        {value:'B',label:'차량번호순'},
+        {value:'E',label:'운전자명순'},
+        {value:'D',label:'거래처명순'},
+       ]}
+      />
+     </div>
+     <button type="button" aria-label={'정렬 방향: '+(sortDirection==='asc'?'오름차순':'내림차순')}
+      title={sortDirection==='asc'?'오름차순 · 누르면 내림차순':'내림차순 · 누르면 오름차순'}
+      disabled={!sortBy}
+      onClick={()=>{setOffset(0);setSortDirection(current=>current==='asc'?'desc':'asc');}}
+      className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#60748F] shadow-[0_3px_12px_rgba(35,49,78,.035)] hover:text-[#1E60F3] disabled:opacity-35">
+      <ArrowUpDown size={16}/>
+     </button>
+     <button type="button" aria-label="Excel 필터·정렬 초기화" title="필터·정렬 초기화"
+      disabled={!Object.values(filters).some(Boolean)&&!sortBy}
+      onClick={resetFilters}
+      className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#60748F] shadow-[0_3px_12px_rgba(35,49,78,.035)] hover:text-[#1E60F3] disabled:opacity-35">
+      <RotateCcw size={15}/>
+     </button>
+    </div>
+   </div>}
    {error&&<p role="alert" className="rounded-xl bg-[#F3F6FC] p-3 text-sm text-[#65758A]">{error}</p>}
    {grid&&<div ref={scrollRef} onScroll={syncScroll} className={'hq-excel-scroll min-w-0 max-w-full overflow-auto overscroll-contain rounded-xl border border-[#E2E9F2] '+(zoom?'min-h-0 flex-1':'max-h-[500px]')}>
     <table className="table-fixed border-collapse text-[11px] text-[#465775]" style={{width:totalWidth,...(zoom&&tableScale!==100?{zoom:tableScale/100}:{})}}><colgroup><col style={{width:52}}/>{columnWidths.map((width,index)=><col key={index} style={{width}}/>)}</colgroup>
@@ -311,10 +375,10 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
       })}
      </tr>)}</tbody>
     </table>
-    {grid.rows.length===0&&<p className="p-8 text-center text-xs text-[#8F9BAA]">이 시트에는 아직 보고가 없습니다.</p>}
+    {grid.rows.length===0&&<p className="p-8 text-center text-xs text-[#8F9BAA]">조건에 맞는 행이 없습니다.</p>}
    </div>}
    {grid&&<div className="flex items-center justify-between gap-2 pt-1"><span className="text-[11px] text-[#8A98AA]">좌우로 이동해 열을 확인하세요.{zoom&&tableScale!==100&&<span className="ml-1.5 font-semibold text-[#1E60F3]">({tableScale}% 배율 적용 중)</span>}</span><div className="flex items-center gap-1.5"><button type="button" aria-label="Excel 왼쪽으로 스크롤" disabled={scrollEdges.left} onClick={()=>scrollRef.current?.scrollBy({left:-340,behavior:'smooth'})} className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#E0E8F2] bg-[#F8FAFD] text-[#7588A1] hover:bg-[#EDF3FA] disabled:opacity-35"><ChevronLeft size={18}/></button><button type="button" aria-label="Excel 오른쪽으로 스크롤" disabled={scrollEdges.right} onClick={()=>scrollRef.current?.scrollBy({left:340,behavior:'smooth'})} className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#E0E8F2] bg-[#F8FAFD] text-[#7588A1] hover:bg-[#EDF3FA] disabled:opacity-35"><ChevronRight size={18}/></button></div></div>}
-   <p className="text-xs text-[#8392A6]">{grid?'표시 '+grid.rows.length+'행 · 전체 '+grid.total+'행':'Excel을 불러오는 중'}</p>
+   <p className="text-xs text-[#8392A6]">{grid?'표시 '+grid.rows.length+'행 · 검색 결과 '+grid.total+'행 / 전체 '+grid.unfilteredTotal+'행':'Excel을 불러오는 중'}</p>
    {grid&&grid.total>grid.limit&&<div className="flex gap-3"><button type="button" disabled={offset===0||busy} onClick={()=>{setEdit(null);setOffset(Math.max(0,offset-grid.limit));}} className="min-h-11 px-3 text-sm text-[#1E60F3] disabled:opacity-40">이전 행</button><button type="button" disabled={offset+grid.limit>=grid.total||busy} onClick={()=>{setEdit(null);setOffset(offset+grid.limit);}} className="min-h-11 px-3 text-sm text-[#1E60F3] disabled:opacity-40">다음 행</button></div>}
    {busy&&<p className="text-xs text-[#1E60F3]">저장 중...</p>}
   </div>}
