@@ -50,14 +50,14 @@ export async function readFleetRegistry(): Promise<FleetRegistryRecord[]> {
     // Keep the physical DB UUID, archived state, capacity and operator notes.
     const canonicalSprinter = canonical?.category === 'sprinter' ? canonical : null;
     const withoutTourer = (value: string) =>
-      value.replace(/투어러|tourer/gi, '').replace(/\\s+/g, ' ').trim();
+      value.replace(/투어러|tourer/gi, '').replace(/\s+/g, ' ').trim();
     const displayProfile: VipRealVehicle = canonicalSprinter ? {
       ...profile,
       model: canonicalSprinter.model,
       modelShort: canonicalSprinter.modelShort,
       subType: canonicalSprinter.subType,
       // Do not turn an old stock model thumbnail into the wrong vehicle.
-      imageUrl: /^\\/images\\/vehicles\\/sprinter_(319|519)\\.webp$/.test(profile.imageUrl || '')
+      imageUrl: /^\/images\/vehicles\/sprinter_(319|519)\.webp$/.test(profile.imageUrl || '')
         ? canonicalSprinter.imageUrl
         : profile.imageUrl || canonicalSprinter.imageUrl,
     } : profile.category === 'sprinter' ? {
