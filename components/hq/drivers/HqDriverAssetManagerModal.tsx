@@ -569,22 +569,25 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                 </div>
 
                 {/* Quick Vehicle Plate Search */}
-                <div className="relative w-36 sm:w-44 shrink-0">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
+                <div className="relative w-48 shrink-0 sm:w-52">
+                  <Search aria-hidden="true"
+                    className="pointer-events-none absolute left-3 top-1/2 z-10 size-3.5 -translate-y-1/2 text-[#94A1B2]" />
                   <HqInput
-                    type="text"
+                    type="search"
+                    aria-label="차량번호나 차종 검색"
                     value={vehicleSearchQuery}
                     onChange={(e) => setVehicleSearchQuery(e.target.value)}
-                    placeholder="차량번호나 차종 검색"
-                    className="pl-8 pr-7 text-[12px]"
+                    placeholder="차량번호·차종 검색"
+                    className="w-full py-2 pl-9 pr-8 text-center text-[12px] placeholder:text-center placeholder:text-[12px]"
                   />
                   {vehicleSearchQuery && (
                     <button
                       type="button"
+                      aria-label="차량 검색 초기화"
                       onClick={() => setVehicleSearchQuery('')}
-                      className="absolute right-2 top-1.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-[#94A1B2] hover:text-[#526680]"
                     >
-                      <X className="w-3 h-3" />
+                      <X className="size-3" />
                     </button>
                   )}
                 </div>
