@@ -24,6 +24,8 @@ export interface HqSearchSelectProps {
   size?: 'sm' | 'md';
   categoryOptions?: Array<{ value: string; label: string }>;
   imageShape?: 'circle' | 'vehicle';
+  /** Hide the filter field for short fixed lists, e.g. two chauffeur roles. */
+  searchable?: boolean;
 }
 
 /**
@@ -33,7 +35,7 @@ export interface HqSearchSelectProps {
  */
 export function HqSearchSelect({
   label, value, onChange, options, placeholder, emptyLabel,
-  disabled = false, size = 'md', categoryOptions, imageShape = 'circle',
+  disabled = false, size = 'md', categoryOptions, imageShape = 'circle', searchable = true,
 }: HqSearchSelectProps) {
   const id = useId();
   const root = useRef<HTMLDivElement>(null);
@@ -50,7 +52,7 @@ export function HqSearchSelect({
 
   useEffect(() => {
     if (!open) return;
-    searchInput.current?.focus();
+    if (searchable) searchInput.current?.focus();
     const onOutside = (event: PointerEvent) => {
       if (!root.current?.contains(event.target as Node)) setOpen(false);
     };
@@ -101,15 +103,17 @@ export function HqSearchSelect({
       {open && (
         <div id={id} role="listbox" aria-label={label}
           className="relative z-[80] mt-2 w-full min-w-0 max-w-[520px] rounded-[17px] bg-white p-2 shadow-[0_12px_35px_rgba(35,49,78,0.12)]">
-          <div className="relative">
-            <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9BA7B7]"/>
-            <input ref={searchInput} type="search" aria-label={`${label} 검색`}
-              value={search} onChange={event => setSearch(event.target.value)}
-              placeholder="이름 또는 번호 검색"
-              className="min-h-10 w-full rounded-[11px] bg-[#F7F9FC] py-2 pl-9 pr-8 text-[12px] font-medium text-[#17233B] outline-none focus:ring-2 focus:ring-[#1E60F3]/15"/>
-            {search && <button type="button" onClick={() => setSearch('')} aria-label="검색 지우기"
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#94A1B2]"><X size={14}/></button>}
-          </div>
+          {searchable && (
+            <div className="relative">
+              <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9BA7B7]"/>
+              <input ref={searchInput} type="search" aria-label={`${label} 검색`}
+                value={search} onChange={event => setSearch(event.target.value)}
+                placeholder="이름 또는 번호 검색"
+                className="min-h-10 w-full rounded-[11px] bg-[#F7F9FC] py-2 pl-9 pr-8 text-[12px] font-medium text-[#17233B] outline-none focus:ring-2 focus:ring-[#1E60F3]/15"/>
+              {search && <button type="button" onClick={() => setSearch('')} aria-label="검색 지우기"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#94A1B2]"><X size={14}/></button>}
+            </div>
+          )
           {categoryOptions && (
             <div className="flex flex-wrap gap-1 py-2">
               {[{ value: 'all', label: '전체' }, ...categoryOptions].map(item => (
