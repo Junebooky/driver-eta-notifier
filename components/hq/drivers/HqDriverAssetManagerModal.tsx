@@ -9,7 +9,6 @@ import {
   Loader2,
   ExternalLink,
   Search,
-  Sparkles,
 } from 'lucide-react';
 import { HqDriverSummary } from '@/types/driverHq';
 import {
@@ -455,9 +454,13 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between gap-3 bg-white px-5 py-5 sm:px-6">
           <div className="flex items-center gap-2.5">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-[14px] bg-[#EEF3FF] text-[#1E60F3]">
-              <Sparkles className="w-4 h-4" />
-            </div>
+            <img
+              src="/images/icons/drivers/icon_profile_card.png"
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              className="size-10 shrink-0 object-contain"
+            />
             <div>
               <h2 className="text-[19px] font-bold tracking-[-.03em] text-[#17233B]">
                 기사 프로필 및 배차 카드
