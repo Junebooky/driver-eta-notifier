@@ -22,7 +22,7 @@ function sheetEntry(entries:Record<string,Uint8Array>,sheet:string){
 export const excelCellColumn=(col:string)=>COLS.includes(col)&&col.length===1;
 export type WorkbookViewRow={row:number;cells:string[];locked:string[]};
 /** Read-only view options; sorting never changes a stored Excel row index. */
-export type WorkbookSortColumn='B'|'D'|'E';
+export type WorkbookSortColumn='A'|'B'|'C'|'D'|'E'|'F'|'G'|'H'|'I'|'J'|'K'|'L';
 export type WorkbookGridQuery={
  plate?:string;
  driver?:string;
@@ -48,7 +48,7 @@ export function readWorkbookGrid(bytes:Uint8Array,month:string,limit=300,offset=
  // filter choices. A report row has a person/company or a date plus a plate.
  const reportRows=live.filter(row=>cell('D',row)||cell('E',row)||
   (cell('B',row)&&String(sheet.cells['A'+row]?.v??'').trim()));
- const facet=(col:WorkbookSortColumn)=>[...new Set(reportRows.map(row=>cell(col,row)).filter(Boolean))].sort(collator.compare);
+ const facet=(col:'B'|'D'|'E')=>[...new Set(reportRows.map(row=>cell(col,row)).filter(Boolean))].sort(collator.compare);
  const filterOptions={plate:facet('B'),customer:facet('D'),driver:facet('E')};
  const selected:[WorkbookSortColumn,string][]=[
   ['B',query.plate?.trim()??''],['D',query.customer?.trim()??''],['E',query.driver?.trim()??''],
@@ -56,13 +56,19 @@ export function readWorkbookGrid(bytes:Uint8Array,month:string,limit=300,offset=
  // A report's location is always its actual Excel row, even when filters were set.
  let visible=focusRow===undefined&&selected.length?
   live.filter(row=>selected.every(([col,value])=>cell(col,row)===value)):live;
- if(focusRow===undefined&&query.sortBy&&['B','D','E'].includes(query.sortBy)){
+ if(focusRow===undefined&&query.sortBy&&COLS.includes(query.sortBy)){
   const column=query.sortBy,sign=query.sortDirection==='desc'?-1:1;
   visible=[...visible].sort((a,b)=>{
    const x=cell(column,a),y=cell(column,b);
    if(!x&&!y)return a-b;
    if(!x)return 1;
    if(!y)return -1;
+   // Dates, mileage, OT and amounts need numeric ordering, not lexical 100/20 ordering.
+   const asNumber=(raw:string)=>/^[-+]?\\d+(?:,?\\d{3})*(?:\\.\\d+)?$/.test(raw)?Number(raw.replace(/,/g,'')):NaN;
+   if(['A','I','J','L'].includes(column)){
+    const nx=asNumber(x),ny=asNumber(y);
+    if(Number.isFinite(nx)&&Number.isFinite(ny))return sign*(nx-ny)||a-b;
+   }
    return sign*collator.compare(x,y)||a-b;
   });
  }
