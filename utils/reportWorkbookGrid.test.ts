@@ -46,7 +46,7 @@ test('HQ row locator selects correct page by physical Excel row, never by report
 test('whole-month filters use real B/D/E columns, combine matches, and preserve physical report rows',()=>{
  const original=kakaoWorkbookFixture();
  const initial=readWorkbookGrid(original,'4월');
- assert.deepEqual(new Set(initial.filterOptions.plate),new Set(['1458','703서2660/2874','원본 비표준 메모']));
+ assert.deepEqual(new Set(initial.filterOptions.plate),new Set(['1458','703서2660/2874']));
  assert.ok(initial.filterOptions.customer.includes('기존 거래처'));
  assert.ok(initial.filterOptions.driver.includes('다른 기사'));
  const matches=readWorkbookGrid(original,'4월',1,0,undefined,{plate:'703서2660/2874',driver:'기존 기사',customer:'기존 거래처'});
