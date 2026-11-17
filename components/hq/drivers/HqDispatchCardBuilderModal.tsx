@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CheckCircle2, Download, ImagePlus, Loader2,
-  Monitor, Smartphone, SlidersHorizontal, UserRound, ChevronDown,
+  UserRound, ChevronDown,
 } from 'lucide-react';
 import type { HqDriverSummary } from '@/types/driverHq';
 import type { VipRealVehicle } from '@/utils/vehicleData';
@@ -30,6 +30,7 @@ import {
 import { HqButton, HqCard, HqInput, HqSelect, HqSegmentedTabs } from '@/components/hq/ui';
 import { HqModal } from '@/components/hq/ui/HqModal';
 import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
+import { CHAUFFEUR_POSITION_OPTIONS, formatBilingualChauffeurName, getEnglishPosition, validateDispatchCardProfile, type ChauffeurPositionCode } from '@/lib/dispatchCards/chauffeurIdentity';
 
 interface Props {
   isOpen: boolean;
@@ -73,7 +74,9 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   );
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [name, setName] = useState(driver.name);
-  const [position, setPosition] = useState('');
+  const [englishName, setEnglishName] = useState('');
+  const [positionCode, setPositionCode] = useState<ChauffeurPositionCode | ''>('');
+  const [savedIdentity, setSavedIdentity] = useState('');
   const [phone, setPhone] = useState(driver.phone || '');
   const [photoUrl, setPhotoUrl] = useState('');
   const [photoStored, setPhotoStored] = useState(false);
@@ -125,10 +128,13 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     smallPortraitFrame, portraitPlacement,
   );
   const portraitDirty = portraitPlacement.zoom !== portraitSavedPlacement.zoom ||
-    portraitPlacement.x !== portraitSavedPlacement.x ||
-    portraitPlacement.y !== portraitSavedPlacement.y;
+    portraitPlacement.x !== portraitSavedPlacement.x || portraitPlacement.y !== portraitSavedPlacement.y;
+  const cardProfile = { koreanName: name.trim(), englishName: englishName.trim(), positionCode, phone: phone.trim() };
+  const validCardProfile = validateDispatchCardProfile(cardProfile);
+  const identityDirty = Boolean(validCardProfile && JSON.stringify(validCardProfile) !== savedIdentity);
+  const cardSettingsDirty = portraitDirty || identityDirty;
   const isComplete = Boolean(
-    portraitSettingsLoaded && photoStored && photoUrl && name.trim() && position.trim() && phone.trim() && vehicle && photos,
+    portraitSettingsLoaded && validCardProfile && photoStored && photoUrl && vehicle && photos,
   );
 
   useEffect(() => {
@@ -141,7 +147,8 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     if (!isOpen) return;
     const id = ++currentRequest.current;
     setName(driver.name);
-    setPosition('');
+    setEnglishName('');
+    setPositionCode('');
     setPhone(driver.phone || '');
     setPhotoUrl('');
     setPhotoStored(false);
@@ -211,7 +218,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     setPortraitSettingsLoaded(false);
     setPortraitPlacement({ ...DEFAULT_DISPATCH_PORTRAIT_PLACEMENT });
     setPortraitSavedPlacement({ ...DEFAULT_DISPATCH_PORTRAIT_PLACEMENT });
-    void fetch('/api/hq/drivers/assets/portrait?driverId=' + encodeURIComponent(driver.id), {
+    void fetch('/api/hq/drivers/assets/card-profile?driverId=' + encodeURIComponent(driver.id), {
       cache: 'no-store',
     })
       .then(async response => {
@@ -223,6 +230,14 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
         const placement = normalizePortraitPlacement(data.placement);
         setPortraitPlacement(placement);
         setPortraitSavedPlacement(placement);
+        if (data.profile) {
+          setName(data.profile.koreanName || driver.name);
+          setEnglishName(data.profile.englishName || '');
+          setPositionCode(data.profile.positionCode || '');
+          setPhone(data.profile.phone || driver.phone || '');
+          const saved = validateDispatchCardProfile(data.profile);
+          setSavedIdentity(saved ? JSON.stringify(saved) : '');
+        }
         setPortraitSettingsLoaded(true);
       })
       .catch(error => {
@@ -233,22 +248,22 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     return () => { ++portraitRequest.current; };
   }, [isOpen, driver.id]);
 
-  /** The same settings are stored once per chauffeur, not once per vehicle. */
-  async function persistPortraitPlacement(): Promise<void> {
-    if (!portraitSettingsLoaded) throw new Error('기사 사진 구도를 먼저 불러와야 합니다.');
-    if (!portraitDirty) return;
+  /** One server write stores bilingual name, two-choice role and portrait crop per chauffeur. */
+  async function persistCardSettings(): Promise<void> {
+    if (!portraitSettingsLoaded) throw new Error('기사 배차카드 정보를 먼저 불러와야 합니다.');
+    if (!validCardProfile) throw new Error('한국어·영문 성명과 직책, 전화번호를 확인해 주세요.');
+    if (!cardSettingsDirty) return;
     setPortraitSaving(true);
     try {
-      const response = await fetch('/api/hq/drivers/assets/portrait', {
+      const response = await fetch('/api/hq/drivers/assets/card-profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ driverId: driver.id, placement: portraitPlacement }),
+        body: JSON.stringify({ driverId: driver.id, profile: validCardProfile, placement: portraitPlacement }),
       });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok || result.ok !== true) {
-        throw new Error(result.error || '기사 사진 구도 저장 실패');
-      }
+      if (!response.ok || result.ok !== true) throw new Error(result.error || '배차카드 기사 정보 저장 실패');
       setPortraitSavedPlacement(normalizePortraitPlacement(result.placement));
+      setSavedIdentity(JSON.stringify(result.profile));
     } finally {
       setPortraitSaving(false);
     }
@@ -310,8 +325,8 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     const assets = resolveDispatchCardPhotos(currentVehicle);
     if (!assets) throw new Error('해당 차량의 외관·실내 이미지가 등록되지 않았습니다.');
     return {
-      name: name.trim(),
-      position: position.trim(),
+      name: formatBilingualChauffeurName(name, englishName),
+      position: getEnglishPosition(positionCode),
       phone: phone.trim(),
       plate: currentVehicle.plate,
       model: dispatchCardVehicleLabel(currentVehicle),
@@ -358,7 +373,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     };
     // Only values used by rendering, including position adjustments, trigger preview updates.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, isComplete, vehicle?.uuid, orientation, name, position, phone, photoUrl, portraitPlacement, perVehiclePlacements]);
+  }, [isOpen, isComplete, vehicle?.uuid, orientation, name, englishName, positionCode, phone, photoUrl, portraitPlacement, perVehiclePlacements]);
 
   const updatePlacement = (key: keyof CardPlacement, value: number) => {
     if (!vehicle) return;
@@ -379,7 +394,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     setBusy(true);
     setError('');
     try {
-      await persistPortraitPlacement();
+      await persistCardSettings();
       const canvas = await renderDispatchCard(buildInput(vehicle, orientation));
       const blob = await cardCanvasToPng(canvas);
       downloadBlob(blob, 'VIP_' + cleanFilename(name) + '_' + cleanFilename(vehicle.plate) + '_' + orientation + '.png');
@@ -399,7 +414,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     const entries: Record<string, Uint8Array> = {};
     const failures: string[] = [];
     try {
-      await persistPortraitPlacement();
+      await persistCardSettings();
       for (let i = 0; i < availableVehicles.length; i++) {
         const item = availableVehicles[i];
         setProgress((i + 1) + ' / ' + availableVehicles.length + '대 생성 중 · ' + item.plate);
@@ -442,7 +457,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     let skippedCount = 0;
     const failures: string[] = [];
     try {
-      await persistPortraitPlacement();
+      await persistCardSettings();
       // Always refresh immediately before the batch. The server also rejects
       // writes to an existing slot when skipIfExists=true.
       const latest = await loadSavedCards();
@@ -545,9 +560,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
       <div className="grid min-w-0 gap-5 lg:grid-cols-[340px_minmax(0,1fr)]">
         <div className="min-w-0 space-y-4">
           <HqCard className="p-4 sm:p-5">
-            <h3 className="mb-4 flex items-center gap-2 text-[14px] font-semibold text-[#21344D]">
-              <UserRound className="size-4 text-[#1E60F3]" /> 기사 정보
-            </h3>
+            <h3 className="mb-4 text-[14px] font-semibold text-[#21344D]">기사 정보</h3>
             <div className="mb-5 flex items-center gap-3">
               <div className="flex size-[92px] shrink-0 items-center justify-center overflow-hidden rounded-[15px] bg-[#F5F7FA]">
                 {photoUrl ? <img src={photoUrl} alt="기사 프로필" className="size-full object-contain" /> :
@@ -570,8 +583,8 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
             </div>
             <div className="space-y-3">
               {([
-                { label: '기사 성명', value: name, onChange: setName, placeholder: '기사 이름' },
-                { label: '직책', value: position, onChange: setPosition, placeholder: '예: 실장 / Department Manager' },
+                { label: '한국어 성명', value: name, onChange: setName, placeholder: '윤태준' },
+                { label: '영문 성명', value: englishName, onChange: setEnglishName, placeholder: 'Tae-jun Yun' },
                 { label: '전화번호', value: phone, onChange: setPhone, placeholder: '예: +82 10 1234 5678' },
               ] as const).map(field => (
                 <label key={field.label} className="block space-y-1.5">
@@ -580,16 +593,24 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
                     placeholder={field.placeholder} maxLength={90} />
                 </label>
               ))}
+              <label className="block space-y-1.5">
+                <span className="text-[12px] font-medium text-[#526680]">직책</span>
+                <HqSelect value={positionCode} onChange={event => setPositionCode(event.target.value as ChauffeurPositionCode | '')}
+                  aria-label="기사 직책 선택">
+                  <option value="">직책 선택</option>
+                  {CHAUFFEUR_POSITION_OPTIONS.map(option => (
+                    <option key={option.value} value={option.value}>{option.label} ({option.english})</option>
+                  ))}
+                </HqSelect>
+              </label>
             </div>
             <p className="mt-3 text-[11px] leading-relaxed text-[#8492A4]">
-              기사 정보 수정은 생성할 카드에만 적용되며 기사 원본 정보는 바뀌지 않습니다.
+              카드에는 이름을 한·영 한 줄로, 직책은 영어로 표시합니다. 원본 기사 계정 정보는 바꾸지 않습니다.
             </p>
           </HqCard>
 
           <HqCard className="p-4 sm:p-5">
-            <h3 className="mb-1 flex items-center gap-2 text-[14px] font-semibold text-[#21344D]">
-              <SlidersHorizontal className="size-4 text-[#1E60F3]" /> 기사 사진 구도
-            </h3>
+            <h3 className="mb-1 text-[14px] font-semibold text-[#21344D]">기사 사진 구도</h3>
             <p className="mb-4 text-[11px] leading-relaxed text-[#8492A4]">
               기사마다 얼굴 크기가 달라도 맞출 수 있어요. 미리보기와 오른쪽 완성 카드를 보면서 조절하세요.
             </p>
@@ -638,11 +659,11 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
                 기본 구도 복원
               </HqButton>
               <HqButton variant={portraitDirty ? 'primary' : 'secondary'} size="sm"
-                disabled={!portraitSettingsLoaded || !portraitDirty || busy || portraitSaving}
+                disabled={!portraitSettingsLoaded || !cardSettingsDirty || !validCardProfile || busy || portraitSaving}
                 loading={portraitSaving}
                 onClick={() => {
-                  void persistPortraitPlacement()
-                    .then(() => setMessage('기사 사진 구도를 저장했습니다. 이후 새 차량 카드에도 동일하게 적용됩니다.'))
+                  void persistCardSettings()
+                    .then(() => setMessage('기사 정보와 사진 구도를 저장했습니다. 이후 새 차량 카드에도 동일하게 적용됩니다.'))
                     .catch(err => setError(err instanceof Error ? err.message : '사진 구도 저장 실패'));
                 }}>
                 구도 저장
@@ -650,7 +671,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
             </div>
             <p className="mt-3 text-[11px] leading-relaxed text-[#8492A4]">
               {portraitSettingsLoaded
-                ? portraitDirty
+                ? cardSettingsDirty
                   ? '미저장 변경사항이 있습니다. 카드 등록·다운로드 시에도 자동 저장됩니다.'
                   : '기사별 설정 저장됨 · 이후 만드는 PC·모바일 카드에 공통 적용 (기존 등록 카드는 유지)'
                 : '기사별 사진 설정 불러오는 중…'}
@@ -685,9 +706,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
           </HqCard>
 
           <HqCard className="p-4 sm:p-5">
-            <h3 className="mb-3 flex items-center gap-2 text-[14px] font-semibold text-[#21344D]">
-              <SlidersHorizontal className="size-4 text-[#1E60F3]" /> 이미지 위치 조정
-            </h3>
+            <h3 className="mb-3 text-[14px] font-semibold text-[#21344D]">이미지 위치 조정</h3>
             <HqSegmentedTabs aria-label="조정할 차량 이미지" value={photoKind}
               onValueChange={value => setPhotoKind(value as CardPhotoKind)}
               tabs={[
@@ -735,8 +754,8 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
               <HqSegmentedTabs aria-label="배차카드 미리보기 규격" value={orientation}
                 onValueChange={value => setOrientation(value as CardOrientation)}
                 tabs={[
-                  { id: 'pc', label: <><Monitor className="size-4" /> PC</> },
-                  { id: 'mobile', label: <><Smartphone className="size-4" /> 모바일</> },
+                  { id: 'pc', label: 'PC' },
+                  { id: 'mobile', label: '모바일' },
                 ]} />
             </div>
             <div className="flex min-h-[280px] items-center justify-center bg-[#F5F7FA] p-4 sm:min-h-[430px] sm:p-6">
