@@ -20,8 +20,8 @@ test('VIP Real Vehicles - Model Image Mapping Policy (Issue #10)', async (t) => 
 
   await t.test('2. Sprinter 519 CDI (8 vehicles) all share sprinter_519.webp', () => {
     const plates519 = [
+      '125호 9982',
       '700호 1458',
-      '125호 8040',
       '703서 2658',
       '70호 3864',
       '71두 3338',
@@ -37,8 +37,8 @@ test('VIP Real Vehicles - Model Image Mapping Policy (Issue #10)', async (t) => 
     }
   });
 
-  await t.test('3. Sprinter 319 CDI (9982) uses sprinter_319.webp', () => {
-    const plates319 = ['125호 9982'];
+  await t.test('3. Sprinter 319 CDI (8040) uses sprinter_319.webp', () => {
+    const plates319 = ['125호 8040'];
     for (const plate of plates319) {
       const veh = findVipVehicle(plate);
       assert.ok(veh, `Plate ${plate} must exist in VIP_REAL_VEHICLES`);
@@ -120,10 +120,10 @@ test('VIP Real Vehicles - Model Image Mapping Policy (Issue #10)', async (t) => 
     assert.equal(getVehicleImage({ model: '프리미엄 럭셔리 리무진 버스', category: 'bus' }), '/images/vehicles/bus.webp');
   });
 
-  await t.test('12. First vehicle is 125호 9982 (Benz Sprinter 319 CDI, 6 seats)', () => {
+  await t.test('12. First vehicle is 125호 9982 (Benz Sprinter 519 CDI, 6 seats)', () => {
     const firstVeh = VIP_REAL_VEHICLES[0];
     assert.equal(firstVeh.plate, '125호 9982');
-    assert.equal(firstVeh.model, '벤츠 스프린터 319 CDI');
+    assert.equal(firstVeh.model, '벤츠 스프린터 519 CDI');
     assert.equal(firstVeh.brand, '벤츠');
     assert.equal(firstVeh.capacity, '6인승');
     assert.equal(firstVeh.category, 'sprinter');
