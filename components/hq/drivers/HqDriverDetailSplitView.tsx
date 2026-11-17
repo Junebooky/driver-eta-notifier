@@ -477,7 +477,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
               <div className="ml-0.5 inline-flex shrink-0 items-center gap-1">
                 {/* 1. 전화 걸기 아이콘 */}
                 <div className="relative group/phone inline-flex items-center justify-center">
-                  {activeDriver.phone ? (
+                  {getDialablePhoneHref(activeDriver.phone) ? (
                     <button
                       type="button"
                       onClick={() => {
@@ -515,7 +515,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                   <div className="absolute top-full right-1/2 translate-x-1/2 pt-2 hidden group-hover/phone:flex flex-col items-center pointer-events-none z-50">
                     <div className="w-2 h-2 bg-white rotate-45 -mb-1 shadow-xs" />
                     <span className="whitespace-nowrap rounded-[12px] bg-white px-3 py-2 text-[11px] font-medium text-[#4D607C] shadow-[0_8px_22px_rgba(35,49,78,0.1)] animate-in fade-in-50 duration-150">
-                      {activeDriver.phone ? formatKoreanMobileForDisplay(activeDriver.phone) : '연락처 미등록'}
+                      {getDialablePhoneHref(activeDriver.phone) ? formatKoreanMobileForDisplay(activeDriver.phone) : '연락처 미등록'}
                     </span>
                   </div>
                 </div>
@@ -624,7 +624,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
             <div className="flex items-center justify-between">
               <span className="text-slate-400 font-semibold">연락처</span>
               <span className="font-mono font-bold text-slate-800">
-                {activeDriver.phone ? (
+                {getDialablePhoneHref(activeDriver.phone) ? (
                   <a href={getDialablePhoneHref(activeDriver.phone)} className="hover:text-[#0050FF] hover:underline transition-colors">
                     {formatKoreanMobileForDisplay(activeDriver.phone)}
                   </a>
