@@ -658,7 +658,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
                 onClick={() => setPortraitPlacement({ ...DEFAULT_DISPATCH_PORTRAIT_PLACEMENT })}>
                 기본 구도 복원
               </HqButton>
-              <HqButton variant={portraitDirty ? 'primary' : 'secondary'} size="sm"
+              <HqButton variant={cardSettingsDirty ? 'primary' : 'secondary'} size="sm"
                 disabled={!portraitSettingsLoaded || !cardSettingsDirty || !validCardProfile || busy || portraitSaving}
                 loading={portraitSaving}
                 onClick={() => {
@@ -666,7 +666,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
                     .then(() => setMessage('기사 정보와 사진 구도를 저장했습니다. 이후 새 차량 카드에도 동일하게 적용됩니다.'))
                     .catch(err => setError(err instanceof Error ? err.message : '사진 구도 저장 실패'));
                 }}>
-                구도 저장
+                기사 정보·구도 저장
               </HqButton>
             </div>
             <p className="mt-3 text-[11px] leading-relaxed text-[#8492A4]">
@@ -769,7 +769,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
               {!previewLoading && (!isComplete || !previewUrl) && (
                 <div className="space-y-2 px-2 text-center text-[#8492A4]">
                   <ImagePlus className="mx-auto size-8" strokeWidth={1.5} />
-                  <p className="text-[13px] font-semibold text-[#54657A]">기사 사진·성명·직책·전화번호를 입력해 주세요.</p>
+                  <p className="text-[13px] font-semibold text-[#54657A]">기사 사진·한국어/영문 성명·직책·전화번호를 입력해 주세요.</p>
                   <p className="text-[12px]">입력이 완료되면 선택한 차량 카드가 미리보기로 표시됩니다.</p>
                 </div>
               )}
