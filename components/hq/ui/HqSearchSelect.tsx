@@ -113,7 +113,7 @@ export function HqSearchSelect({
               {search && <button type="button" onClick={() => setSearch('')} aria-label="검색 지우기"
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#94A1B2]"><X size={14}/></button>}
             </div>
-          )
+          )}
           {categoryOptions && (
             <div className="flex flex-wrap gap-1 py-2">
               {[{ value: 'all', label: '전체' }, ...categoryOptions].map(item => (
