@@ -21,11 +21,12 @@ test('English chauffeur name and selected role must be explicitly provided', () 
   const source = { koreanName: '윤태준', englishName: '  Tae-jun  Yun ', phone: '010-0000-0000', positionCode: 'chauffeur' };
   const valid = validateDispatchCardProfile(source);
   assert.deepEqual(valid, {
-    koreanName: '윤태준', englishName: 'Tae-jun Yun', phone: '010-0000-0000', positionCode: 'chauffeur',
+    koreanName: '윤태준', englishName: 'Tae-jun Yun', phone: '+82-10-0000-0000', positionCode: 'chauffeur',
   });
   assert.equal(validateDispatchCardProfile({ ...source, englishName: '' }), null);
   assert.equal(validateDispatchCardProfile({ ...source, positionCode: 'Executive Director' }), null);
   assert.equal(validateDispatchCardProfile({ ...source, positionCode: '' }), null);
+  assert.equal(validateDispatchCardProfile({ ...source, phone: '+82-' }), null);
 });
 
 test('only Sprinter 8040 is 319 CDI; remaining registered Sprinters are 519 CDI', () => {
