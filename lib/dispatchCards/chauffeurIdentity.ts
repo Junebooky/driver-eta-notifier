@@ -1,3 +1,5 @@
+import { normalizeKoreanMobileNumber } from '@/utils/koreanInternationalPhone';
+
 /** Customer-facing chauffeur roles. These are service roles, not internal corporate ranks. */
 export const CHAUFFEUR_POSITION_OPTIONS = [
   { value: 'chauffeur', label: '의전기사', english: 'Chauffeur' },
@@ -25,10 +27,13 @@ export function validateDispatchCardProfile(value: unknown): DispatchCardProfile
   const koreanName = data.koreanName.trim();
   const englishName = data.englishName.trim().replace(/\s+/g, ' ');
   const phone = data.phone.trim();
+  const normalizedPhone = normalizeKoreanMobileNumber(phone);
   if (!koreanName || koreanName.length > 60 || !englishName || englishName.length > 80 ||
       !/^[A-Za-zÀ-ž .'-]+$/.test(englishName) ||
-      !phone || phone.length > 55 || !getEnglishPosition(data.positionCode)) return null;
-  return { koreanName, englishName, phone, positionCode: data.positionCode as ChauffeurPositionCode };
+      !phone || phone.length > 55 || !getEnglishPosition(data.positionCode) ||
+      (phone.startsWith('+82') && !normalizedPhone)) return null;
+  return { koreanName, englishName, phone: normalizedPhone || phone,
+    positionCode: data.positionCode as ChauffeurPositionCode };
 }
 
 export function formatBilingualChauffeurName(koreanName: string, englishName: string): string {
