@@ -26,6 +26,7 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
  const [highlightedRow,setHighlightedRow]=useState<number|null>(null);
  const [flashSequence,setFlashSequence]=useState(0);
  const scrollRef=useRef<HTMLDivElement>(null);
+ const gridRequestSequence=useRef(0);
  const [sourceLink,setSourceLink]=useState<SourceLink|null>(null);
  const [sourceText,setSourceText]=useState<OriginalSource|null>(null);
  const [sourceLoading,setSourceLoading]=useState(false);
@@ -100,6 +101,7 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
  },[grid,highlightedRow,flashSequence]);
 
  const load=useCallback(async(target:string,focusRow?:number)=>{
+  const requestId=++gridRequestSequence.current;
   const params=new URLSearchParams({view:'1',year:String(year)});
   if(target)params.set('month',target);
   params.set('offset',String(focusRow===undefined?offset:0));
@@ -110,6 +112,7 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
   }
   const r=await fetch('/api/hq/report-workbook?'+params,{cache:'no-store'});
   const data=await r.json();
+  if(requestId!==gridRequestSequence.current)return;
   if(!r.ok)throw Error(data.error||'Excel을 불러올 수 없습니다.');
   dismissSource();setGrid(data);setMonth(data.month);
   if(focusRow!==undefined){
@@ -123,6 +126,7 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
   void Promise.resolve().then(()=>load(month,navigateTo?.row)).catch(e=>{
    setNavigateTo(null);setError((e as Error).message);
   });
+  return ()=>{++gridRequestSequence.current;};
  },[open,month,load,navigateTo]);
  async function sortMonth(){
   if(!grid||busy)return;
