@@ -650,7 +650,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                   <Search aria-hidden="true"
                     className="pointer-events-none absolute left-3 top-1/2 z-10 size-3.5 -translate-y-1/2 text-[#94A1B2]" />
                   <HqInput
-                    type="search"
+                    type="text"
                     aria-label="차량번호나 차종 검색"
                     value={vehicleSearchQuery}
                     onChange={(e) => setVehicleSearchQuery(e.target.value)}
