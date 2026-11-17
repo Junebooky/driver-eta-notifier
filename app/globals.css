@@ -723,6 +723,17 @@ dialog::backdrop {
   line-height: 1.5;
 }
 .hq-ui-field::placeholder { color: #95A3B9; }
+/* Compact search with a leading icon: preserve 12px centered placeholder at every breakpoint. */
+.hq-ui-field.hq-ui-search-compact {
+  padding-left: 36px;
+  padding-right: 32px;
+  text-align: center;
+  font-size: 12px;
+}
+.hq-ui-field.hq-ui-search-compact::placeholder {
+  font-size: 12px;
+  text-align: center;
+}
 .hq-ui-field:disabled { opacity: .5; cursor: not-allowed; }
 .hq-ui-field:focus-visible {
   border-color: rgba(30,96,243,.18);
