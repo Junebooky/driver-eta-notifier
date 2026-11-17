@@ -14,6 +14,7 @@ test('Korean mobile entry automatically converts 010 to the +82 international fo
     '010-6348-8726',
     '+82-10-6348-8726',
     '+82 10 6348 8726',
+    '+821063488726',
     '+82-01063488726',
     '821063488726',
     '10-6348-8726',
