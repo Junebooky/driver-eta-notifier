@@ -628,20 +628,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                           alt={v.modelShort}
                           className="w-9 h-6 object-contain shrink-0 filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.18)]"
                         />
-                        {isComplete ? (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-50 text-[#1E60F3] text-[9.5px] font-semibold shrink-0">
-                            <span className="w-3.5 h-3.5 rounded-full bg-[#1E60F3] text-white flex items-center justify-center shrink-0">
-                              <Check className="w-2 h-2 stroke-[2.5]" />
-                            </span>
-                            <span>완비</span>
-                          </span>
-                        ) : isPartial ? (
-                          <span className="px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-800 text-[9px] font-black">
-                            1건
-                          </span>
-                        ) : (
-                          <span className="w-2 h-2 rounded-full bg-slate-200" title="안내 카드 미등록" />
-                        )}
+                        {isComplete ? <HqBadge>완비</HqBadge> : isPartial ? <HqBadge>1건</HqBadge> : <span className="size-2 rounded-full bg-[#DDE3EC]" title="카드 미등록" />}
                       </div>
 
                       <div className="min-w-0">
@@ -690,18 +677,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                     <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
                       <span>PC용 가로 카드 (4:3)</span>
                     </span>
-                    {bundle?.pcInfo ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-[#1E60F3] text-xs font-semibold">
-                        <span className="w-4 h-4 rounded-full bg-[#1E60F3] text-white flex items-center justify-center shrink-0">
-                          <Check className="w-2.5 h-2.5 stroke-[2.5]" />
-                        </span>
-                        <span>등록 완료</span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 text-xs font-semibold">
-                        미등록
-                      </span>
-                    )}
+                    <HqBadge>{bundle?.pcInfo ? '등록 완료' : '미등록'}</HqBadge>
                   </div>
                 </div>
 
@@ -731,10 +707,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                       setIsDraggingPc(false);
                     }}
                     onDrop={(e) => handleDropFile(e, 'info', 'pc')}
-                    className={`w-full aspect-[4/3] rounded-xl overflow-hidden border transition-all flex items-center justify-center relative group ${isManualUploadOpen ? 'cursor-pointer' : 'cursor-default'} ${isDraggingPc
-                      ? 'border-2 border-dashed border-[#1E60F3] bg-blue-50/60 ring-2 ring-blue-300'
-                      : 'border-slate-200 bg-white hover:border-blue-400'
-                      }`}
+                    className={'group relative flex w-full aspect-[4/3] items-center justify-center overflow-hidden rounded-[13px] bg-white transition-all ' + (isManualUploadOpen ? 'cursor-pointer' : 'cursor-default') + ' ' + (isDraggingPc ? 'ring-2 ring-[#1E60F3]/40 bg-[#F3F7FF]' : 'shadow-[0_3px_12px_rgba(35,49,78,.04)]')}
                   >
                     {bundle?.pcInfo?.signedUrl ? (
                       <>
@@ -819,18 +792,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                     <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
                       <span>모바일용 세로 카드 (9:16)</span>
                     </span>
-                    {bundle?.mobileInfo ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-[#1E60F3] text-xs font-semibold">
-                        <span className="w-4 h-4 rounded-full bg-[#1E60F3] text-white flex items-center justify-center shrink-0">
-                          <Check className="w-2.5 h-2.5 stroke-[2.5]" />
-                        </span>
-                        <span>등록 완료</span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 text-xs font-semibold">
-                        미등록
-                      </span>
-                    )}
+                    <HqBadge>{bundle?.mobileInfo ? '등록 완료' : '미등록'}</HqBadge>
                   </div>
                 </div>
 
@@ -860,10 +822,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                       setIsDraggingMobile(false);
                     }}
                     onDrop={(e) => handleDropFile(e, 'info', 'mobile')}
-                    className={`w-32 sm:w-36 aspect-[9/16] rounded-2xl border transition-all bg-white relative overflow-hidden flex flex-col group ${isManualUploadOpen ? 'cursor-pointer' : 'cursor-default'} ${isDraggingMobile
-                      ? 'border-2 border-dashed border-[#1E60F3] bg-blue-50/60 ring-2 ring-blue-300'
-                      : 'border-slate-200 shadow-2xs hover:border-blue-400'
-                      }`}
+                    className={'group relative flex w-32 flex-col overflow-hidden rounded-[13px] bg-white aspect-[9/16] transition-all sm:w-36 ' + (isManualUploadOpen ? 'cursor-pointer' : 'cursor-default') + ' ' + (isDraggingMobile ? 'ring-2 ring-[#1E60F3]/40 bg-[#F3F7FF]' : 'shadow-[0_3px_12px_rgba(35,49,78,.04)]')}
                   >
                     {/* Screen Content */}
                     <div className="flex-1 bg-white relative flex items-center justify-center overflow-hidden">
