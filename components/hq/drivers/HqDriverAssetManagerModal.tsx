@@ -27,7 +27,7 @@ import {
 } from '@/utils/vehicleData';
 import { haptics } from '@/utils/haptics';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
-import { HqBadge, HqButton, HqCard, HqInput, HqSegmentedTabs } from '@/components/hq/ui';
+import { HqBadge, HqButton, HqCard, HqIconButton, HqInput, HqSegmentedTabs } from '@/components/hq/ui';
 import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
 import { useHqFleetRegistry } from '@/hooks/useHqFleetRegistry';
 import { HqDispatchCardBuilderModal } from './HqDispatchCardBuilderModal';
@@ -400,12 +400,11 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
               disabled={!activeDriver || fleet.loading || Boolean(fleet.error)}
               onClick={() => setIsAutoBuilderOpen(true)}
             >
-              <Sparkles className="size-3.5" /> 배차카드 자동 생성
+              배차카드 자동 생성
             </HqButton>
-            <button type="button" onClick={onClose} aria-label="닫기"
-              className="flex size-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600">
-              <X className="w-5 h-5" />
-            </button>
+            <HqIconButton variant="subtle" aria-label="닫기" onClick={onClose}>
+              <X className="size-4" />
+            </HqIconButton>
           </div>
         </div>
 
@@ -435,20 +434,11 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
           </div>
         </div>
 
-        {/* Notification Status Banner */}
+        {/* Shared neutral feedback; status uses the HQ A-plan primitive. */}
         {statusMessage && (
-          <div
-            className={`px-4 py-2 text-xs font-bold flex items-center gap-2 shrink-0 ${statusMessage.type === 'success'
-              ? 'bg-emerald-50 text-emerald-800 border-b border-emerald-100'
-              : statusMessage.type === 'warning'
-                ? 'bg-amber-50 text-amber-800 border-b border-amber-100'
-                : 'bg-rose-50 text-rose-800 border-b border-rose-100'
-              }`}
-          >
-            {statusMessage.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
-            {statusMessage.type === 'warning' && <AlertTriangle className="w-4 h-4 text-amber-600" />}
-            {statusMessage.type === 'error' && <AlertTriangle className="w-4 h-4 text-rose-600" />}
-            <span>{statusMessage.text}</span>
+          <div className="shrink-0 bg-white px-5 pb-3 sm:px-6">
+            <HqInlineFeedback message={statusMessage.text}
+              tone={statusMessage.type === 'error' ? 'error' : statusMessage.type === 'success' ? 'success' : 'info'} />
           </div>
         )}
 
@@ -473,18 +463,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                   고객 알림톡과 모바일 명함에 표시돼요
                 </p>
               </div>
-              {bundle?.profile ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-[#1E60F3] text-xs font-semibold">
-                  <span className="w-4 h-4 rounded-full bg-[#1E60F3] text-white flex items-center justify-center shrink-0">
-                    <Check className="w-2.5 h-2.5 stroke-[2.5]" />
-                  </span>
-                  <span>등록 완료</span>
-                </span>
-              ) : (
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 text-xs font-semibold">
-                  미등록
-                </span>
-              )}
+              <HqBadge>{bundle?.profile ? '등록 완료' : '미등록'}</HqBadge>
             </div>
 
             <div
@@ -504,26 +483,26 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                 setIsDraggingProfile(false);
               }}
               onDrop={(e) => handleDropFile(e, 'profile')}
-              className={`flex flex-col sm:flex-row items-center gap-4 bg-white p-3.5 rounded-xl border transition-all ${isDraggingProfile
-                ? 'border-2 border-dashed border-[#1E60F3] bg-blue-50/60 ring-2 ring-blue-300'
-                : 'border-slate-200 shadow-2xs'
+              className={`flex flex-col items-center gap-4 rounded-[15px] bg-[#FAFBFD] p-4 transition-all sm:flex-row ${isDraggingProfile
+                ? 'ring-2 ring-[#1E60F3]/40 bg-[#F3F7FF]'
+                : 'shadow-[0_3px_12px_rgba(35,49,78,.025)]'
                 }`}
             >
               {bundle?.profile?.signedUrl ? (
                 <img
                   src={bundle.profile.signedUrl}
                   alt={activeDriver?.name || '기사 프로필'}
-                  className="w-20 h-20 rounded-2xl object-cover ring-2 ring-blue-100 shadow-xs shrink-0"
+                  className="size-20 shrink-0 rounded-[14px] bg-white object-contain"
                 />
               ) : (
-                <div className="w-20 h-20 rounded-2xl bg-slate-100 text-slate-400 border border-dashed border-slate-300 flex flex-col items-center justify-center text-xs font-bold shrink-0">
+                <div className="flex size-20 shrink-0 flex-col items-center justify-center rounded-[14px] bg-white text-xs font-medium text-[#8492A4]">
                   <User className="w-6 h-6 mb-1 text-slate-400" />
                   <span className="text-[10px]">사진 없음</span>
                 </div>
               )}
 
               <div className="min-w-0 flex-1 space-y-1">
-                <div className="text-xs font-black text-slate-800">
+                <div className="text-[12px] font-semibold text-[#24374F]">
                   {activeDriver?.name} 기사님
                 </div>
                 {!bundle?.profile && (
@@ -585,22 +564,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                 </p>
               </div>
 
-              {bundle?.isFullyComplete ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-[#1E60F3] text-xs font-semibold self-start sm:self-auto">
-                  <span className="w-4 h-4 rounded-full bg-[#1E60F3] text-white flex items-center justify-center shrink-0">
-                    <Check className="w-2.5 h-2.5 stroke-[2.5]" />
-                  </span>
-                  <span>완비 (PC·모바일)</span>
-                </span>
-              ) : bundle?.isReadyForCustomerDispatch ? (
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold border border-indigo-100 self-start sm:self-auto">
-                  1종 등록됨
-                </span>
-              ) : (
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 text-xs font-semibold self-start sm:self-auto">
-                  카드 미등록
-                </span>
-              )}
+              <HqBadge>{bundle?.isFullyComplete ? '완비 (PC·모바일)' : bundle?.isReadyForCustomerDispatch ? '1종 등록됨' : '카드 미등록'}</HqBadge>
             </div>
 
             {/* Visual Vehicle Selector with Category Filter Tabs & Plate Chips */}
