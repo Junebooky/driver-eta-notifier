@@ -6,7 +6,7 @@ import {workbookFromFile} from '@/utils/kakaoExcelWorkbook';
 import {parseDriverReport} from '@/utils/driverReportChat';
 import {isReportServiceType} from '@/utils/reportServiceTypes';
 import {readWorkbook,storeWorkbook} from '@/lib/driverReports/storage';
-import {readWorkbookGrid,patchWorkbookCell} from '@/utils/reportWorkbookGrid';
+import {readWorkbookGrid,patchWorkbookCell,addWorkbookDownloadAutoFilters} from '@/utils/reportWorkbookGrid';
 import {organizeManagedMonth} from '@/utils/reportWorkbookRowOrder';
 import {refitWorkbookRouteColumns} from '@/utils/reportWorkbookOperations';
 import {boundedBody,UUID,privateJson,failure,sameOrigin} from '@/lib/driverReports/http';
@@ -47,7 +47,7 @@ export async function GET(req:NextRequest){
   if(req.nextUrl.searchParams.get('download')==='1'){
    if(!w)throw new Error('장부가 없습니다.');let bytes=w.bytes;
    if(version){let q=db.from('report_workbook_versions').select('*').eq('org_id',org).eq('ledger_year',w.year!);q=version==='original'?q.eq('kind','original').order('generation',{ascending:false}).limit(1):q.eq('id',version);const r=await q.single();check(r.error);bytes=await readWorkbook(r.data!);}
-   if(!version)bytes=refitWorkbookRouteColumns(bytes); // Only the latest download gets presentation widths.
+   if(!version){bytes=refitWorkbookRouteColumns(bytes);bytes=addWorkbookDownloadAutoFilters(bytes);} // Latest download only: visual widths + native Excel filters. Immutable backups remain untouched.
    const downloadName=version?`${w.year}-excel-backup-${version==='original'?'original':version.slice(0,8)}.xlsx`:w.filename;
    return new NextResponse(Uint8Array.from(bytes),{headers:{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(downloadName)}`,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
   }
