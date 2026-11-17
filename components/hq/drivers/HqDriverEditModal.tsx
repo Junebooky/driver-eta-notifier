@@ -89,9 +89,13 @@ export const HqDriverEditModal: React.FC<HqDriverEditModalProps> = ({
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between bg-white px-5 py-5">
           <div className="flex items-center gap-2">
-            <div className="flex size-11 items-center justify-center rounded-[15px] bg-[#EEF3FF] text-[#1E60F3]">
-              <User className="w-4 h-4" />
-            </div>
+            <img
+              src="/images/icons/drivers/icon_driver.png"
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              className="size-11 shrink-0 object-contain"
+            />
             <div>
               <h3 className="text-[18px] font-bold tracking-[-0.025em] text-[#17233B]">기사 정보 수정</h3>
               <p className="text-[11px] text-slate-500 font-medium">소속 구분 및 프로필 정보를 변경할 수 있어요</p>
