@@ -22,6 +22,7 @@ import { HqDriverSummary, DriverScheduleItem } from '@/types/driverHq';
 import { useHqDrivers } from '@/utils/useHqDrivers';
 import { haptics } from '@/utils/haptics';
 import { formatPhoneNumber } from '@/utils/formatters';
+import { formatKoreanMobileForDisplay, getDialablePhoneHref } from '@/utils/koreanInternationalPhone';
 import { HqDriverAssetManagerModal } from './HqDriverAssetManagerModal';
 import { HqDriverEditModal } from './HqDriverEditModal';
 import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
@@ -403,8 +404,18 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
 
           {/* Driver Profile Header Card */}
           <div className="relative space-y-3 rounded-[18px] bg-[#FAFBFD] p-4">
-            {/* 1행: 아바타 + 기사 풀네임 + 소속 뱃지 + 수정(연필) 버튼 */}
-            <div className="flex items-center gap-3">
+            {/* Keep the edit action at top right instead of under the name. */}
+            <button
+              type="button"
+              title="기사 정보 수정"
+              aria-label="기사 정보 수정"
+              onClick={() => { haptics.selection(); setIsEditModalOpen(true); }}
+              className="absolute right-3 top-3 inline-flex size-7 items-center justify-center rounded-[9px] bg-white text-[#73839D] shadow-[0_2px_8px_rgba(35,49,78,0.045)] transition-colors hover:bg-[#EEF3FF] hover:text-[#1E60F3]"
+            >
+              <Pencil className="size-3.5" />
+            </button>
+            {/* Avatar and name reserve room for the top-right action. */}
+            <div className="flex items-center gap-3 pr-7">
               {effectiveAvatarUrl && !avatarLoadError ? (
                 <div
                   className="relative group/avatar cursor-pointer shrink-0"
@@ -441,17 +452,6 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                       소속
                     </span>
                   )}
-                  <button
-                    type="button"
-                    title="기사 정보 수정"
-                    onClick={() => {
-                      haptics.selection();
-                      setIsEditModalOpen(true);
-                    }}
-                    className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer shrink-0"
-                  >
-                    <Pencil className="w-3.5 h-3.5 stroke-[2.2]" />
-                  </button>
                 </div>
                 <p className="text-[11.5px] text-slate-500 mt-0.5 truncate">
                   {activeDriver.residence ? `${activeDriver.residence} 거주` : '거주지 미등록'}
@@ -459,10 +459,10 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
               </div>
             </div>
 
-            {/* 2행: 지원 언어 뱃지 (좌측) + 전화 & VIP의전카드 3D 아이콘 나란히 (우측) */}
-            <div className="flex items-center justify-between pt-2.5 border-t border-slate-200/60">
+            {/* Compact language chips and quick actions on one balanced row. */}
+            <div className="flex flex-wrap items-center gap-2 border-t border-slate-200/60 pt-2.5">
               {/* 언어 뱃지 */}
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="inline-flex flex-wrap items-center gap-1.5">
                 <span className="bg-white border border-slate-200/80 px-2 py-0.5 rounded-full text-[11px] font-medium text-slate-700 shadow-2xs">
                   🇰🇷 한국어
                 </span>
@@ -474,7 +474,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
               </div>
 
               {/* 액션 아이콘: 전화 & VIP 의전카드 나란히 */}
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="ml-0.5 inline-flex shrink-0 items-center gap-1">
                 {/* 1. 전화 걸기 아이콘 */}
                 <div className="relative group/phone inline-flex items-center justify-center">
                   {activeDriver.phone ? (
@@ -482,15 +482,16 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                       type="button"
                       onClick={() => {
                         haptics.lightTap();
-                        window.location.href = `tel:${activeDriver.phone}`;
+                        const uri = getDialablePhoneHref(activeDriver.phone);
+                        if (uri) window.location.href = uri;
                       }}
                       className="cursor-pointer transition-transform duration-150 group-hover/phone:scale-110 active:scale-95 flex items-center justify-center"
-                      aria-label={formatPhoneNumber(activeDriver.phone)}
+                      aria-label={'전화 걸기 ' + formatKoreanMobileForDisplay(activeDriver.phone)}
                     >
                       <img
                         src="/images/icons/drivers/icon_phone.png"
                         alt="전화 걸기"
-                        className="w-9 h-9 object-contain drop-shadow-2xs select-none"
+                        className="size-7 object-contain drop-shadow-2xs select-none"
                         draggable={false}
                       />
                     </button>
@@ -504,7 +505,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                       <img
                         src="/images/icons/drivers/icon_phone.png"
                         alt="연락처 미등록"
-                        className="w-9 h-9 object-contain select-none grayscale"
+                        className="size-7 object-contain select-none grayscale"
                         draggable={false}
                       />
                     </button>
@@ -514,7 +515,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                   <div className="absolute top-full right-1/2 translate-x-1/2 pt-2 hidden group-hover/phone:flex flex-col items-center pointer-events-none z-50">
                     <div className="w-2 h-2 bg-white rotate-45 -mb-1 shadow-xs" />
                     <span className="whitespace-nowrap rounded-[12px] bg-white px-3 py-2 text-[11px] font-medium text-[#4D607C] shadow-[0_8px_22px_rgba(35,49,78,0.1)] animate-in fade-in-50 duration-150">
-                      {activeDriver.phone ? formatPhoneNumber(activeDriver.phone) : '연락처 미등록'}
+                      {activeDriver.phone ? formatKoreanMobileForDisplay(activeDriver.phone) : '연락처 미등록'}
                     </span>
                   </div>
                 </div>
@@ -533,7 +534,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                     <img
                       src="/images/icons/drivers/icon_profile_card.png"
                       alt="프로필 카드를 관리해요"
-                      className="w-11 h-11 object-contain drop-shadow-2xs select-none"
+                      className="size-7 object-contain drop-shadow-2xs select-none"
                       draggable={false}
                     />
                   </button>
@@ -624,8 +625,8 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
               <span className="text-slate-400 font-semibold">연락처</span>
               <span className="font-mono font-bold text-slate-800">
                 {activeDriver.phone ? (
-                  <a href={`tel:${activeDriver.phone}`} className="hover:text-[#0050FF] hover:underline transition-colors">
-                    {formatPhoneNumber(activeDriver.phone)}
+                  <a href={getDialablePhoneHref(activeDriver.phone)} className="hover:text-[#0050FF] hover:underline transition-colors">
+                    {formatKoreanMobileForDisplay(activeDriver.phone)}
                   </a>
                 ) : (
                   '미등록'
