@@ -349,9 +349,11 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
         });
       }
 
-      if (assetType === 'profile') await refreshProfile(activeDriver.id);
-      else await refreshSummary(activeDriver.id);
-      await fetchBundle(true);
+      if (assetType === 'profile') {
+        await refreshProfile(activeDriver.id);
+      } else {
+        await Promise.all([refreshSummary(activeDriver.id), fetchBundle(true)]);
+      }
       onAssetUpdated?.();
     } catch (err: any) {
       setStatusMessage({ type: 'error', text: err?.message || '네트워크 오류' });
@@ -395,9 +397,11 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
       haptics.success();
       setPendingDelete(null);
       setStatusMessage({ type: 'success', text: `${pendingDelete.label}이 삭제되었습니다.` });
-      if (pendingDelete.type === 'profile') await refreshProfile(pendingDelete.driverId);
-      else await refreshSummary(pendingDelete.driverId);
-      await fetchBundle(true);
+      if (pendingDelete.type === 'profile') {
+        await refreshProfile(pendingDelete.driverId);
+      } else {
+        await Promise.all([refreshSummary(pendingDelete.driverId), fetchBundle(true)]);
+      }
       onAssetUpdated?.();
     } catch (error) {
       haptics.errorAlert();
@@ -651,7 +655,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                     value={vehicleSearchQuery}
                     onChange={(e) => setVehicleSearchQuery(e.target.value)}
                     placeholder="차량번호·차종 검색"
-                    className="w-full py-2 pl-9 pr-8 text-center text-[12px] placeholder:text-center placeholder:text-[12px]"
+                    className="hq-ui-search-compact"
                   />
                   {vehicleSearchQuery && (
                     <button
