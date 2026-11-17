@@ -1,8 +1,8 @@
 /**
  * VIP LIMOUSINE KOREA — 전체 20대 공식 차량 데이터 마스터 (Single Source of Truth)
  *
- * [벤츠 스프린터 319 CDI] 1대: 125호 9982
- * [벤츠 스프린터 519 CDI] 8대: 700호 1458, 125호 8040, 703서 2658, 70호 3864, 71두 3338, 73호 2553, 71두 3285, 711하 1058
+ * [벤츠 스프린터 319 CDI] 1대: 125호 8040
+ * [벤츠 스프린터 519 CDI] 8대: 125호 9982, 700호 1458, 703서 2658, 70호 3864, 71두 3338, 73호 2553, 71두 3285, 711하 1058
  * [현대 스타리아 리무진] 4대: 125호 7665, 125호 9037, 142호 8407, 116허 1514
  * [기아 카니발 하이리무진] 2대: 101호 7681, 193호 5336
  * [제네시스 GV80] 1대: 203호 5947
@@ -130,25 +130,25 @@ export function stripManufacturerName(rawModel: string | undefined | null): stri
 }
 
 export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
-  // 1. [벤츠 스프린터 319 CDI] 1대
+  // 1. [벤츠 스프린터 519 CDI] 1대 (9982)
   {
     id: 'veh-sp-9982',
     uuid: 'e0f7c22a-0001-4c12-8800-000000009982',
     plate: '125호 9982',
     plateShort: '9982',
-    model: '벤츠 스프린터 319 CDI',
-    modelShort: '스프린터 319 CDI',
+    model: '벤츠 스프린터 519 CDI',
+    modelShort: '스프린터 519 CDI',
     brand: '벤츠',
     category: 'sprinter',
     categoryLabel: '벤츠 스프린터',
-    subType: '319 CDI',
+    subType: '519 CDI',
     capacity: '6인승',
     status: '운행 중',
     fuelType: '디젤',
-    imageUrl: '/images/vehicles/sprinter_319.webp',
+    imageUrl: '/images/vehicles/sprinter_519.webp',
   },
 
-  // 2. [벤츠 스프린터 519 CDI] 2대 (1458, 8040)
+  // 2. [벤츠 스프린터 519 CDI] 1대 (1458), [319 CDI] 1대 (8040)
   {
     id: 'veh-sp-1458',
     uuid: 'e0f7c22a-0001-4c12-8800-000000001458',
@@ -170,16 +170,16 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     uuid: 'e0f7c22a-0001-4c12-8800-000000008040',
     plate: '125호 8040',
     plateShort: '8040',
-    model: '벤츠 스프린터 519 CDI',
-    modelShort: '스프린터 519 CDI',
+    model: '벤츠 스프린터 319 CDI',
+    modelShort: '스프린터 319 CDI',
     brand: '벤츠',
     category: 'sprinter',
     categoryLabel: '벤츠 스프린터',
-    subType: '519 CDI',
+    subType: '319 CDI',
     capacity: '11인승',
     status: '차고지 대기',
     fuelType: '디젤',
-    imageUrl: '/images/vehicles/sprinter_519.webp',
+    imageUrl: '/images/vehicles/sprinter_319.webp',
   },
 
   // 3. [벤츠 스프린터 519 CDI] 6대 (2658, 3864, 3338, 2553, 3285, 1058)
@@ -492,7 +492,7 @@ export const VIP_VEHICLE_FLEET_CATEGORIES = [
     totalCount: 9,
     activeCount: 7,
     availableCount: 2,
-    details: '319 CDI 1대 · 519 CDI 8대',
+    details: '319 CDI 1대(8040) · 519 CDI 8대',
     plates: ['125호 9982', '700호 1458', '125호 8040', '703서 2658', '70호 3864', '71두 3338', '73호 2553', '71두 3285', '711하 1058'],
   },
   {
@@ -687,10 +687,10 @@ export function getVehicleImage(
   const category = vehicle.category || '';
   const subType = (vehicle as any).subType || '';
 
-  // 1. Sprinter 519 CDI (8 vehicles: 1458, 8040, 2658, 3864, 3338, 2553, 3285, 1058)
+  // 1. Sprinter 519 CDI (8 vehicles: 9982, 1458, 2658, 3864, 3338, 2553, 3285, 1058)
   if (
+    plateShort === '9982' ||
     plateShort === '1458' ||
-    plateShort === '8040' ||
     plateShort === '2658' ||
     plateShort === '3864' ||
     plateShort === '3338' ||
@@ -702,9 +702,9 @@ export function getVehicleImage(
     return '/images/vehicles/sprinter_519.webp';
   }
 
-  // 2. Sprinter 319 CDI (1 vehicle: 9982)
+  // 2. Sprinter 319 CDI (1 vehicle: 8040)
   if (
-    plateShort === '9982' ||
+    plateShort === '8040' ||
     (category === 'sprinter' && (model.includes('319') || subType.includes('319')))
   ) {
     return '/images/vehicles/sprinter_319.webp';
