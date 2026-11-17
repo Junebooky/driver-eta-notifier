@@ -471,7 +471,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
               disabled={!activeDriver || fleet.loading || Boolean(fleet.error)}
               onClick={() => setIsAutoBuilderOpen(true)}
             >
-              배차카드 자동 생성
+              배차카드 만들기
             </HqButton>
             <HqIconButton variant="subtle" aria-label="닫기" onClick={onClose}>
               <X className="size-4" />
