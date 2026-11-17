@@ -74,6 +74,38 @@ export function readWorkbookGrid(bytes:Uint8Array,month:string,limit=300,offset=
  }));
  return {months:book.SheetNames.filter(m=>/^(?:[1-9]|1[0-2])월$/.test(m)),month,rows,total:visible.length,unfilteredTotal:live.length,filterOptions,offset,limit,columns:COLS.split('')};
 }
+/**
+ * Add native Excel dropdown filter/sort arrows to a DOWNLOAD COPY only.
+ * The stored owner original, archived versions, Excel row numbers and formulas
+ * stay byte-for-byte unchanged. Existing Excel filters and table definitions win.
+ */
+export function addWorkbookDownloadAutoFilters(bytes:Uint8Array):Uint8Array{
+ const book=workbookFromFile(bytes),entries=unzipSync(bytes);
+ let changed=false;
+ for(const month of book.SheetNames.filter(name=>/^(?:[1-9]|1[0-2])월$/.test(name))){
+  const path=sheetEntry(entries,month),source=strFromU8(entries[path]);
+  if(/<(?:autoFilter|tableParts|sheetProtection|sheetCalcPr)\b/i.test(source))continue;
+  if(!source.includes('</sheetData>'))continue;
+  const sheet=book.Sheets[month];
+  // A merged header cannot reliably host native Excel filter buttons.
+  if(sheet.merges.some(range=>range.s.r===0&&range.e.r>=0&&range.s.c<=11))continue;
+  const reportRows=Object.entries(sheet.cells).flatMap(([address,cell])=>{
+   const match=address.match(/^[DE]([2-9]|[1-9]\d+)$/);
+   return match&&String(cell.v??'').trim()?[Number(match[1])]:[];
+  });
+  if(!reportRows.length)continue;
+  const last=Math.max(...reportRows);
+  if(last>25000)continue;
+  const patched=source.replace('</sheetData>',`</sheetData><autoFilter ref="A1:L${last}"/>`);
+  if(patched===source)continue;
+  entries[path]=strToU8(patched);
+  changed=true;
+ }
+ if(!changed)return bytes;
+ const output=zipSync(entries,{level:6});
+ workbookFromFile(output); // Validate the resulting XLSX before it is sent.
+ return output;
+}
 export function patchWorkbookCell(bytes:Uint8Array,month:string,row:number,col:string,value:string){
  if(!/^(?:[1-9]|1[0-2])월$/.test(month)||!excelCellColumn(col)||!Number.isInteger(row)||row<2||row>25000)throw new Error('편집할 셀 위치를 확인해 주세요.');
  if(typeof value!=='string'||value.length>MAX_VALUE||/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(value))throw new Error('셀 값을 확인해 주세요.');
