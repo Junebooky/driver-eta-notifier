@@ -45,11 +45,32 @@ export async function readFleetRegistry(): Promise<FleetRegistryRecord[]> {
       adminMemo: typeof extras.adminMemo === 'string' ? extras.adminMemo : undefined,
       chargingSpecs: extras.chargingSpecs,
     };
+    // Display verified Sprinter models by their physical plate, even if a
+    // previously saved cockpit.vehicles row still contains the old 319/519 label.
+    // Keep the physical DB UUID, archived state, capacity and operator notes.
+    const canonicalSprinter = canonical?.category === 'sprinter' ? canonical : null;
+    const withoutTourer = (value: string) =>
+      value.replace(/투어러|tourer/gi, '').replace(/\\s+/g, ' ').trim();
+    const displayProfile: VipRealVehicle = canonicalSprinter ? {
+      ...profile,
+      model: canonicalSprinter.model,
+      modelShort: canonicalSprinter.modelShort,
+      subType: canonicalSprinter.subType,
+      // Do not turn an old stock model thumbnail into the wrong vehicle.
+      imageUrl: /^\\/images\\/vehicles\\/sprinter_(319|519)\\.webp$/.test(profile.imageUrl || '')
+        ? canonicalSprinter.imageUrl
+        : profile.imageUrl || canonicalSprinter.imageUrl,
+    } : profile.category === 'sprinter' ? {
+      ...profile,
+      model: withoutTourer(profile.model),
+      modelShort: withoutTourer(profile.modelShort),
+      subType: withoutTourer(profile.subType),
+    } : profile;
     return {
       vehicle_id: fleetId,
       organization_id: String(row.organization_id || ''),
       plate,
-      profile,
+      profile: displayProfile,
       archived: row.archived === true,
       created_at: row.created_at,
       updated_at: row.updated_at,
