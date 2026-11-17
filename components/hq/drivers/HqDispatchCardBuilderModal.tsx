@@ -40,6 +40,7 @@ interface Props {
   vehicles: VipRealVehicle[];
   onClose: () => void;
   onAssetUpdated?: () => void;
+  onProfileUpdated?: () => void;
 }
 
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
@@ -68,7 +69,7 @@ function getPhotoPreviewUrl(path: string) {
 }
 
 export const HqDispatchCardBuilderModal: React.FC<Props> = ({
-  isOpen, driver, vehicles, onClose, onAssetUpdated,
+  isOpen, driver, vehicles, onClose, onAssetUpdated, onProfileUpdated,
 }) => {
   const availableVehicles = useMemo(
     () => vehicles.filter(vehicle => Boolean(resolveDispatchCardPhotos(vehicle))),
@@ -310,7 +311,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
       setPhotoUrl(getPhotoPreviewUrl(data.storagePath));
       setPhotoStored(true);
       setMessage('기사 사진을 비공개 저장소에 저장했습니다. 카드를 미리 볼 수 있습니다.');
-      onAssetUpdated?.();
+      onProfileUpdated?.();
     } catch (err) {
       if (currentRequest.current === id) {
         setPhotoStored(false);
