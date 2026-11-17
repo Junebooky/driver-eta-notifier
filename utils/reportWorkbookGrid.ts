@@ -21,7 +21,16 @@ function sheetEntry(entries:Record<string,Uint8Array>,sheet:string){
 }
 export const excelCellColumn=(col:string)=>COLS.includes(col)&&col.length===1;
 export type WorkbookViewRow={row:number;cells:string[];locked:string[]};
-export function readWorkbookGrid(bytes:Uint8Array,month:string,limit=300,offset=0,focusRow?:number){
+/** Read-only view options; sorting never changes a stored Excel row index. */
+export type WorkbookSortColumn='B'|'D'|'E';
+export type WorkbookGridQuery={
+ plate?:string;
+ driver?:string;
+ customer?:string;
+ sortBy?:WorkbookSortColumn;
+ sortDirection?:'asc'|'desc';
+};
+export function readWorkbookGrid(bytes:Uint8Array,month:string,limit=300,offset=0,focusRow?:number,query:WorkbookGridQuery={}){
  if(!/^(?:[1-9]|1[0-2])월$/.test(month))throw new Error('월별 시트를 선택해 주세요.');
  const book=workbookFromFile(bytes),sheet=book.Sheets[month];
  if(!sheet)throw new Error('선택한 월 시트가 없습니다.');
@@ -33,17 +42,37 @@ export function readWorkbookGrid(bytes:Uint8Array,month:string,limit=300,offset=
   const v=sheet.cells[col+n]?.v;
   return formulas.has(col+n)||v!==undefined&&v!==null&&String(v)!=='';
  }));
+ const cell=(col:WorkbookSortColumn,row:number)=>String(sheet.cells[col+row]?.v??'').trim();
+ const collator=new Intl.Collator('ko-KR',{numeric:true,sensitivity:'base'});
+ const facet=(col:WorkbookSortColumn)=>[...new Set(live.map(row=>cell(col,row)).filter(Boolean))].sort(collator.compare);
+ const filterOptions={plate:facet('B'),customer:facet('D'),driver:facet('E')};
+ const selected:[WorkbookSortColumn,string][]=[
+  ['B',query.plate?.trim()??''],['D',query.customer?.trim()??''],['E',query.driver?.trim()??''],
+ ].filter((entry):entry is [WorkbookSortColumn,string]=>Boolean(entry[1]));
+ // A report's location is always its actual Excel row, even when filters were set.
+ let visible=focusRow===undefined&&selected.length?
+  live.filter(row=>selected.every(([col,value])=>cell(col,row)===value)):live;
+ if(focusRow===undefined&&query.sortBy&&['B','D','E'].includes(query.sortBy)){
+  const column=query.sortBy,sign=query.sortDirection==='desc'?-1:1;
+  visible=[...visible].sort((a,b)=>{
+   const x=cell(column,a),y=cell(column,b);
+   if(!x&&!y)return a-b;
+   if(!x)return 1;
+   if(!y)return -1;
+   return sign*collator.compare(x,y)||a-b;
+  });
+ }
  if(focusRow!==undefined){
   if(!Number.isInteger(focusRow)||focusRow<2||focusRow>25000)throw new Error('이동할 Excel 행을 확인해 주세요.');
-  const target=live.indexOf(focusRow);
+  const target=visible.indexOf(focusRow);
   if(target<0)throw new Error('선택한 보고가 현재 Excel 행에 없습니다. 운행보고 상태를 새로고침해 주세요.');
   offset=Math.floor(target/limit)*limit;
  }
- const rows:WorkbookViewRow[]=live.slice(offset,offset+limit).map(row=>({
+ const rows:WorkbookViewRow[]=visible.slice(offset,offset+limit).map(row=>({
   row,cells:COLS.split('').map(col=>{const value=sheet.cells[col+row]?.v;if(col==='A'&&typeof value==='number'&&value>20000&&value<100000){return new Date((book.date1904?Date.UTC(1904,0,1):Date.UTC(1899,11,30))+value*86400000).toISOString().slice(0,10);}return String(value??'');}),
   locked:COLS.split('').filter(col=>formulas.has(col+row))
  }));
- return {months:book.SheetNames.filter(m=>/^(?:[1-9]|1[0-2])월$/.test(m)),month,rows,total:live.length,offset,limit,columns:COLS.split('')};
+ return {months:book.SheetNames.filter(m=>/^(?:[1-9]|1[0-2])월$/.test(m)),month,rows,total:visible.length,unfilteredTotal:live.length,filterOptions,offset,limit,columns:COLS.split('')};
 }
 export function patchWorkbookCell(bytes:Uint8Array,month:string,row:number,col:string,value:string){
  if(!/^(?:[1-9]|1[0-2])월$/.test(month)||!excelCellColumn(col)||!Number.isInteger(row)||row<2||row>25000)throw new Error('편집할 셀 위치를 확인해 주세요.');
