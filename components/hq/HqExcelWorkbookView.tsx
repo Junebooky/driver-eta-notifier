@@ -6,7 +6,7 @@ export type ReportExcelFocus={year:number;sheet:string;row:number;requestId:numb
 type Row={row:number;cells:string[];locked:string[]};
 type Grid={version:string;year:number;filename:string;month:string;months:string[];total:number;unfilteredTotal:number;filterOptions:{plate:string[];driver:string[];customer:string[]};offset:number;limit:number;rows:Row[];columns:string[];linkedRows:number[]};
 type FilterKey='plate'|'driver'|'customer';
-type SortKey=''|'B'|'D'|'E';
+type SortKey=''|'A'|'B'|'C'|'D'|'E'|'F'|'G'|'H'|'I'|'J'|'K'|'L';
 const blankFilters=()=>({plate:'',driver:'',customer:''});
 type SourceLink={year:number;month:string;row:number;version:string};
 type OriginalSource={year:number;month:string;row:number;rawMessage:string;driver:string;customer:string;plate:string;submittedAt:string};
@@ -316,14 +316,9 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
        label="Excel 정렬 기준"
        placeholder="기본 순서"
        emptyLabel="기본 순서"
-       searchable={false}
        value={sortBy}
        onChange={value=>{setOffset(0);setEdit(null);setSortBy(value as SortKey);}}
-       options={[
-        {value:'B',label:'차량번호순'},
-        {value:'E',label:'운전자명순'},
-        {value:'D',label:'거래처명순'},
-       ]}
+       options={headers.map((name,index)=>({value:grid.columns[index],label:name+'순'}))}
       />
      </div>
      <button type="button" aria-label={'정렬 방향: '+(sortDirection==='asc'?'오름차순':'내림차순')}
@@ -346,7 +341,26 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
     <table className="table-fixed border-collapse text-[11px] text-[#465775]" style={{width:totalWidth,...(zoom&&tableScale!==100?{zoom:tableScale/100}:{})}}><colgroup><col style={{width:52}}/>{columnWidths.map((width,index)=><col key={index} style={{width}}/>)}</colgroup>
      <thead className="sticky top-0 z-10 bg-[#EDF2F8]"><tr>
       <th className="sticky left-0 z-20 border-b border-r border-[#DCE5F1] bg-[#EDF2F8] px-2 py-2">행</th>
-      {headers.map(h=><th key={h} className="overflow-hidden whitespace-nowrap border-b border-r border-[#DCE5F1] px-3 py-2 text-left">{h}</th>)}
+      {headers.map((h,index)=>{
+        const col=grid.columns[index] as SortKey,active=sortBy===col;
+        return <th key={h} aria-sort={active?(sortDirection==='asc'?'ascending':'descending'):'none'}
+         className="overflow-hidden whitespace-nowrap border-b border-r border-[#DCE5F1] text-left">
+         <button type="button"
+          aria-label={h+' 열 정렬'+(active?' · '+(sortDirection==='asc'?'오름차순':'내림차순'):'')}
+          title={active?(sortDirection==='asc'?'내림차순으로 정렬':'기본 순서로 복원'):'오름차순 정렬'}
+          onClick={()=>{
+           setOffset(0);setEdit(null);
+           if(active){
+            if(sortDirection==='asc')setSortDirection('desc');
+            else{setSortBy('');setSortDirection('asc');}
+           }else{setSortBy(col);setSortDirection('asc');}
+          }}
+          className={'group flex w-full items-center justify-between gap-1 px-3 py-2 text-left font-semibold transition-colors hover:bg-white/70 '+(active?'text-[#1E60F3]':'text-[#526680]')}>
+          <span className="truncate">{h}</span>
+          <ArrowUpDown size={12} className={active?'shrink-0 opacity-90':'shrink-0 opacity-35 group-hover:opacity-75'}/>
+         </button>
+        </th>;
+       })}
      </tr></thead>
      <tbody>{grid.rows.map(row=><tr key={row.row+(highlightedRow===row.row?'-'+flashSequence:'')}
       data-excel-row={row.row}
