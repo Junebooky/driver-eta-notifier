@@ -44,7 +44,11 @@ export function readWorkbookGrid(bytes:Uint8Array,month:string,limit=300,offset=
  }));
  const cell=(col:WorkbookSortColumn,row:number)=>String(sheet.cells[col+row]?.v??'').trim();
  const collator=new Intl.Collator('ko-KR',{numeric:true,sensitivity:'base'});
- const facet=(col:WorkbookSortColumn)=>[...new Set(live.map(row=>cell(col,row)).filter(Boolean))].sort(collator.compare);
+ // Footer calculations and detached handwritten notes are not vehicle/customer
+ // filter choices. A report row has a person/company or a date plus a plate.
+ const reportRows=live.filter(row=>cell('D',row)||cell('E',row)||
+  (cell('B',row)&&String(sheet.cells['A'+row]?.v??'').trim()));
+ const facet=(col:WorkbookSortColumn)=>[...new Set(reportRows.map(row=>cell(col,row)).filter(Boolean))].sort(collator.compare);
  const filterOptions={plate:facet('B'),customer:facet('D'),driver:facet('E')};
  const selected:[WorkbookSortColumn,string][]=[
   ['B',query.plate?.trim()??''],['D',query.customer?.trim()??''],['E',query.driver?.trim()??''],
