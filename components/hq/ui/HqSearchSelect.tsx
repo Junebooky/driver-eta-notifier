@@ -75,7 +75,7 @@ export function HqSearchSelect({
   };
 
   return (
-    <div className="relative min-w-0" ref={root}>
+    <div className={`relative min-w-0 ${open ? 'z-[90]' : ''}`} ref={root}>
       <button
         type="button"
         aria-label={label}
@@ -102,7 +102,7 @@ export function HqSearchSelect({
       </button>
       {open && (
         <div id={id} role="listbox" aria-label={label}
-          className="relative z-[80] mt-2 w-full min-w-0 max-w-[520px] rounded-[17px] bg-white p-2 shadow-[0_12px_35px_rgba(35,49,78,0.12)]">
+          className="absolute left-0 top-full z-[100] mt-2 w-full min-w-[210px] max-w-[520px] rounded-[17px] bg-white p-2 shadow-[0_12px_35px_rgba(35,49,78,0.12)]">
           {searchable && (
             <div className="relative">
               <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9BA7B7]"/>
