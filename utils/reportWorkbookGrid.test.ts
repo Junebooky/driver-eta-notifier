@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {unzipSync,strFromU8} from 'fflate';
 import {kakaoWorkbookFixture} from './kakaoExcelFixture';
-import {patchWorkbookCell,readWorkbookGrid} from './reportWorkbookGrid';
+import {patchWorkbookCell,readWorkbookGrid,addWorkbookDownloadAutoFilters} from './reportWorkbookGrid';
 import {workbookFromFile} from './kakaoExcelWorkbook';
 test('HQ grid reads A-L values and saves one cell while preserving other XLSX members',()=>{
  const b=kakaoWorkbookFixture(),view=readWorkbookGrid(b,'4월');
@@ -41,4 +41,69 @@ test('HQ row locator selects correct page by physical Excel row, never by report
  assert.equal(readWorkbookGrid(bytes,'4월',1,100,2).offset,0);
  assert.throws(()=>readWorkbookGrid(bytes,'4월',1,0,99999),/행/);
  assert.throws(()=>readWorkbookGrid(bytes,'4월',1,0,999),/현재 Excel 행/);
+});
+
+test('whole-month filters use real B/D/E columns, combine matches, and preserve physical report rows',()=>{
+ const original=kakaoWorkbookFixture();
+ const initial=readWorkbookGrid(original,'4월');
+ assert.deepEqual(new Set(initial.filterOptions.plate),new Set(['1458','703서2660/2874']));
+ assert.ok(initial.filterOptions.customer.includes('기존 거래처'));
+ assert.ok(initial.filterOptions.driver.includes('다른 기사'));
+ const matches=readWorkbookGrid(original,'4월',1,0,undefined,{plate:'703서2660/2874',driver:'기존 기사',customer:'기존 거래처'});
+ assert.equal(matches.total,1);
+ assert.equal(matches.rows[0].row,3);
+ assert.equal(matches.unfilteredTotal,initial.total);
+ assert.equal(readWorkbookGrid(original,'4월',300,0,undefined,{plate:'1458',customer:'기존 거래처'}).total,0);
+ assert.equal(readWorkbookGrid(original,'4월',300,0,undefined,{customer:'다른 거래처'}).rows[0].row,2);
+ assert.equal(readWorkbookGrid(original,'4월',300,0,undefined,{driver:'기존 기사'}).rows[0].row,3);
+ assert.deepEqual(kakaoWorkbookFixture(),original,'a filtered preview never mutates the source workbook');
+});
+
+test('column sorts are non-destructive, stable across pages and bypassed for physical focus',()=>{
+ const b=kakaoWorkbookFixture();
+ const ascending=readWorkbookGrid(b,'4월',1,0,undefined,{sortBy:'D',sortDirection:'asc'});
+ const descending=readWorkbookGrid(b,'4월',1,0,undefined,{sortBy:'D',sortDirection:'desc'});
+ assert.equal(ascending.rows[0].row,3);
+ assert.equal(descending.rows[0].row,2);
+ assert.equal(readWorkbookGrid(b,'4월',1,1,undefined,{sortBy:'D',sortDirection:'asc'}).rows[0].row,2);
+ const focused=readWorkbookGrid(b,'4월',1,0,3,{plate:'not this number',sortBy:'D',sortDirection:'desc'});
+ assert.equal(focused.rows[0].row,3);
+ assert.equal(focused.offset,1,'focus pages by physical row when filters are ignored');
+ assert.equal(readWorkbookGrid(b,'4월').rows[0].row,2,'the stored order never changes');
+});
+
+test('latest Excel download has native sheet filter arrows while saved originals and formulas remain unchanged',()=>{
+ const bytes=kakaoWorkbookFixture(),original=unzipSync(bytes);
+ const download=addWorkbookDownloadAutoFilters(bytes),after=unzipSync(download);
+ assert.notDeepEqual(download,bytes);
+ assert.match(strFromU8(after['xl/worksheets/sheet1.xml']),/<autoFilter ref="A1:L3"\/>/);
+ assert.doesNotMatch(strFromU8(after['xl/worksheets/sheet1.xml']),/<autoFilter ref="A1:L244"/);
+ assert.deepEqual(after['xl/worksheets/sheet2.xml'],original['xl/worksheets/sheet2.xml']);
+ for(const name of Object.keys(original))if(name!=='xl/worksheets/sheet1.xml')assert.deepEqual(after[name],original[name]);
+ assert.match(strFromU8(after['xl/worksheets/sheet1.xml']),/<f>SUM\(J2:J112\)\*1\.1<\/f>/);
+ assert.deepEqual(unzipSync(bytes)['xl/worksheets/sheet1.xml'],original['xl/worksheets/sheet1.xml']);
+ assert.equal(workbookFromFile(download).Sheets['4월'].cells.D2.v,'다른 거래처');
+ assert.equal(addWorkbookDownloadAutoFilters(download),download,'already filtered workbook is returned without rewriting');
+});
+
+test('download filters leave a protected monthly worksheet byte-for-byte unchanged',async()=>{
+ const {zipSync,strToU8}=await import('fflate'),base=unzipSync(kakaoWorkbookFixture());
+ base['xl/worksheets/sheet1.xml']=strToU8(strFromU8(base['xl/worksheets/sheet1.xml']).replace('</sheetData>','</sheetData><sheetProtection sheet="1"/>'));
+ const bytes=zipSync(base);
+ assert.deepEqual(addWorkbookDownloadAutoFilters(bytes),bytes);
+});
+
+test('all twelve columns can sort without reassigning Excel row IDs; monetary amounts sort numerically',()=>{
+ const raw=kakaoWorkbookFixture();
+ const first=patchWorkbookCell(raw,'4월',2,'J','12,000').bytes;
+ const modified=patchWorkbookCell(first,'4월',3,'J','900').bytes;
+ const ordered=readWorkbookGrid(modified,'4월',300,0,undefined,{sortBy:'J',sortDirection:'asc'});
+ assert.deepEqual(ordered.rows.filter(row=>row.row<4).map(row=>row.row),[3,2]);
+ const reversed=readWorkbookGrid(modified,'4월',300,0,undefined,{sortBy:'J',sortDirection:'desc'});
+ assert.deepEqual(reversed.rows.filter(row=>row.row<4).map(row=>row.row),[2,3]);
+ for(const col of 'ABCDEFGHIJKL' as string){
+  assert.ok(readWorkbookGrid(modified,'4월',300,0,undefined,{sortBy:col as import('./reportWorkbookGrid').WorkbookSortColumn}).rows.length>0);
+ }
+ assert.equal(workbookFromFile(modified).Sheets['4월'].cells.J2.v,12000);
+ assert.equal(workbookFromFile(modified).Sheets['4월'].cells.J3.v,900);
 });

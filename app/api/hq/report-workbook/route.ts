@@ -6,7 +6,7 @@ import {workbookFromFile} from '@/utils/kakaoExcelWorkbook';
 import {parseDriverReport} from '@/utils/driverReportChat';
 import {isReportServiceType} from '@/utils/reportServiceTypes';
 import {readWorkbook,storeWorkbook} from '@/lib/driverReports/storage';
-import {readWorkbookGrid,patchWorkbookCell} from '@/utils/reportWorkbookGrid';
+import {readWorkbookGrid,patchWorkbookCell,addWorkbookDownloadAutoFilters} from '@/utils/reportWorkbookGrid';
 import {organizeManagedMonth} from '@/utils/reportWorkbookRowOrder';
 import {refitWorkbookRouteColumns} from '@/utils/reportWorkbookOperations';
 import {boundedBody,UUID,privateJson,failure,sameOrigin} from '@/lib/driverReports/http';
@@ -29,7 +29,15 @@ export async function GET(req:NextRequest){
    const focusText=req.nextUrl.searchParams.get('focusRow');
    const focusRow=focusText===null?undefined:Number(focusText);
    if(focusRow!==undefined&&(!/^\d{1,5}$/.test(focusText!)||!Number.isInteger(focusRow)||focusRow<2||focusRow>25000))throw new Error('이동할 Excel 행을 확인해 주세요.');
-   const view=readWorkbookGrid(w.bytes,month,300,offset,focusRow);
+   const filter=(key:string)=>{const value=req.nextUrl.searchParams.get(key)||'';if(value.length>180)throw new Error('Excel 필터가 너무 깁니다.');return value;};
+   const sortBy=filter('sortBy'),sortDirection=filter('sortDirection');
+   if(sortBy&&!/^[A-L]$/.test(sortBy))throw new Error('정렬 열을 확인해 주세요.');
+   if(sortDirection&&!['asc','desc'].includes(sortDirection))throw new Error('정렬 방향을 확인해 주세요.');
+   const view=readWorkbookGrid(w.bytes,month,300,offset,focusRow,{
+    plate:filter('plate'),driver:filter('driver'),customer:filter('customer'),
+    sortBy:sortBy as import('@/utils/reportWorkbookGrid').WorkbookSortColumn|undefined,
+    sortDirection:sortDirection as 'asc'|'desc'|undefined,
+   });
    const linked=new Set(Object.values(w.manifest||{})
     .filter(where=>where.sheet===view.month).map(where=>where.row));
    return privateJson({ok:true,version:w.id,year:w.year,filename:w.filename,...view,
@@ -39,7 +47,7 @@ export async function GET(req:NextRequest){
   if(req.nextUrl.searchParams.get('download')==='1'){
    if(!w)throw new Error('장부가 없습니다.');let bytes=w.bytes;
    if(version){let q=db.from('report_workbook_versions').select('*').eq('org_id',org).eq('ledger_year',w.year!);q=version==='original'?q.eq('kind','original').order('generation',{ascending:false}).limit(1):q.eq('id',version);const r=await q.single();check(r.error);bytes=await readWorkbook(r.data!);}
-   if(!version)bytes=refitWorkbookRouteColumns(bytes); // Only the latest download gets presentation widths.
+   if(!version){bytes=refitWorkbookRouteColumns(bytes);bytes=addWorkbookDownloadAutoFilters(bytes);} // Latest download only: visual widths + native Excel filters. Immutable backups remain untouched.
    const downloadName=version?`${w.year}-excel-backup-${version==='original'?'original':version.slice(0,8)}.xlsx`:w.filename;
    return new NextResponse(Uint8Array.from(bytes),{headers:{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(downloadName)}`,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
   }
