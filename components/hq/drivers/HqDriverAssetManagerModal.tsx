@@ -524,10 +524,9 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                     e.target.value = '';
                   }}
                 />
-                <button
-                  type="button"
-                  disabled={!isDbReady || isUploading === 'profile'}
-                  onClick={() => profileInputRef.current?.click()}
+                <HqButton variant="secondary" size="sm"
+  disabled={!isDbReady || isUploading === 'profile'}
+  onClick={() => profileInputRef.current?.click()}> profileInputRef.current?.click()}
                   className="px-3.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition-colors cursor-pointer bg-blue-50 hover:bg-blue-100 text-[#1E60F3] disabled:opacity-50"
                 >
                   {isUploading === 'profile' ? (
@@ -538,7 +537,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                   <span>
                     {bundle?.profile ? '사진 교체' : '사진 등록'}
                   </span>
-                </button>
+                </HqButton>
 
                 {bundle?.profile && (
                   <button
@@ -756,10 +755,9 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                       e.target.value = '';
                     }}
                   />
-                  <button
-                    type="button"
-                    disabled={!isDbReady || !assetVehicleReady || isUploading === 'pc' || isDeleting}
-                    onClick={() => pcInputRef.current?.click()}
+                  <HqButton variant="secondary" size="sm" className="flex-1"
+  disabled={!isDbReady || !assetVehicleReady || isUploading === 'pc' || isDeleting}
+  onClick={() => pcInputRef.current?.click()}> pcInputRef.current?.click()}
                     className="flex-1 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer bg-blue-50 hover:bg-blue-100 text-[#1E60F3] disabled:opacity-50"
                   >
                     {isUploading === 'pc' ? (
@@ -770,7 +768,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                     <span>
                       {bundle?.pcInfo ? '이미지 교체' : '이미지 등록'}
                     </span>
-                  </button>
+                  </HqButton>
 
                   {bundle?.pcInfo && (
                     <button
@@ -875,10 +873,9 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                       e.target.value = '';
                     }}
                   />
-                  <button
-                    type="button"
-                    disabled={!isDbReady || !assetVehicleReady || isUploading === 'mobile' || isDeleting}
-                    onClick={() => mobileInputRef.current?.click()}
+                  <HqButton variant="secondary" size="sm" className="flex-1"
+  disabled={!isDbReady || !assetVehicleReady || isUploading === 'mobile' || isDeleting}
+  onClick={() => mobileInputRef.current?.click()}> mobileInputRef.current?.click()}
                     className="flex-1 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer bg-blue-50 hover:bg-blue-100 text-[#1E60F3] disabled:opacity-50"
                   >
                     {isUploading === 'mobile' ? (
@@ -889,7 +886,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                     <span>
                       {bundle?.mobileInfo ? '이미지 교체' : '이미지 등록'}
                     </span>
-                  </button>
+                  </HqButton>
 
                   {bundle?.mobileInfo && (
                     <button
@@ -911,13 +908,9 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
         <div className="flex shrink-0 items-center justify-between bg-white px-5 py-4 text-xs text-[#73839D] sm:px-6">
           <span className="hidden sm:inline">등록된 카드는 고객 알림톡과 차량 상세 화면에 실시간으로 반영돼요.</span>
           <span className="sm:hidden">실시간 고객 배차 연동</span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 transition-colors cursor-pointer shadow-xs"
-          >
+          <HqButton variant="secondary" onClick={onClose}>
             닫기
-          </button>
+          </HqButton>
         </div>
       </div>
       {isAutoBuilderOpen && activeDriver && (
@@ -939,16 +932,14 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
               선택한 파일이 삭제되며 고객에게 표시되지 않을 수 있습니다. 계속하시겠습니까?
             </p>
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" disabled={isDeleting}
-                onClick={() => setPendingDelete(null)}
+              <HqButton variant="subtle" size="sm" disabled={isDeleting} onClick={() => setPendingDelete(null)}> setPendingDelete(null)}
                 className="min-h-10 rounded-[12px] bg-[#F4F6FA] px-4 text-[12px] font-semibold text-[#5A6E86] disabled:opacity-50">
                 취소
-              </button>
-              <button type="button" disabled={isDeleting}
-                onClick={() => void confirmDeleteAsset()}
+              </HqButton>
+              <HqButton variant="danger" size="sm" loading={isDeleting} onClick={() => void confirmDeleteAsset()}> void confirmDeleteAsset()}
                 className="min-h-10 rounded-[12px] bg-[#A85C54] px-4 text-[12px] font-semibold text-white disabled:opacity-50">
                 {isDeleting ? '삭제 중…' : '파일 삭제'}
-              </button>
+              </HqButton>
             </div>
           </div>
         </div>
