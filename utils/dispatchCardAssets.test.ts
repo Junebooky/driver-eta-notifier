@@ -6,7 +6,7 @@ import manifest from '@/lib/dispatchCards/dispatchCardAssetManifest.json';
 
 const availableImageSets: Record<string, { exterior: string; interiorOne: string; interiorTwo: string }> = manifest;
 import { VIP_REAL_VEHICLES } from './vehicleData';
-import { dispatchCardModelFolder, resolveDispatchCardPhotos } from '@/lib/dispatchCards/dispatchCardAssets';
+import { dispatchCardModelFolder, dispatchCardVehicleLabel, resolveDispatchCardPhotos } from '@/lib/dispatchCards/dispatchCardAssets';
 import { DISPATCH_CARD_DIMENSIONS } from '@/lib/dispatchCards/renderDispatchCard';
 import {
   calculatePortraitCrop,
@@ -93,4 +93,36 @@ test('800x800 portrait covers both card frames without a blank strip even at sli
       assert.ok(image.w >= frame.w && image.h >= frame.h);
     }
   }
+});
+
+test('customer card names use official Mercedes-Benz Sprinter and the verified seats for each plate', () => {
+  const seating: Record<string, number> = {
+    '9982': 6, '1458': 9, '8040': 11, '2658': 15, '3864': 15,
+    '3338': 9, '2553': 12, '3285': 9, '1058': 12,
+  };
+  const sprinters = VIP_REAL_VEHICLES.filter(vehicle => vehicle.category === 'sprinter');
+  assert.equal(sprinters.length, Object.keys(seating).length);
+  for (const vehicle of sprinters) {
+    const expectedModel = vehicle.plateShort === '8040' ? '319' : '519';
+    assert.equal(
+      dispatchCardVehicleLabel(vehicle),
+      `Mercedes-Benz Sprinter ${expectedModel} CDI · ${seating[vehicle.plateShort]} Seats`,
+      vehicle.plate,
+    );
+  }
+
+  // A stale DB row must never change the customer-visible model or seat count.
+  const sprinter1458 = sprinters.find(vehicle => vehicle.plateShort === '1458');
+  assert.ok(sprinter1458);
+  const stale = { ...sprinter1458, modelShort: '스프린터 319 CDI', capacity: '15인승' };
+  assert.equal(dispatchCardVehicleLabel(stale), 'Mercedes-Benz Sprinter 519 CDI · 9 Seats');
+
+  const staria = VIP_REAL_VEHICLES.find(vehicle => vehicle.plateShort === '8407');
+  assert.ok(staria);
+  assert.equal(dispatchCardVehicleLabel(staria), 'Staria Limousine · 9 Seats');
+  const s560 = VIP_REAL_VEHICLES.find(vehicle => vehicle.plateShort === '3343');
+  assert.ok(s560);
+  assert.equal(dispatchCardVehicleLabel(s560), 'Mercedes-Benz S560 · 4 Seats');
+  assert.equal(dispatchCardVehicleLabel({ model: '스프린터 519 CDI', modelShort: '스프린터 519 CDI' }),
+    'Mercedes-Benz Sprinter 519 CDI');
 });
