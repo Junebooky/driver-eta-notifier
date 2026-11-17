@@ -655,14 +655,6 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
               </span>
             </div>
 
-            {activeDriver.vehicleModel && activeDriver.vehicleModel !== '차량 미지정' && (
-              <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
-                <span className="text-slate-400 font-semibold">배정 차량</span>
-                <span className="font-bold text-slate-800">
-                  {activeDriver.vehicleModel} ({activeDriver.carNumber || activeDriver.vehicleNo})
-                </span>
-              </div>
-            )}
           </div>
 
           {/* Card: 최근 운행일 */}
