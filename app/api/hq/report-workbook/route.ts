@@ -29,7 +29,15 @@ export async function GET(req:NextRequest){
    const focusText=req.nextUrl.searchParams.get('focusRow');
    const focusRow=focusText===null?undefined:Number(focusText);
    if(focusRow!==undefined&&(!/^\d{1,5}$/.test(focusText!)||!Number.isInteger(focusRow)||focusRow<2||focusRow>25000))throw new Error('이동할 Excel 행을 확인해 주세요.');
-   const view=readWorkbookGrid(w.bytes,month,300,offset,focusRow);
+   const filter=(key:string)=>{const value=req.nextUrl.searchParams.get(key)||'';if(value.length>180)throw new Error('Excel 필터가 너무 깁니다.');return value;};
+   const sortBy=filter('sortBy'),sortDirection=filter('sortDirection');
+   if(sortBy&&!['B','D','E'].includes(sortBy))throw new Error('정렬 열을 확인해 주세요.');
+   if(sortDirection&&!['asc','desc'].includes(sortDirection))throw new Error('정렬 방향을 확인해 주세요.');
+   const view=readWorkbookGrid(w.bytes,month,300,offset,focusRow,{
+    plate:filter('plate'),driver:filter('driver'),customer:filter('customer'),
+    sortBy:sortBy as 'B'|'D'|'E'|undefined,
+    sortDirection:sortDirection as 'asc'|'desc'|undefined,
+   });
    const linked=new Set(Object.values(w.manifest||{})
     .filter(where=>where.sheet===view.month).map(where=>where.row));
    return privateJson({ok:true,version:w.id,year:w.year,filename:w.filename,...view,
