@@ -13,7 +13,7 @@ import {
 test('the uploaded 2172x724 WebP art is included in the branch', () => {
   assert.equal(GOLD_WAVE_IMAGE, '/images/dispatch_cards/backgrounds/gold_wave.webp');
   assert.match(GOLD_WAVE_IMAGE, /^\/images\/dispatch_cards\/backgrounds\/[^/]+\.webp$/);
-  assert.ok(statSync(join(process.cwd(), 'public', GOLD_WAVE_IMAGE)).size > 100_000);
+  assert.ok(statSync(join(process.cwd(), 'public', GOLD_WAVE_IMAGE.replace(/^\//, ''))).size > 100_000);
 });
 
 test('both card formats use 13% alpha, top original and footer horizontally flipped', () => {
@@ -28,8 +28,8 @@ test('both card formats use 13% alpha, top original and footer horizontally flip
     assert.equal(areas.top.w, card.width);
     assert.equal(areas.bottom.w, card.width);
     assert.ok(areas.top.y >= 16);
-    assert.ok(areas.top.y + areas.top.h <= orientation === 'pc' ? 288 : 272);
-    assert.ok(areas.bottom.y > orientation === 'pc' ? 1120 : 1588);
+    assert.ok(areas.top.y + areas.top.h <= (orientation === 'pc' ? 288 : 272));
+    assert.ok(areas.bottom.y > (orientation === 'pc' ? 1120 : 1588));
     // Keep both golden beams (top 17px, bottom 16px) untouched.
     assert.ok(areas.bottom.y + areas.bottom.h <= card.height - 16);
   }
