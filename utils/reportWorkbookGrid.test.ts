@@ -92,3 +92,18 @@ test('download filters leave a protected monthly worksheet byte-for-byte unchang
  const bytes=zipSync(base);
  assert.deepEqual(addWorkbookDownloadAutoFilters(bytes),bytes);
 });
+
+test('all twelve columns can sort without reassigning Excel row IDs; monetary amounts sort numerically',()=>{
+ const raw=kakaoWorkbookFixture();
+ const first=patchWorkbookCell(raw,'4월',2,'J','12,000').bytes;
+ const modified=patchWorkbookCell(first,'4월',3,'J','900').bytes;
+ const ordered=readWorkbookGrid(modified,'4월',300,0,undefined,{sortBy:'J',sortDirection:'asc'});
+ assert.deepEqual(ordered.rows.filter(row=>row.row<4).map(row=>row.row),[3,2]);
+ const reversed=readWorkbookGrid(modified,'4월',300,0,undefined,{sortBy:'J',sortDirection:'desc'});
+ assert.deepEqual(reversed.rows.filter(row=>row.row<4).map(row=>row.row),[2,3]);
+ for(const col of 'ABCDEFGHIJKL' as string){
+  assert.ok(readWorkbookGrid(modified,'4월',300,0,undefined,{sortBy:col as import('./reportWorkbookGrid').WorkbookSortColumn}).rows.length>0);
+ }
+ assert.equal(workbookFromFile(modified).Sheets['4월'].cells.J2.v,12000);
+ assert.equal(workbookFromFile(modified).Sheets['4월'].cells.J3.v,900);
+});
