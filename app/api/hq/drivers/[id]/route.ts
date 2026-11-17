@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { normalizeKoreanMobileNumber } from '@/utils/koreanInternationalPhone';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { requireHqAdmin } from '@/lib/auth/serverAuth';
 import { mapDbDriverToHqSummary } from '@/types/driverHq';
@@ -111,7 +112,11 @@ export async function PATCH(
       updatePayload.driver_name = body.name.trim();
     }
     if (body.phone !== undefined) {
-      updatePayload.phone = body.phone ? String(body.phone).trim() : null;
+      const rawPhone = body.phone ? String(body.phone).trim() : '';
+      if (rawPhone.startsWith('+82') && !normalizeKoreanMobileNumber(rawPhone)) {
+        return NextResponse.json({ ok: false, error: '휴대폰 번호를 완성해 주세요. 예: +82-10-6348-8726' }, { status: 400 });
+      }
+      updatePayload.phone = normalizeKoreanMobileNumber(rawPhone) || rawPhone || null;
     }
     if (body.englishAvailable !== undefined) {
       updatePayload.english_available = Boolean(body.englishAvailable);
