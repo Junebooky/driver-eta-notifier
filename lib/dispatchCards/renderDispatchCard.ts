@@ -1,5 +1,9 @@
 import type { DispatchCardPhotoSet } from './dispatchCardAssets';
 import { calculatePortraitCrop, DEFAULT_DISPATCH_PORTRAIT_PLACEMENT } from './portraitCrop';
+import {
+  GOLD_WAVE_IMAGE, GOLD_WAVE_OPACITY, GOLD_WAVE_REGIONS,
+  calculateGoldWaveCoverRect, type WaveRegion,
+} from './goldWaveLayout';
 
 export type CardOrientation = 'pc' | 'mobile';
 export type CardPhotoKind = 'exterior' | 'interiorOne' | 'interiorTwo';
@@ -34,6 +38,19 @@ const GOLD_LINE = '#8E7C60';
 const WHITE = '#F2F0EC';
 const DARK = '#161616';
 const FONT = 'Arial, "Noto Sans KR", sans-serif';
+
+// Shared decorative image: avoid re-fetching this 2172×724 WebP for every
+// vehicle and every PC/mobile card in an auto-generation batch.
+let goldWavePromise: Promise<HTMLImageElement> | null = null;
+function getGoldWaveImage(): Promise<HTMLImageElement> {
+  if (!goldWavePromise) {
+    goldWavePromise = loadImage(GOLD_WAVE_IMAGE).catch(error => {
+      goldWavePromise = null; // Allow a retry if the request temporarily fails.
+      throw error;
+    });
+  }
+  return goldWavePromise;
+}
 
 async function loadImage(src: string): Promise<HTMLImageElement> {
   // Resolve private profile proxy and same-origin vehicle assets to blobs.
@@ -176,21 +193,27 @@ function goldBeam(ctx: CanvasRenderingContext2D, top: boolean, width: number, he
   ctx.fillRect(0, y, width, h);
 }
 
-function goldWaves(ctx: CanvasRenderingContext2D, width: number, height: number, startY: number) {
+/**
+ * Draw the uploaded black/gold 3:1 artwork behind content at exactly 13% opacity.
+ * Clip it to the header/footer, preserve its aspect ratio, and flip the footer
+ * horizontally to match the supplied customer-card references.
+ */
+function drawGoldWaveLayer(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  area: WaveRegion,
+) {
+  const image = calculateGoldWaveCoverRect(img.naturalWidth, img.naturalHeight, area);
   ctx.save();
   ctx.beginPath();
-  ctx.rect(0, startY, width, height - startY - 15);
+  ctx.rect(area.x, area.y, area.w, area.h);
   ctx.clip();
-  for (let i = 0; i < 34; i++) {
-    const s = i * 12;
-    ctx.beginPath();
-    ctx.moveTo(-width * 0.1, height - 15 - i * 3);
-    ctx.bezierCurveTo(width * 0.12, height - 260 - s, width * 0.23, height + 145 - s, width * 0.37, height - 40);
-    ctx.bezierCurveTo(width * 0.58, height - 340 + s * 0.2, width * 0.67, height - 30 + s * 0.1, width * 1.12, height - 210 - s * 0.2);
-    ctx.strokeStyle = 'rgba(174,121,43,' + (0.07 + i * 0.004) + ')';
-    ctx.lineWidth = 1.15;
-    ctx.stroke();
+  ctx.globalAlpha = GOLD_WAVE_OPACITY;
+  if (area.flipX) {
+    ctx.translate(2 * area.x + area.w, 0);
+    ctx.scale(-1, 1);
   }
+  ctx.drawImage(img, image.x, image.y, image.w, image.h);
   ctx.restore();
 }
 
@@ -243,14 +266,12 @@ function drawPortraitInfo(
   }
 }
 
-function drawFooter(ctx: CanvasRenderingContext2D, orientation: CardOrientation, w: number, h: number) {
+function drawFooter(ctx: CanvasRenderingContext2D, orientation: CardOrientation) {
   if (orientation === 'pc') {
-    goldWaves(ctx, w, h, 1166);
     line(ctx, 112, 1220, 1905, 1220);
     drawText(ctx, '저희 VIP 리무진 코리아를 이용해 주셔서 감사합니다.', 1000, 1281, 26, WHITE, 1200, 'center');
     drawText(ctx, 'Thank you for choosing VIP Limousine Korea. We wish you a comfortable journey.', 1000, 1356, 22, '#CFC9C0', 1500, 'center');
   } else {
-    goldWaves(ctx, w, h, 1692);
     line(ctx, 75, 1705, 1005, 1705);
     drawText(ctx, '저희 VIP 리무진 코리아를 이용해 주셔서 감사합니다.', 540, 1775, 26, WHITE, 970, 'center');
     drawText(ctx, 'Thank you for choosing VIP Limousine Korea.', 540, 1844, 21, '#CFC9C0', 965, 'center');
@@ -262,11 +283,12 @@ export async function renderDispatchCard(input: DispatchCardRenderInput): Promis
     throw new Error('기사 사진, 이름, 직책, 전화번호가 모두 필요합니다.');
   }
 
-  const [exterior, interiorOne, interiorTwo, portrait] = await Promise.all([
+  const [exterior, interiorOne, interiorTwo, portrait, goldWave] = await Promise.all([
     loadImage(input.photos.exterior),
     loadImage(input.photos.interiorOne),
     loadImage(input.photos.interiorTwo),
     loadImage(input.photoUrl),
+    getGoldWaveImage(),
   ]);
   const { width: w, height: h } = DISPATCH_CARD_DIMENSIONS[input.orientation];
   const canvas = document.createElement('canvas');
@@ -278,6 +300,9 @@ export async function renderDispatchCard(input: DispatchCardRenderInput): Promis
   ctx.imageSmoothingQuality = 'high';
   ctx.fillStyle = DARK;
   ctx.fillRect(0, 0, w, h);
+  const waveRegions = GOLD_WAVE_REGIONS[input.orientation];
+  drawGoldWaveLayer(ctx, goldWave, waveRegions.top);
+  drawGoldWaveLayer(ctx, goldWave, waveRegions.bottom);
   goldBeam(ctx, true, w, h);
   drawBrand(ctx, input.orientation);
 
@@ -294,7 +319,7 @@ export async function renderDispatchCard(input: DispatchCardRenderInput): Promis
   }
 
   drawPortraitInfo(ctx, portrait, input);
-  drawFooter(ctx, input.orientation, w, h);
+  drawFooter(ctx, input.orientation);
   goldBeam(ctx, false, w, h);
   return canvas;
 }
