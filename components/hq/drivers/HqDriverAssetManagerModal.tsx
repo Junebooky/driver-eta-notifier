@@ -526,9 +526,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                 />
                 <HqButton variant="secondary" size="sm"
   disabled={!isDbReady || isUploading === 'profile'}
-  onClick={() => profileInputRef.current?.click()}> profileInputRef.current?.click()}
-                  className="px-3.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition-colors cursor-pointer bg-blue-50 hover:bg-blue-100 text-[#1E60F3] disabled:opacity-50"
-                >
+  onClick={() => profileInputRef.current?.click()}>
                   {isUploading === 'profile' ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   ) : (
@@ -757,9 +755,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                   />
                   <HqButton variant="secondary" size="sm" className="flex-1"
   disabled={!isDbReady || !assetVehicleReady || isUploading === 'pc' || isDeleting}
-  onClick={() => pcInputRef.current?.click()}> pcInputRef.current?.click()}
-                    className="flex-1 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer bg-blue-50 hover:bg-blue-100 text-[#1E60F3] disabled:opacity-50"
-                  >
+  onClick={() => pcInputRef.current?.click()}>
                     {isUploading === 'pc' ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     ) : (
@@ -875,9 +871,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                   />
                   <HqButton variant="secondary" size="sm" className="flex-1"
   disabled={!isDbReady || !assetVehicleReady || isUploading === 'mobile' || isDeleting}
-  onClick={() => mobileInputRef.current?.click()}> mobileInputRef.current?.click()}
-                    className="flex-1 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer bg-blue-50 hover:bg-blue-100 text-[#1E60F3] disabled:opacity-50"
-                  >
+  onClick={() => mobileInputRef.current?.click()}>
                     {isUploading === 'mobile' ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     ) : (
@@ -932,12 +926,10 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
               선택한 파일이 삭제되며 고객에게 표시되지 않을 수 있습니다. 계속하시겠습니까?
             </p>
             <div className="mt-5 flex justify-end gap-2">
-              <HqButton variant="subtle" size="sm" disabled={isDeleting} onClick={() => setPendingDelete(null)}> setPendingDelete(null)}
-                className="min-h-10 rounded-[12px] bg-[#F4F6FA] px-4 text-[12px] font-semibold text-[#5A6E86] disabled:opacity-50">
+              <HqButton variant="subtle" size="sm" disabled={isDeleting} onClick={() => setPendingDelete(null)}>
                 취소
               </HqButton>
-              <HqButton variant="danger" size="sm" loading={isDeleting} onClick={() => void confirmDeleteAsset()}> void confirmDeleteAsset()}
-                className="min-h-10 rounded-[12px] bg-[#A85C54] px-4 text-[12px] font-semibold text-white disabled:opacity-50">
+              <HqButton variant="danger" size="sm" loading={isDeleting} onClick={() => void confirmDeleteAsset()}>
                 {isDeleting ? '삭제 중…' : '파일 삭제'}
               </HqButton>
             </div>
