@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, User, Phone, MapPin, FileText, Check, Loader2 } from 'lucide-react';
 import { HqDriverSummary } from '@/types/driverHq';
-import { formatPhoneNumber } from '@/utils/formatters';
+import { formatKoreanMobileInternationalInput, normalizeKoreanMobileNumber, KOREA_MOBILE_PREFIX } from '@/utils/koreanInternationalPhone';
 import { haptics } from '@/utils/haptics';
 
 export interface HqDriverEditModalProps {
@@ -31,7 +31,8 @@ export const HqDriverEditModal: React.FC<HqDriverEditModalProps> = ({
   useEffect(() => {
     if (driver && isOpen) {
       setName(driver.name || '');
-      setPhone(driver.phone || '');
+      setPhone(driver.phone && /\d/.test(driver.phone)
+        ? formatKoreanMobileInternationalInput(driver.phone) : KOREA_MOBILE_PREFIX);
       setAffiliationType(driver.affiliationType || 'freelance');
       setResidence(driver.residence || '');
       setEnglishAvailable(Boolean(driver.englishAvailable));
@@ -49,13 +50,18 @@ export const HqDriverEditModal: React.FC<HqDriverEditModalProps> = ({
       return;
     }
 
+    const normalizedPhone = normalizeKoreanMobileNumber(phone);
+    if (phone.trim() && phone !== KOREA_MOBILE_PREFIX && phone.startsWith('+82') && !normalizedPhone) {
+      setErrorMessage('휴대폰 번호 11자리를 입력해 주세요. 예: +82-10-6348-8726');
+      return;
+    }
     setIsSubmitting(true);
     setErrorMessage(null);
 
     try {
       const ok = await onSave(driver.id, {
         name: name.trim(),
-        phone: phone.trim(),
+        phone: normalizedPhone || (phone === KOREA_MOBILE_PREFIX ? '' : phone.trim()),
         affiliationType,
         residence: residence.trim(),
         englishAvailable,
@@ -176,9 +182,11 @@ export const HqDriverEditModal: React.FC<HqDriverEditModalProps> = ({
               <input
                 type="tel"
                 value={phone}
-                onChange={(e) => setPhone(formatPhoneNumber(e.target.value))}
-                placeholder="010-0000-0000"
-                maxLength={13}
+                onChange={(e) => setPhone(formatKoreanMobileInternationalInput(e.target.value))}
+                placeholder="+82-10-0000-0000"
+                maxLength={24}
+                inputMode="tel"
+                autoComplete="tel"
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:ring-2 focus:ring-[#1E60F3] transition-all font-mono font-bold"
               />
             </div>
