@@ -27,7 +27,7 @@ import {
   normalizePortraitPlacement,
   calculatePortraitCrop,
 } from '@/lib/dispatchCards/portraitCrop';
-import { HqButton, HqCard, HqInput, HqSelect, HqSegmentedTabs } from '@/components/hq/ui';
+import { HqButton, HqCard, HqInput, HqSegmentedTabs } from '@/components/hq/ui';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 import { HqModal } from '@/components/hq/ui/HqModal';
 import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
@@ -532,8 +532,8 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   return (
     <HqModal
       isOpen={isOpen}
-      title="배차카드 자동 생성"
-      subtitle="기사 정보 한 번 입력 · 차량별 PC·모바일 카드 생성"
+      title="배차카드 만들기"
+      subtitle="기사 정보 한 번으로 모든 차량 카드 완성"
       icon={<span className="flex size-10 shrink-0 items-center justify-center rounded-[14px] bg-[#EEF3FF] text-[#1E60F3]"><UserRound className="size-5" /></span>}
       onClose={closeModal}
       className="max-w-[1180px]! w-full"
@@ -553,7 +553,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
                 }
               }}>
               {busy ? (progress || '저장 중…') : (
-                <><CheckCircle2 className="size-4" />{generationMode === 'missing' ? '미생성 카드만 등록' : generationMode === 'selected' ? '선택 차량 등록' : '전체 카드 재생성'}</>
+                <><CheckCircle2 className="size-4" />{generationMode === 'missing' ? '비어 있는 카드 등록하기' : generationMode === 'selected' ? '선택 차량 등록' : '전체 카드 재생성'}</>
               )}
             </HqButton>
           </div>
@@ -570,7 +570,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
                   <UserRound className="size-7 text-[#A0ACBB]" />}
               </div>
               <div className="min-w-0 space-y-2">
-                <p className="text-[12px] leading-relaxed text-[#73839A]">정면·어깨까지 나온 투명 PNG 사진을 권장합니다.</p>
+                <p className="text-[12px] leading-relaxed text-[#73839A]">정면 상반신 · 투명 배경(PNG) 권장</p>
                 <input ref={fileRef} className="hidden" type="file" accept="image/png,image/jpeg,image/webp"
                   onChange={event => {
                     const file = event.target.files?.[0];
@@ -619,14 +619,14 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
               </div>
             </div>
             <p className="mt-3 text-[11px] leading-relaxed text-[#8492A4]">
-              카드에는 이름을 한·영 한 줄로, 직책은 영어로 표시합니다. 원본 기사 계정 정보는 바꾸지 않습니다.
+              카드엔 영문 직책만 표시되며, 원본 프로필은 유지돼요.
             </p>
           </HqCard>
 
           <HqCard className="p-4 sm:p-5">
             <h3 className="mb-1 text-[14px] font-semibold text-[#21344D]">기사 사진 구도</h3>
             <p className="mb-4 text-[11px] leading-relaxed text-[#8492A4]">
-              기사마다 얼굴 크기가 달라도 맞출 수 있어요. 미리보기와 오른쪽 완성 카드를 보면서 조절하세요.
+              미리보기를 보며 얼굴 크기와 위치를 맞춰주세요.
             </p>
             {photoUrl && (
               <div className="mb-4 flex items-center gap-4 rounded-[14px] bg-[#F7F9FC] p-3">
@@ -686,7 +686,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
             <p className="mt-3 text-[11px] leading-relaxed text-[#8492A4]">
               {portraitSettingsLoaded
                 ? cardSettingsDirty
-                  ? '미저장 변경사항이 있습니다. 카드 등록·다운로드 시에도 자동 저장됩니다.'
+                  ? '변경사항 있음 · 등록 시 자동 저장'
                   : '기사별 설정 저장됨 · 이후 만드는 PC·모바일 카드에 공통 적용 (기존 등록 카드는 유지)'
                 : '기사별 사진 설정 불러오는 중…'}
             </p>
@@ -697,14 +697,22 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
               <h3 className="text-[14px] font-semibold text-[#21344D]">차량 선택</h3>
               <span className="text-[12px] text-[#73839A]">사진 연결 {availableVehicles.length}대</span>
             </div>
-            <HqSelect aria-label="미리보기 차량 선택" value={vehicle?.uuid || ''}
-              onChange={event => setSelectedVehicleId(event.target.value)}
-              disabled={!availableVehicles.length || busy}>
-              {availableVehicles.length === 0 && <option value="">이미지가 준비된 차량 없음</option>}
-              {availableVehicles.map(item => <option key={item.uuid} value={item.uuid}>{item.plate} · {dispatchCardVehicleLabel(item)}</option>)}
-            </HqSelect>
+            <HqSearchSelect
+              label="미리보기 차량 선택"
+              value={vehicle?.uuid || ''}
+              onChange={setSelectedVehicleId}
+              disabled={!availableVehicles.length || busy}
+              placeholder="이미지가 준비된 차량 없음"
+              size="md"
+              imageShape="vehicle"
+              options={availableVehicles.map(item => ({
+                value: item.uuid,
+                label: item.plate,
+                subtitle: dispatchCardVehicleLabel(item),
+              }))}
+            />
             <p className="mt-3 text-[11px] leading-relaxed text-[#8492A4]">
-              외관 1장·실내 2장이 준비된 차량만 표시됩니다. 차량별 전용 사진이 공통 모델 사진보다 우선합니다.
+              사진 3장(외관 1·실내 2)이 등록된 차량만 표시돼요.
             </p>
             <div className="mt-3 rounded-[12px] bg-[#F7F9FC] p-3 text-[12px] leading-relaxed text-[#526680]">
               {summaryLoaded
@@ -754,7 +762,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
               }}>
               선택 이미지 초기화
             </HqButton>
-            <p className="mt-2 text-[11px] text-[#8492A4]">이번 생성에만 적용되며 다른 관리자 기기에는 저장되지 않습니다.</p>
+            <p className="mt-2 text-[11px] text-[#8492A4]">현재 작업에만 임시 적용돼요.</p>
           </HqCard>
         </div>
 
@@ -763,7 +771,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
             <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
               <div>
                 <h3 className="text-[14px] font-semibold text-[#21344D]">완성 카드 미리보기</h3>
-                <p className="mt-1 text-[11px] text-[#8492A4]">PC·모바일 규격을 선택해 완성된 이미지를 확인하세요.</p>
+                <p className="mt-1 text-[11px] text-[#8492A4]">규격별 완성 이미지를 확인해 보세요.</p>
               </div>
               <HqSegmentedTabs aria-label="배차카드 미리보기 규격" value={orientation}
                 onValueChange={value => setOrientation(value as CardOrientation)}
@@ -798,13 +806,13 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
             <button type="button" className="flex min-h-10 w-full items-center justify-between text-left"
               onClick={() => setAdvancedOpen(value => !value)} aria-expanded={advancedOpen}>
               <span className="text-[13px] font-semibold text-[#526680]">
-                {generationMode === 'missing' ? '저장 범위 · 미생성 카드만 추가' : generationMode === 'selected' ? '저장 범위 · 선택 차량' : '저장 범위 · 전체 재생성'}
+                {generationMode === 'missing' ? '미생성 카드만 추가' : generationMode === 'selected' ? '저장 범위 · 선택 차량' : '저장 범위 · 전체 재생성'}
               </span>
               <ChevronDown className={'size-4 text-[#8492A4] transition-transform ' + (advancedOpen ? 'rotate-180' : '')} />
             </button>
             <p className="mt-1 text-[11px] leading-relaxed text-[#8492A4]">
               {generationMode === 'missing'
-                ? '기존에 등록된 PC·모바일 카드는 보존하고 없는 카드만 추가합니다.'
+                ? '기존 카드는 유지하고 비어 있는 카드만 채워요.'
                 : generationMode === 'selected'
                   ? '선택한 차량의 PC·모바일 카드를 새 버전으로 저장합니다.'
                   : '이미지 준비된 모든 차량의 카드를 새 버전으로 다시 생성합니다.'}
