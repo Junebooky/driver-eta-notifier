@@ -31,6 +31,7 @@ import { HqButton, HqCard, HqInput, HqSelect, HqSegmentedTabs } from '@/componen
 import { HqModal } from '@/components/hq/ui/HqModal';
 import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
 import { CHAUFFEUR_POSITION_OPTIONS, formatBilingualChauffeurName, getEnglishPosition, validateDispatchCardProfile, type ChauffeurPositionCode } from '@/lib/dispatchCards/chauffeurIdentity';
+import { formatKoreanMobileInternationalInput, KOREA_MOBILE_PREFIX } from '@/utils/koreanInternationalPhone';
 
 interface Props {
   isOpen: boolean;
@@ -77,7 +78,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   const [englishName, setEnglishName] = useState('');
   const [positionCode, setPositionCode] = useState<ChauffeurPositionCode | ''>('');
   const [savedIdentity, setSavedIdentity] = useState('');
-  const [phone, setPhone] = useState(driver.phone || '');
+  const [phone, setPhone] = useState(formatKoreanMobileInternationalInput(driver.phone || KOREA_MOBILE_PREFIX));
   const [photoUrl, setPhotoUrl] = useState('');
   const [photoStored, setPhotoStored] = useState(false);
   const [portraitPlacement, setPortraitPlacement] = useState<CardPlacement>({ ...DEFAULT_DISPATCH_PORTRAIT_PLACEMENT });
@@ -149,7 +150,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     setName(driver.name);
     setEnglishName('');
     setPositionCode('');
-    setPhone(driver.phone || '');
+    setPhone(formatKoreanMobileInternationalInput(driver.phone || KOREA_MOBILE_PREFIX));
     setPhotoUrl('');
     setPhotoStored(false);
     setPhotoLoading(true);
@@ -234,7 +235,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
           setName(data.profile.koreanName || driver.name);
           setEnglishName(data.profile.englishName || '');
           setPositionCode(data.profile.positionCode || '');
-          setPhone(data.profile.phone || driver.phone || '');
+          setPhone(formatKoreanMobileInternationalInput(data.profile.phone || driver.phone || KOREA_MOBILE_PREFIX));
           const saved = validateDispatchCardProfile(data.profile);
           setSavedIdentity(saved ? JSON.stringify(saved) : '');
         }
@@ -585,12 +586,15 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
               {([
                 { label: '한국어 성명', value: name, onChange: setName, placeholder: '윤태준' },
                 { label: '영문 성명', value: englishName, onChange: setEnglishName, placeholder: 'Tae-jun Yun' },
-                { label: '전화번호', value: phone, onChange: setPhone, placeholder: '예: +82 10 1234 5678' },
+                { label: '전화번호', value: phone, onChange: setPhone, placeholder: '+82-10-1234-5678' },
               ] as const).map(field => (
                 <label key={field.label} className="block space-y-1.5">
                   <span className="text-[12px] font-medium text-[#526680]">{field.label}</span>
-                  <HqInput value={field.value} onChange={event => field.onChange(event.target.value)}
-                    placeholder={field.placeholder} maxLength={90} />
+                  <HqInput value={field.value}
+                    onChange={event => field.onChange(field.label === '전화번호'
+                      ? formatKoreanMobileInternationalInput(event.target.value) : event.target.value)}
+                    placeholder={field.placeholder} maxLength={field.label === '전화번호' ? 24 : 90}
+                    inputMode={field.label === '전화번호' ? 'tel' : 'text'} />
                 </label>
               ))}
               <label className="block space-y-1.5">
