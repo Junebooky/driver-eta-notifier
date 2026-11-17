@@ -545,7 +545,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
           </HqButton>
           <div className="flex w-full gap-2 sm:w-auto">
             <HqButton variant="subtle" onClick={closeModal} className="flex-1 sm:flex-none">닫기</HqButton>
-            <HqButton variant="primary" className="min-w-0 flex-[2] sm:flex-none" loading={busy}
+            <HqButton variant="primary" className="min-w-0 flex-[2] whitespace-nowrap sm:flex-none" loading={busy}
               disabled={!isComplete || !dbReady || !summaryLoaded || busy || portraitSaving || photoUploading || previewLoading || (generationMode === 'missing' && missingVehicles.length === 0)}
               onClick={() => {
                 if (generationMode !== 'all' || window.confirm('준비된 모든 차량의 기존 카드를 새 버전으로 교체할까요?')) {
