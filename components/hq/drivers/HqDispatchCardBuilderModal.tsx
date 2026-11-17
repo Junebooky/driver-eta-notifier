@@ -701,7 +701,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
               onChange={event => setSelectedVehicleId(event.target.value)}
               disabled={!availableVehicles.length || busy}>
               {availableVehicles.length === 0 && <option value="">이미지가 준비된 차량 없음</option>}
-              {availableVehicles.map(item => <option key={item.uuid} value={item.uuid}>{item.plate} · {item.modelShort}</option>)}
+              {availableVehicles.map(item => <option key={item.uuid} value={item.uuid}>{item.plate} · {dispatchCardVehicleLabel(item)}</option>)}
             </HqSelect>
             <p className="mt-3 text-[11px] leading-relaxed text-[#8492A4]">
               외관 1장·실내 2장이 준비된 차량만 표시됩니다. 차량별 전용 사진이 공통 모델 사진보다 우선합니다.
