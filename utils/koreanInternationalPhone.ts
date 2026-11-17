@@ -15,9 +15,11 @@ export function formatKoreanMobileInternationalInput(value: string): string {
   if (!text) return '';
 
   // Preserve a genuine foreign international number instead of replacing its country code.
-  if (/^\+(?!82(?:\D|$))/.test(text)) return text.replace(/[^\d+\-\s]/g, '').slice(0, 26);
+  if (text.startsWith('+') && !text.startsWith('+82')) {
+    return text.replace(/[^\d+\-\s]/g, '').slice(0, 26);
+  }
 
-  const hasCountryCode = /^\+82(?:\D|\d)/.test(text) || /^82(?:\D|10)/.test(text);
+  const hasCountryCode = text.startsWith('+82') || /^82(?:\D|10)/.test(text);
   let digits = text.replace(/\D/g, '');
   if (hasCountryCode) digits = digits.slice(2);
 
