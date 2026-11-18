@@ -9,7 +9,7 @@ import {readWorkbook,storeWorkbook} from '@/lib/driverReports/storage';
 import {readWorkbookGrid,patchWorkbookCell,addWorkbookDownloadAutoFilters} from '@/utils/reportWorkbookGrid';
 import {organizeManagedMonth} from '@/utils/reportWorkbookRowOrder';
 import {refitWorkbookRouteColumns} from '@/utils/reportWorkbookOperations';
-import {appendManualWorkbookRow,appendManualWorkbookColumn} from '@/utils/reportWorkbookStructure';
+import {appendManualWorkbookRow,appendManualWorkbookColumn,deleteManualWorkbookRow,deleteManualWorkbookColumn} from '@/utils/reportWorkbookStructure';
 import {boundedBody,UUID,privateJson,failure,sameOrigin} from '@/lib/driverReports/http';
 export const dynamic='force-dynamic';export const runtime='nodejs';
 export async function GET(req:NextRequest){
@@ -67,15 +67,31 @@ export async function POST(req:NextRequest){
   let replacement:null|Awaited<ReturnType<typeof replaceWorkbook>>=null;
   if(req.headers.get('content-type')?.startsWith('application/json')){
    const b=JSON.parse(new TextDecoder().decode(await boundedBody(req,4096)));
-   if(b.action==='add_row'||b.action==='add_column'){
+   if(['add_row','add_column','delete_row','delete_column'].includes(b.action)){
     if(!Number.isInteger(b.year)||b.year<2000||b.year>2099||!UUID.test(b.expectedVersion||'')||typeof b.month!=='string')
      throw new Error('Excel 버전 또는 월별 시트를 확인해 주세요.');
     if(b.action==='add_column'&&typeof b.label!=='string')throw new Error('추가할 열 이름을 입력해 주세요.');
+    if(b.action==='delete_row'&&(!Number.isInteger(b.row)||b.row<2||b.row>25000))
+     throw new Error('삭제할 행 번호를 확인해 주세요.');
+    if(b.action==='delete_column'&&(typeof b.column!=='string'||!/^[M-Z]$/.test(b.column)))
+     throw new Error('삭제할 사용자 열을 선택해 주세요.');
     const w=await currentWorkbook(s.org,b.year);
     if(!w||w.id!==b.expectedVersion)return privateJson({ok:false,error:'다른 관리자가 Excel을 변경했습니다. 다시 불러와 주세요.'},409);
-    const change=b.action==='add_row'?
-     appendManualWorkbookRow(w.bytes,b.month):
-     appendManualWorkbookColumn(w.bytes,b.month,b.label);
+    if(b.action==='delete_row'){
+     // Server-side protection even if a stale/custom client sends an unsupported
+     // linked row. The DB commit checks again within its transaction.
+     const inManifest=Object.values(w.manifest||{}).some(where=>where.sheet===b.month&&where.row===b.row);
+     if(inManifest)throw new Error('기사 운행보고가 연결된 행은 삭제할 수 없습니다.');
+     const linked=await db.from('report_submissions')
+      .select('id').eq('org_id',s.org).eq('ledger_year',w.year)
+      .eq('excel_sheet_name',b.month).eq('excel_row_number',b.row).eq('excel_status','applied').limit(1);
+     check(linked.error);
+     if(linked.data?.length)throw new Error('운행보고와 연결된 행은 삭제할 수 없습니다.');
+    }
+    const change=b.action==='add_row'?appendManualWorkbookRow(w.bytes,b.month):
+     b.action==='add_column'?appendManualWorkbookColumn(w.bytes,b.month,b.label):
+     b.action==='delete_row'?deleteManualWorkbookRow(w.bytes,b.month,b.row):
+     deleteManualWorkbookColumn(w.bytes,b.month,b.column);
     const changed=await db.rpc('commit_report_hq_sheet_change',{
      p_org:s.org,p_actor:s.userId,p_year:w.year,p_expected:w.id,
      p_storage:await storeWorkbook(s.org,change.bytes),p_sheet:b.month,
