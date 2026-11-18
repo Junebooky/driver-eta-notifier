@@ -1,10 +1,11 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {ChevronDown,ChevronUp,ChevronLeft,ChevronRight,Expand,Minimize2,FileSpreadsheet,Pencil,Save,X,ArrowUpDown,ZoomIn,ZoomOut,MessageSquareText,Filter,RotateCcw,Rows3,Columns3,Plus,Check} from 'lucide-react';
+import {ChevronDown,ChevronUp,ChevronLeft,ChevronRight,Expand,Minimize2,FileSpreadsheet,Pencil,Save,X,ArrowUpDown,ZoomIn,ZoomOut,MessageSquareText,Filter,RotateCcw,Rows3,Columns3,Plus,Check,Trash2,AlertTriangle} from 'lucide-react';
 import {HqSearchSelect} from './ui/HqSearchSelect';
 export type ReportExcelFocus={year:number;sheet:string;row:number;requestId:number};
 type Row={row:number;cells:string[];locked:string[]};
-type Grid={version:string;year:number;filename:string;month:string;months:string[];total:number;unfilteredTotal:number;filterOptions:{plate:string[];driver:string[];customer:string[]};offset:number;limit:number;rows:Row[];columns:string[];headers:string[];linkedRows:number[]};
+type Grid={version:string;year:number;filename:string;month:string;months:string[];total:number;unfilteredTotal:number;filterOptions:{plate:string[];driver:string[];customer:string[]};offset:number;limit:number;rows:Row[];columns:string[];headers:string[];linkedRows:number[];manualRows:number[]};
+type DeleteTarget={action:'delete_row';row:number}|{action:'delete_column';column:string;label:string};
 type FilterKey='plate'|'driver'|'customer';
 type SortKey=string;
 const blankFilters=()=>({plate:'',driver:'',customer:''});
@@ -18,6 +19,7 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
  const [showColumnForm,setShowColumnForm]=useState(false);
  const [columnLabel,setColumnLabel]=useState('');
  const [success,setSuccess]=useState('');
+ const [deleteTarget,setDeleteTarget]=useState<DeleteTarget|null>(null);
  const renderedWidths=[...columnWidths,...Array(Math.max(0,(grid?.columns.length??12)-12)).fill(165)];
  const renderedTotal=52+renderedWidths.reduce((sum,width)=>sum+width,0);
  const [filters,setFilters]=useState(blankFilters);
@@ -161,6 +163,23 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
     await load(grid.month);
    }
    await onCommitted();
+  }catch(e){setError((e as Error).message);}finally{setBusy(false);}
+ }
+ async function deleteStructure(){
+  if(!grid||!deleteTarget||busy)return;
+  const target=deleteTarget;
+  setBusy(true);setError('');setSuccess('');
+  try{
+   const r=await fetch('/api/hq/report-workbook',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:target.action,year,month:grid.month,expectedVersion:grid.version,
+     ...(target.action==='delete_row'?{row:target.row}:{column:target.column})})});
+   const data=await r.json().catch(()=>({}));
+   if(!r.ok||!data.ok)throw Error(data.error||'Excel 삭제를 완료하지 못했습니다.');
+   setDeleteTarget(null);setEdit(null);dismissSource();setHighlightedRow(null);
+   resetFilters();
+   await load(grid.month);
+   await onCommitted();
+   setSuccess(target.action==='delete_row'?target.row+'행을 삭제했습니다.':'사용자 '+target.column+'열을 삭제했습니다.');
   }catch(e){setError((e as Error).message);}finally{setBusy(false);}
  }
  async function save(){
@@ -325,7 +344,17 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
      className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[#E4EAF2] bg-white px-3.5 text-[12px] font-semibold text-[#536985] shadow-[0_3px_10px_rgba(25,40,66,.035)] transition-colors hover:bg-[#F6F9FC] disabled:opacity-40">
      <Columns3 size={15}/><Plus size={12}/>열 추가
     </button>
-    <span className="text-[11px] text-[#92A0B2]">빈 행에 추가 · 사용자 열은 L열 오른쪽부터</span>
+    <button type="button" aria-label="Excel 수기 행 삭제" disabled={busy||!grid.manualRows?.length}
+     onClick={()=>{const row=grid.manualRows.at(-1);if(row)setDeleteTarget({action:'delete_row',row});}}
+     className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[#E4EAF2] bg-white px-3.5 text-[12px] font-semibold text-[#708098] transition-colors hover:bg-[#F8F5F5] disabled:opacity-35">
+     <Rows3 size={15}/><Trash2 size={13}/>행 삭제
+    </button>
+    <button type="button" aria-label="Excel 사용자 열 삭제" disabled={busy||!grid.columns.some(col=>/^[M-Z]$/.test(col))}
+     onClick={()=>{const col=grid.columns.filter(x=>/^[M-Z]$/.test(x)).at(-1);if(col)setDeleteTarget({action:'delete_column',column:col,label:grid.headers[grid.columns.indexOf(col)]});}}
+     className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[#E4EAF2] bg-white px-3.5 text-[12px] font-semibold text-[#708098] transition-colors hover:bg-[#F8F5F5] disabled:opacity-35">
+     <Columns3 size={15}/><Trash2 size={13}/>열 삭제
+    </button>
+    <span className="text-[11px] text-[#92A0B2]">자동입력 열(A~L)·기사 보고 연결 행은 삭제 보호</span>
    </div>}
    {grid&&showColumnForm&&<form onSubmit={e=>{e.preventDefault();void addStructure('add_column');}}
     className="flex flex-wrap items-center gap-2 rounded-xl bg-[#F7F9FC] p-3">
@@ -395,6 +424,7 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
         const col=grid.columns[index] as SortKey,active=sortBy===col;
         return <th key={h} aria-sort={active?(sortDirection==='asc'?'ascending':'descending'):'none'}
          className="overflow-hidden whitespace-nowrap border-b border-r border-[#DCE5F1] text-left">
+         <div className="flex min-w-0 items-center">
          <button type="button"
           aria-label={h+' 열 정렬'+(active?' · '+(sortDirection==='asc'?'오름차순':'내림차순'):'')}
           title={active?(sortDirection==='asc'?'내림차순으로 정렬':'기본 순서로 복원'):'오름차순 정렬'}
@@ -409,6 +439,13 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
           <span className="truncate">{h}</span>
           <ArrowUpDown size={12} className={active?'shrink-0 opacity-90':'shrink-0 opacity-35 group-hover:opacity-75'}/>
          </button>
+         {/^[M-Z]$/.test(col)&&<button type="button" disabled={busy}
+          aria-label={h+' 열 삭제'} title={h+' 사용자 열 삭제'}
+          onClick={()=>setDeleteTarget({action:'delete_column',column:col,label:h})}
+          className="mx-1 inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-[#94A1B2] hover:bg-white hover:text-[#B76363] disabled:opacity-40">
+          <Trash2 size={13}/>
+         </button>}
+         </div>
         </th>;
        })}
      </tr></thead>
@@ -424,6 +461,16 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
           className="flex min-h-9 w-full flex-col items-center justify-center gap-0.5 rounded-md text-[#1E60F3] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30">
           <span>{row.row}</span><MessageSquareText size={12} strokeWidth={1.7}/>
          </button>
+        :grid.manualRows?.includes(row.row)?
+         <div className="flex min-h-9 items-center justify-center gap-0.5">
+          <span className="text-[11px]">{row.row}</span>
+          <button type="button" disabled={busy} title={row.row+'행 삭제'}
+           aria-label={row.row+'행 삭제'}
+           onClick={()=>setDeleteTarget({action:'delete_row',row:row.row})}
+           className="inline-flex size-7 items-center justify-center rounded-md text-[#93A1B3] hover:bg-white hover:text-[#B76363] disabled:opacity-40">
+           <Trash2 size={12}/>
+          </button>
+         </div>
         :<span className="block px-1 py-2">{row.row}</span>}
       </td>
       {row.cells.map((value,i)=>{
@@ -449,6 +496,44 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
    <p className="text-xs text-[#8392A6]">{grid?'표시 '+grid.rows.length+'행 · 검색 결과 '+grid.total+'행 / 전체 '+grid.unfilteredTotal+'행':'Excel을 불러오는 중'}</p>
    {grid&&grid.total>grid.limit&&<div className="flex gap-3"><button type="button" disabled={offset===0||busy} onClick={()=>{setEdit(null);setOffset(Math.max(0,offset-grid.limit));}} className="min-h-11 px-3 text-sm text-[#1E60F3] disabled:opacity-40">이전 행</button><button type="button" disabled={offset+grid.limit>=grid.total||busy} onClick={()=>{setEdit(null);setOffset(offset+grid.limit);}} className="min-h-11 px-3 text-sm text-[#1E60F3] disabled:opacity-40">다음 행</button></div>}
    {busy&&<p className="text-xs text-[#1E60F3]">저장 중...</p>}
+  </div>}
+  {deleteTarget&&grid&&<div role="presentation" className="fixed inset-0 z-[280] flex items-center justify-center bg-[#162238]/40 p-4">
+   <div role="alertdialog" aria-modal="true" aria-labelledby="hq-excel-delete-title"
+    aria-describedby="hq-excel-delete-desc"
+    className="w-full max-w-[420px] rounded-[20px] bg-white p-5 shadow-[0_24px_65px_rgba(19,36,64,.2)] sm:p-6">
+    <div className="flex items-start justify-between gap-3">
+     <div className="flex min-w-0 items-center gap-2.5">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#F7F0EF] text-[#B96666]"><AlertTriangle size={19}/></span>
+      <h3 id="hq-excel-delete-title" className="text-[15px] font-bold text-[#354868]">{deleteTarget.action==='delete_row'?'행 삭제':'열 삭제'}</h3>
+     </div>
+     <button type="button" aria-label="삭제 취소" onClick={()=>setDeleteTarget(null)}
+      className="inline-flex size-8 items-center justify-center rounded-lg bg-[#F6F8FA] text-[#7A8BA0]"><X size={16}/></button>
+    </div>
+    <p id="hq-excel-delete-desc" className="mt-3 text-[12px] leading-6 text-[#63748A]">
+     해당 {deleteTarget.action==='delete_row'?'수기 행':'사용자 지정 열'}의 셀 내용이 Excel 작업본에서 삭제됩니다.
+     기존 행 번호와 자동 운행보고 연결은 변경되지 않으며, 이전 장부 버전은 보관됩니다.
+    </p>
+    <label htmlFor="hq-excel-delete-choice" className="mt-4 block text-[12px] font-semibold text-[#506681]">삭제할 {deleteTarget.action==='delete_row'?'행':'열'}</label>
+    <select id="hq-excel-delete-choice"
+     value={deleteTarget.action==='delete_row'?String(deleteTarget.row):deleteTarget.column}
+     onChange={e=>{
+      if(deleteTarget.action==='delete_row')setDeleteTarget({action:'delete_row',row:Number(e.target.value)});
+      else setDeleteTarget({action:'delete_column',column:e.target.value,label:grid.headers[grid.columns.indexOf(e.target.value)]});
+     }}
+     className="mt-2 h-11 w-full rounded-xl border border-[#E1E8F1] bg-white px-3 text-[13px] text-[#354868] outline-none focus:border-[#1E60F3]">
+     {deleteTarget.action==='delete_row'
+      ?grid.manualRows.map(r=><option key={r} value={r}>{r}행</option>)
+      :grid.columns.filter(c=>/^[M-Z]$/.test(c)).map(c=><option key={c} value={c}>{c} · {grid.headers[grid.columns.indexOf(c)]}</option>)}
+    </select>
+    <div className="mt-5 flex justify-end gap-2">
+     <button type="button" onClick={()=>setDeleteTarget(null)} disabled={busy}
+      className="min-h-10 rounded-xl bg-[#F2F5F9] px-4 text-[12px] font-semibold text-[#687B94]">취소</button>
+     <button type="button" disabled={busy} onClick={()=>void deleteStructure()}
+      className="min-h-10 rounded-xl bg-[#B76363] px-4 text-[12px] font-semibold text-white disabled:opacity-40">
+      {busy?'삭제 중...':'선택 항목 삭제'}
+     </button>
+    </div>
+   </div>
   </div>}
   {sourceLink&&(
    <aside role="dialog" aria-label="연결된 기사 운행보고 원문"
