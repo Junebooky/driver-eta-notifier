@@ -108,8 +108,9 @@ test('rich Excel metadata (drawings, hyperlinks, validations, conditional format
  const decorations='<conditionalFormatting sqref="B2:B3"><cfRule type="expression" priority="1"><formula>TRUE</formula></cfRule></conditionalFormatting>'
   +'<dataValidations count="1"><dataValidation sqref="D2" type="list" allowBlank="1"><formula1>"Y,N"</formula1></dataValidation></dataValidations>'
   +'<hyperlinks><hyperlink ref="D2" location="Sheet2!A1" display="goto"/></hyperlinks>'
-  +'<drawing r:id="rId99"/><extLst><ext uri="{01101010}"/></extLst>';
+  +'<drawing r:id="rId99"/><tableParts count="1"><tablePart r:id="rId100"/></tableParts><extLst><ext uri="{01101010}"/></extLst>';
  zipped[path]=strToU8(original.replace('</worksheet>',decorations+'</worksheet>'));
+ zipped['xl/tables/table1.xml']=strToU8('<table ref="A1:L10"/>');
  const bytes=zipSync(zipped,{level:6});
  const added=appendManualWorkbookRow(bytes,'4월');
  assert.equal(added.rowNumber,4);
@@ -174,4 +175,16 @@ test('protected worksheet refuses delete; explicit worksheet formulas may not be
  withFormula[path]=strToU8(strFromU8(withFormula[path]).replace('</sheetData>','</sheetData><row r="300">'+formula+'</row>'));
  assert.throws(()=>deleteManualWorkbookColumn(zipSync(withFormula,{level:6}),'4월','M'),/참조하는 Excel 수식/);
  for(const name of Object.keys(src))if(name!=='path')assert.ok(src[name]);
+});
+
+test('a custom Excel table-owned header is protected while adjacent user columns remain editable',()=>{
+ const entries=unzipSync(kakaoWorkbookFixture());
+ let source=strFromU8(entries[path]);
+ if(!/xmlns:r=/.test(source))source=source.replace('<worksheet','<worksheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"');
+ entries[path]=strToU8(source.replace('</worksheet>','<tableParts count="1"><tablePart r:id="rId101"/></tableParts></worksheet>'));
+ entries['xl/tables/table1.xml']=strToU8('<table ref="A1:M10"/>');
+ const bytes=zipSync(entries,{level:6});
+ assert.throws(()=>appendManualWorkbookColumn(bytes,'4월','메모'),/표가 M열을 사용/);
+ assert.equal(appendManualWorkbookRow(bytes,'4월').rowNumber,4,'no-shift row creation is safe for existing table ranges');
+ assert.deepEqual(unzipSync(bytes)[path],entries[path]);
 });
