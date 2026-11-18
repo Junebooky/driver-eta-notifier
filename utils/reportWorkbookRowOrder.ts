@@ -82,6 +82,7 @@ export function organizeManagedMonth(bytes:Uint8Array,month:string,year:number,m
  for(const [row,xml] of rowMap){
   if(/<f(?:\s|>)/.test(xml))protectedRows.add(row);
   if(!rowInfo(xml))protectedRows.add(row);
+  if(/\bcustomHeight="1"/.test(xml)&&/\bht="22\.17"/.test(xml))protectedRows.add(row); // Never compact onto an HQ-created manual blank row.
  }
  const ids=new Map<number,string>();
  for(const [id,where] of Object.entries(manifest||{})){
