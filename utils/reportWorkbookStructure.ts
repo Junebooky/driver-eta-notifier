@@ -38,10 +38,12 @@ function safeWorksheet(entries:Record<string,Uint8Array>,month:string){
  if(!monthName(month))throw new Error('월별 Excel 시트를 선택해 주세요.');
  if(Object.keys(entries).some(x=>/_xmlsignatures\//i.test(x)))throw new Error('전자서명된 Excel은 웹에서 구조를 수정할 수 없습니다.');
  const path=sheetXmlPath(entries,month),source=strFromU8(entries[path]);
- // Simple monthly worksheets only. Rich Excel structures need an Excel-native
- // structural update, not a partial XML rewrite that could corrupt references.
- if(/<(?:sheetProtection|tableParts|pivotTableParts|drawing|legacyDrawing|hyperlinks|dataValidations|conditionalFormatting|extLst)\b/i.test(source))
-  throw new Error('보호된 시트·표·외부 연결이 포함된 월별 시트는 안전하게 행·열을 추가할 수 없습니다. 원본 양식을 확인해 주세요.');
+ // All operations are position-preserving: other rows/columns, drawings,
+ // hyperlinks, validations, formatting and native filters are untouched.
+ // Those common metadata tags are NOT proof that adding cells is unsafe.
+ // Actual locked worksheets and pivot result sheets remain read-only.
+ if(/<(?:sheetProtection|pivotTableParts)\b/i.test(source))
+  throw new Error('편집 제한 또는 피벗 테이블이 있는 시트는 구조를 변경할 수 없습니다. Excel 보호 설정을 확인해 주세요.');
  if(/<(?:\w+:)?sheetData\b/.test(source) && !/<sheetData\b[^>]*>/.test(source))
   throw new Error('특수 형식의 Excel 시트는 구조를 수정할 수 없습니다.');
  const part=source.match(/<sheetData\b[^>]*>[\s\S]*?<\/sheetData>/)?.[0];
@@ -67,12 +69,14 @@ export function isManualRowXml(row:string){
  return /\bcustomHeight="1"/.test(row) && /\bht="22\.17"/.test(row);
 }
 export function visibleWorkbookColumns(cells:Record<string,{v:string|number}>) {
- let highest=12;
+ // Gaps are intentional after a custom column is deleted. Show only assigned
+ // columns, not ghost empty columns between M and the last existing one.
+ const custom=new Set<string>();
  for(const [addr,cell] of Object.entries(cells)){
   const col=cellColumn(addr),index=alphaIndex(col);
-  if(index>12&&index<=26&&String(cell.v??'').trim())highest=Math.max(highest,index);
+  if(index>12&&index<=26&&String(cell.v??'').trim())custom.add(col);
  }
- return Array.from({length:highest},(_,i)=>code(i+1));
+ return [...'ABCDEFGHIJKL',...[...custom].sort((a,b)=>alphaIndex(a)-alphaIndex(b))];
 }
 export function appendManualWorkbookRow(bytes:Uint8Array,month:string){
  const wb=workbookFromFile(bytes),sheet=wb.Sheets[month];
@@ -132,9 +136,11 @@ export function appendManualWorkbookColumn(bytes:Uint8Array,month:string,label:s
   if(col.charCodeAt(0)>76 && String(sheet.cells[col+'1']?.v??'').trim()===trimmed)
    throw new Error('이미 사용 중인 열 이름입니다.');
  }
- const next=code(current.length+1);
- if(!EXTRA_COLUMN_LETTERS.includes(next)||next.length!==1)
-  throw new Error('웹 편집의 사용자 추가 열은 Z열까지 지원합니다.');
+ // Reuse an actually empty letter after deleting M while keeping N.
+ const occupied=new Set(current);
+ const next=[...EXTRA_COLUMN_LETTERS].find(col=>!occupied.has(col) &&
+  !Object.entries(sheet.cells).some(([address,cell])=>cellColumn(address)===col&&String(cell.v??'').trim()));
+ if(!next)throw new Error('사용자 추가 열은 Z열까지 지원합니다.');
  const entries=unzipSync(bytes),{path,source,part,fragments}=safeWorksheet(entries,month);
  let row=fragments.find(xml=>rowNumber(xml)===1);
  const formatted=escapeXml(trimmed);
@@ -165,4 +171,63 @@ export function appendManualWorkbookColumn(bytes:Uint8Array,month:string,label:s
  const output=zipSync(entries,{level:6});
  workbookFromFile(output);
  return {bytes:output,column:next,label:trimmed};
+}
+
+/** Delete only a web-created manual row. No row indices are shifted. */
+export function deleteManualWorkbookRow(bytes:Uint8Array,month:string,row:number){
+ if(!Number.isInteger(row)||row<2||row>MAX_MANAGED_ROW)
+  throw new Error('삭제할 행 번호를 확인해 주세요.');
+ const wb=workbookFromFile(bytes),sheet=wb.Sheets[month];
+ if(!sheet)throw new Error('해당 월별 시트가 없습니다.');
+ const entries=unzipSync(bytes),{path,source,part,fragments}=safeWorksheet(entries,month);
+ const existing=fragments.find(xml=>rowNumber(xml)===row);
+ if(!existing||!isManualRowXml(existing))
+  throw new Error('웹에서 추가한 수기 행만 삭제할 수 있습니다. 기존 운행보고는 보호됩니다.');
+ if(/<f(?:\s|>)/.test(existing))
+  throw new Error('수식이 있는 행은 삭제할 수 없습니다.');
+ if(sheet.merges.some(range=>row>=range.s.r+1&&row<=range.e.r+1))
+  throw new Error('병합 범위에 속한 행은 삭제할 수 없습니다.');
+ const revised=source.replace(part,part.replace(existing,''));
+ entries[path]=strToU8(revised);
+ const output=zipSync(entries,{level:6});
+ workbookFromFile(output);
+ return {bytes:output,rowNumber:row};
+}
+
+/** Delete only one custom M-Z column, never the A-L chauffeur-report schema. */
+export function deleteManualWorkbookColumn(bytes:Uint8Array,month:string,col:string){
+ if(!/^[M-Z]$/.test(col))throw new Error('운행보고 자동입력 열 A~L은 삭제할 수 없습니다.');
+ const wb=workbookFromFile(bytes),sheet=wb.Sheets[month];
+ if(!sheet)throw new Error('해당 월별 시트가 없습니다.');
+ const label=String(sheet.cells[col+'1']?.v??'').trim();
+ if(!label)throw new Error('제목이 있는 사용자 추가 열만 삭제할 수 있습니다.');
+ if(sheet.merges.some(range=>alphaIndex(col)-1>=range.s.c&&alphaIndex(col)-1<=range.e.c))
+  throw new Error('병합 범위가 포함된 열은 삭제할 수 없습니다.');
+ // Excel formulas referencing the column anywhere in the workbook must remain
+ // valid. Refuse deletion rather than silently leave #REF! errors.
+ const entries=unzipSync(bytes),{path,source,part,fragments}=safeWorksheet(entries,month);
+ const formulaRef=new RegExp('(^|[^A-Z0-9_])\\$?'+col+'\\$?(?:[1-9]\\d*|:'+col+'\\b)','i');
+ for(const [name,raw] of Object.entries(entries)){
+  if(!/^xl\/worksheets\/sheet[^/]*\.xml$/.test(name))continue;
+  const xml=strFromU8(raw);
+  const formulaParts=xml.match(/<f(?:\s[^>]*)?>[\s\S]*?<\/f>/g)||[];
+  if(formulaParts.some(formula=>formulaRef.test(formula)))
+   throw new Error(col+'열을 참조하는 Excel 수식이 있어 삭제할 수 없습니다.');
+ }
+ const cells=source.match(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g)||[];
+ if(cells.some(cell=>new RegExp('\\br="'+col+'\\d+"').test(cell)&&/<f(?:\s|>)/.test(cell)))
+  throw new Error('수식이 있는 사용자 열은 삭제할 수 없습니다.');
+ const matchCol=new RegExp('\\br="'+col+'[1-9]\\d*"');
+ let removed=0;
+ const changed=source.replace(part,part.replace(ROW_XML,(rowXml)=>{
+  return rowXml.replace(CELL_XML,(cell)=>{
+   if(matchCol.test(cell)){removed++;return '';}
+   return cell;
+  });
+ }));
+ if(!removed)throw new Error('삭제할 Excel 열이 없습니다.');
+ entries[path]=strToU8(changed);
+ const output=zipSync(entries,{level:6});
+ workbookFromFile(output);
+ return {bytes:output,column:col,label};
 }
