@@ -13,7 +13,6 @@ import {workbookFromFile} from './kakaoExcelWorkbook';
 export const MANUAL_ROW_HEIGHT='22.17';
 export const EXTRA_COLUMN_LETTERS='MNOPQRSTUVWXYZ';
 export const MAX_MANAGED_ROW=25000;
-const BASE_COLUMNS='ABCDEFGHIJKL';
 const ROW_XML=/<row\b[^>]*?(?:\/>|>[\s\S]*?<\/row>)/g;
 const CELL_XML=/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g;
 const XML_UNSAFE=/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/;
@@ -41,8 +40,8 @@ function safeWorksheet(entries:Record<string,Uint8Array>,month:string){
  const path=sheetXmlPath(entries,month),source=strFromU8(entries[path]);
  // Simple monthly worksheets only. Rich Excel structures need an Excel-native
  // structural update, not a partial XML rewrite that could corrupt references.
- if(/<(?:sheetProtection|tableParts|pivotTableParts|drawing|legacyDrawing|hyperlinks|dataValidations|conditionalFormatting|autoFilter|extLst)\b/i.test(source))
-  throw new Error('보호된 시트·표·기존 필터 등이 포함된 월별 시트는 안전하게 행·열을 추가할 수 없습니다. 원본 양식을 확인해 주세요.');
+ if(/<(?:sheetProtection|tableParts|pivotTableParts|drawing|legacyDrawing|hyperlinks|dataValidations|conditionalFormatting|extLst)\b/i.test(source))
+  throw new Error('보호된 시트·표·외부 연결이 포함된 월별 시트는 안전하게 행·열을 추가할 수 없습니다. 원본 양식을 확인해 주세요.');
  if(/<(?:\w+:)?sheetData\b/.test(source) && !/<sheetData\b[^>]*>/.test(source))
   throw new Error('특수 형식의 Excel 시트는 구조를 수정할 수 없습니다.');
  const part=source.match(/<sheetData\b[^>]*>[\s\S]*?<\/sheetData>/)?.[0];
@@ -129,7 +128,6 @@ export function appendManualWorkbookColumn(bytes:Uint8Array,month:string,label:s
  const wb=workbookFromFile(bytes),sheet=wb.Sheets[month];
  if(!sheet)throw new Error('선택한 월 시트가 없습니다.');
  const current=visibleWorkbookColumns(sheet.cells);
- if(current.includes(trimmed))throw new Error('이미 사용 중인 열 이름입니다.');
  for(const col of current){
   if(col.charCodeAt(0)>76 && String(sheet.cells[col+'1']?.v??'').trim()===trimmed)
    throw new Error('이미 사용 중인 열 이름입니다.');
@@ -152,7 +150,7 @@ export function appendManualWorkbookColumn(bytes:Uint8Array,month:string,label:s
    if(style)added=added.replace(' r="'+next+'1"',' r="'+next+'1" s="'+style+'"');
    row=row.replace(existing,added);
   }else{
-   const later=cells.find(cell=>alphaIndex(cellColumn(cell.match(/\br="([A-Z]+)\d+"/)?.[1]+'1'||''))>alphaIndex(next));
+   const later=cells.find(cell=>alphaIndex(cell.match(/\br="([A-Z]+)\d+"/)?.[1]||'')>alphaIndex(next));
    if(row.endsWith('/>'))row=row.replace(/\/>$/,'>'+added+'</row>');
    else row=later?row.replace(later,added+later):row.replace('</row>',added+'</row>');
   }
