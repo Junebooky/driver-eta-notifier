@@ -87,3 +87,16 @@ test('protected and special workbooks fail safely without modifying any member',
  assert.throws(()=>appendManualWorkbookColumn(kakaoWorkbookFixture(),'4월','=SUM(1)'),/열 이름/);
  assert.throws(()=>appendManualWorkbookColumn(kakaoWorkbookFixture(),'4월',''),/열 이름/);
 });
+
+test('an existing native Excel auto-filter remains intact after safe row and column additions',()=>{
+ const members=unzipSync(kakaoWorkbookFixture());
+ members[path]=strToU8(strFromU8(members[path]).replace('</sheetData>','</sheetData><autoFilter ref="A1:L3"/>'));
+ const original=zipSync(members);
+ const row=appendManualWorkbookRow(original,'4월');
+ const column=appendManualWorkbookColumn(row.bytes,'4월','새 메모');
+ const xml=strFromU8(unzipSync(column.bytes)[path]);
+ assert.match(xml,/<autoFilter ref="A1:L3"\/>/);
+ assert.match(xml,/<c r="M1" t="inlineStr">/);
+ assert.match(xml,/<row r="4" ht="22\.17" customHeight="1"\/>/);
+ assert.deepEqual(unzipSync(original)[path],members[path]);
+});
