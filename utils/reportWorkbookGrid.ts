@@ -70,7 +70,7 @@ export function readWorkbookGrid(bytes:Uint8Array,month:string,limit=300,offset=
    if(!x)return 1;
    if(!y)return -1;
    // Dates, mileage, OT and amounts need numeric ordering, not lexical 100/20 ordering.
-   const asNumber=(raw:string)=>/^[-+]?\\d+(?:,?\\d{3})*(?:\\.\\d+)?$/.test(raw)?Number(raw.replace(/,/g,'')):NaN;
+   const asNumber=(raw:string)=>/^[-+]?\d+(?:,?\d{3})*(?:\.\d+)?$/.test(raw)?Number(raw.replace(/,/g,'')):NaN;
    if(['A','I','J','L'].includes(column)){
     const nx=asNumber(x),ny=asNumber(y);
     if(Number.isFinite(nx)&&Number.isFinite(ny))return sign*(nx-ny)||a-b;
@@ -144,7 +144,7 @@ export function patchWorkbookCell(bytes:Uint8Array,month:string,row:number,col:s
   if(x&&row>=Number(x[2])&&row<=Number(x[4])&&col>=x[1]&&col<=x[3])throw new Error('병합된 셀은 직접 수정할 수 없습니다.');
  }
  const original=source.match(rowExpression(row))?.[0];
- if(!original||!(visibleWorkbookColumns(book.Sheets[month].cells).some(c=>String(book.Sheets[month].cells[c+row]?.v??'')!=='')||new RegExp('\\bht="'+MANUAL_ROW_HEIGHT+'"').test(original)&&/\\bcustomHeight="1"/.test(original)))throw new Error('기존 데이터 또는 추가된 빈 행만 편집할 수 있습니다.');
+ if(!original||!(visibleWorkbookColumns(book.Sheets[month].cells).some(c=>String(book.Sheets[month].cells[c+row]?.v??'')!=='')||new RegExp('\\bht="'+MANUAL_ROW_HEIGHT+'"').test(original)&&/\bcustomHeight="1"/.test(original)))throw new Error('기존 데이터 또는 추가된 빈 행만 편집할 수 있습니다.');
  const address=col+row,existing=original.match(cellExpression(address))?.[0];
  if(existing&&/<f(?:\s|>)/.test(existing))throw new Error('수식이 포함된 셀은 수정할 수 없습니다.');
  const oldValue=String(book.Sheets[month].cells[address]?.v??'');
