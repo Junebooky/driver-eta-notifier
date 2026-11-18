@@ -88,7 +88,7 @@ export function readWorkbookGrid(bytes:Uint8Array,month:string,limit=300,offset=
   row,cells:columns.map(col=>{const value=sheet.cells[col+row]?.v;if(col==='A'&&typeof value==='number'&&value>20000&&value<100000){return new Date((book.date1904?Date.UTC(1904,0,1):Date.UTC(1899,11,30))+value*86400000).toISOString().slice(0,10);}return String(value??'');}),
   locked:columns.filter(col=>formulas.has(col+row))
  }));
- return {months:book.SheetNames.filter(m=>/^(?:[1-9]|1[0-2])월$/.test(m)),month,rows,total:visible.length,unfilteredTotal:live.length,filterOptions,offset,limit,columns,headers:columns.map((col,i)=>i<12?DEFAULT_HEADERS[i]:String(sheet.cells[col+'1']?.v??col+'열'))};
+ return {months:book.SheetNames.filter(m=>/^(?:[1-9]|1[0-2])월$/.test(m)),month,rows,total:visible.length,unfilteredTotal:live.length,filterOptions,manualRows:addedRows,offset,limit,columns,headers:columns.map((col,i)=>i<12?DEFAULT_HEADERS[i]:String(sheet.cells[col+'1']?.v??col+'열'))};
 }
 /**
  * Add native Excel dropdown filter/sort arrows to a DOWNLOAD COPY only.
