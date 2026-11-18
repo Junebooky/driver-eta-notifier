@@ -424,6 +424,7 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
         const col=grid.columns[index] as SortKey,active=sortBy===col;
         return <th key={h} aria-sort={active?(sortDirection==='asc'?'ascending':'descending'):'none'}
          className="overflow-hidden whitespace-nowrap border-b border-r border-[#DCE5F1] text-left">
+         <div className="flex min-w-0 items-center">
          <button type="button"
           aria-label={h+' 열 정렬'+(active?' · '+(sortDirection==='asc'?'오름차순':'내림차순'):'')}
           title={active?(sortDirection==='asc'?'내림차순으로 정렬':'기본 순서로 복원'):'오름차순 정렬'}
@@ -438,6 +439,13 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
           <span className="truncate">{h}</span>
           <ArrowUpDown size={12} className={active?'shrink-0 opacity-90':'shrink-0 opacity-35 group-hover:opacity-75'}/>
          </button>
+         {/^[M-Z]$/.test(col)&&<button type="button" disabled={busy}
+          aria-label={h+' 열 삭제'} title={h+' 사용자 열 삭제'}
+          onClick={()=>setDeleteTarget({action:'delete_column',column:col,label:h})}
+          className="mx-1 inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-[#94A1B2] hover:bg-white hover:text-[#B76363] disabled:opacity-40">
+          <Trash2 size={13}/>
+         </button>}
+         </div>
         </th>;
        })}
      </tr></thead>
@@ -453,6 +461,16 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
           className="flex min-h-9 w-full flex-col items-center justify-center gap-0.5 rounded-md text-[#1E60F3] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30">
           <span>{row.row}</span><MessageSquareText size={12} strokeWidth={1.7}/>
          </button>
+        :grid.manualRows?.includes(row.row)?
+         <div className="flex min-h-9 items-center justify-center gap-0.5">
+          <span className="text-[11px]">{row.row}</span>
+          <button type="button" disabled={busy} title={row.row+'행 삭제'}
+           aria-label={row.row+'행 삭제'}
+           onClick={()=>setDeleteTarget({action:'delete_row',row:row.row})}
+           className="inline-flex size-7 items-center justify-center rounded-md text-[#93A1B3] hover:bg-white hover:text-[#B76363] disabled:opacity-40">
+           <Trash2 size={12}/>
+          </button>
+         </div>
         :<span className="block px-1 py-2">{row.row}</span>}
       </td>
       {row.cells.map((value,i)=>{
