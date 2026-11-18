@@ -1,22 +1,25 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {ChevronDown,ChevronUp,ChevronLeft,ChevronRight,Expand,Minimize2,FileSpreadsheet,Pencil,Save,X,ArrowUpDown,ZoomIn,ZoomOut,MessageSquareText,Filter,RotateCcw} from 'lucide-react';
+import {ChevronDown,ChevronUp,ChevronLeft,ChevronRight,Expand,Minimize2,FileSpreadsheet,Pencil,Save,X,ArrowUpDown,ZoomIn,ZoomOut,MessageSquareText,Filter,RotateCcw,Rows3,Columns3,Plus,Check} from 'lucide-react';
 import {HqSearchSelect} from './ui/HqSearchSelect';
 export type ReportExcelFocus={year:number;sheet:string;row:number;requestId:number};
 type Row={row:number;cells:string[];locked:string[]};
-type Grid={version:string;year:number;filename:string;month:string;months:string[];total:number;unfilteredTotal:number;filterOptions:{plate:string[];driver:string[];customer:string[]};offset:number;limit:number;rows:Row[];columns:string[];linkedRows:number[]};
+type Grid={version:string;year:number;filename:string;month:string;months:string[];total:number;unfilteredTotal:number;filterOptions:{plate:string[];driver:string[];customer:string[]};offset:number;limit:number;rows:Row[];columns:string[];headers:string[];linkedRows:number[]};
 type FilterKey='plate'|'driver'|'customer';
-type SortKey=''|'A'|'B'|'C'|'D'|'E'|'F'|'G'|'H'|'I'|'J'|'K'|'L';
+type SortKey=string;
 const blankFilters=()=>({plate:'',driver:'',customer:''});
 type SourceLink={year:number;month:string;row:number;version:string};
 type OriginalSource={year:number;month:string;row:number;rawMessage:string;driver:string;customer:string;plate:string;submittedAt:string};
 const sourceLinkKey=(target:SourceLink)=>[target.year,target.version,target.month,target.row].join('/');
 const columnWidths=[120,112,165,210,125,145,475,165,190,130,130,135];
-const totalWidth=52+columnWidths.reduce((sum,width)=>sum+width,0);
-const headers=['날짜','차량번호','차종','거래처','운전자','타임','운행경로','셀프/의전','OT Hours','금액','결제방법','합계'];
 export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onCommitted:()=>Promise<void>;focus?:ReportExcelFocus|null}){
  const [open,setOpen]=useState(false),[month,setMonth]=useState(''),[grid,setGrid]=useState<Grid|null>(null);
  const [offset,setOffset]=useState(0);
+ const [showColumnForm,setShowColumnForm]=useState(false);
+ const [columnLabel,setColumnLabel]=useState('');
+ const [success,setSuccess]=useState('');
+ const renderedWidths=[...columnWidths,...Array(Math.max(0,(grid?.columns.length??12)-12)).fill(165)];
+ const renderedTotal=52+renderedWidths.reduce((sum,width)=>sum+width,0);
  const [filters,setFilters]=useState(blankFilters);
  const [sortBy,setSortBy]=useState<SortKey>('');
  const [sortDirection,setSortDirection]=useState<'asc'|'desc'>('asc');
@@ -137,6 +140,27 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
    const data=await r.json();if(!r.ok)throw Error(data.error||'날짜순 정리를 완료하지 못했습니다.');
    if(data.unchanged)setError(data.message||'이미 날짜순으로 정리돼 있습니다.');
    await load(grid.month);await onCommitted();
+  }catch(e){setError((e as Error).message);}finally{setBusy(false);}
+ }
+ async function addStructure(action:'add_row'|'add_column'){
+  if(!grid||busy)return;
+  setBusy(true);setError('');setSuccess('');setEdit(null);
+  try{
+   const r=await fetch('/api/hq/report-workbook',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action,year,month:grid.month,expectedVersion:grid.version,
+     ...(action==='add_column'?{label:columnLabel}:{})})});
+   const data=await r.json().catch(()=>({}));
+   if(!r.ok||!data.ok)throw Error(data.error||'Excel 구조를 저장하지 못했습니다.');
+   dismissSource();setHighlightedRow(null);resetFilters();
+   if(action==='add_row'){
+    setSuccess(data.row+'행을 추가했습니다. 셀을 눌러 바로 입력하세요.');
+    setNavigateTo({year,sheet:grid.month,row:data.row,requestId:Date.now()});
+   }else{
+    setShowColumnForm(false);setColumnLabel('');
+    setSuccess(data.column+'열 ('+data.label+')을 추가했습니다. 셀을 눌러 입력하세요.');
+    await load(grid.month);
+   }
+   await onCommitted();
   }catch(e){setError((e as Error).message);}finally{setBusy(false);}
  }
  async function save(){
@@ -290,6 +314,32 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
     {grid?.months.map(name=><button type="button" role="tab" aria-selected={month===name} key={name} onClick={()=>{setEdit(null);setError('');setHighlightedRow(null);setNavigateTo(null);resetFilters();setMonth(name);}}
      className={'shrink-0 rounded-xl px-3 py-2 text-xs font-semibold '+(month===name?'bg-[#1E60F3] text-white':'bg-[#F2F4F6] text-[#6F809A]')}>{name}</button>)}
    </div>
+   {grid&&<div className="flex flex-wrap items-center gap-2 rounded-xl bg-white">
+    <button type="button" aria-label="Excel 새 행 추가" disabled={busy}
+     onClick={()=>void addStructure('add_row')}
+     className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[#E4EAF2] bg-white px-3.5 text-[12px] font-semibold text-[#536985] shadow-[0_3px_10px_rgba(25,40,66,.035)] transition-colors hover:bg-[#F6F9FC] disabled:opacity-40">
+     <Rows3 size={15}/><Plus size={12}/>행 추가
+    </button>
+    <button type="button" aria-label="Excel 새 열 추가" disabled={busy||grid.columns.length>=26}
+     onClick={()=>{setShowColumnForm(value=>!value);setError('');setSuccess('');}}
+     className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[#E4EAF2] bg-white px-3.5 text-[12px] font-semibold text-[#536985] shadow-[0_3px_10px_rgba(25,40,66,.035)] transition-colors hover:bg-[#F6F9FC] disabled:opacity-40">
+     <Columns3 size={15}/><Plus size={12}/>열 추가
+    </button>
+    <span className="text-[11px] text-[#92A0B2]">빈 행에 추가 · 사용자 열은 L열 오른쪽부터</span>
+   </div>}
+   {grid&&showColumnForm&&<form onSubmit={e=>{e.preventDefault();void addStructure('add_column');}}
+    className="flex flex-wrap items-center gap-2 rounded-xl bg-[#F7F9FC] p-3">
+    <label htmlFor="hq-excel-new-column-name" className="text-[12px] font-semibold text-[#5B6F88]">새 열 이름</label>
+    <input autoFocus id="hq-excel-new-column-name" value={columnLabel} maxLength={60}
+     onChange={e=>setColumnLabel(e.target.value)} placeholder="예: 비고, 추가 경비" required
+     className="min-h-10 min-w-0 flex-1 basis-[170px] rounded-xl border border-[#E2E9F3] bg-white px-3 text-[13px] text-[#354868] outline-none focus:border-[#1E60F3]" />
+    <button type="submit" disabled={busy||!columnLabel.trim()} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[#1E60F3] px-3.5 text-[12px] font-semibold text-white disabled:opacity-40">
+     <Check size={14}/>추가
+    </button>
+    <button type="button" onClick={()=>{setShowColumnForm(false);setColumnLabel('');}}
+     className="inline-flex min-h-10 items-center justify-center rounded-xl bg-white px-3 text-[12px] text-[#7C8B9E]">취소</button>
+   </form>}
+   {success&&<p role="status" className="rounded-xl bg-[#F4F8FD] px-3 py-2 text-[12px] text-[#53718E]">{success}</p>}
    {grid&&<div aria-label="Excel 열 필터 및 정렬" className="relative z-[40] flex min-w-0 flex-wrap items-center gap-2.5 rounded-2xl bg-[#F7F9FC] p-2.5 sm:p-3">
     <span className="inline-flex shrink-0 items-center gap-1.5 px-1 text-[12px] font-semibold text-[#657892]"><Filter size={14}/>필터</span>
     <div className="grid min-w-0 flex-[3] basis-[520px] grid-cols-1 gap-2 sm:grid-cols-3">
@@ -318,7 +368,7 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
        emptyLabel="기본 순서"
        value={sortBy}
        onChange={value=>{setOffset(0);setEdit(null);setSortBy(value as SortKey);}}
-       options={headers.map((name,index)=>({value:grid.columns[index],label:name+'순'}))}
+       options={grid.headers.map((name,index)=>({value:grid.columns[index],label:name+'순'}))}
       />
      </div>
      <button type="button" aria-label={'정렬 방향: '+(sortDirection==='asc'?'오름차순':'내림차순')}
@@ -338,10 +388,10 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
    </div>}
    {error&&<p role="alert" className="rounded-xl bg-[#F3F6FC] p-3 text-sm text-[#65758A]">{error}</p>}
    {grid&&<div ref={scrollRef} onScroll={syncScroll} className={'hq-excel-scroll min-w-0 max-w-full overflow-auto overscroll-contain rounded-xl border border-[#E2E9F2] '+(zoom?'min-h-0 flex-1':'max-h-[500px]')}>
-    <table className="table-fixed border-collapse text-[11px] text-[#465775]" style={{width:totalWidth,...(zoom&&tableScale!==100?{zoom:tableScale/100}:{})}}><colgroup><col style={{width:52}}/>{columnWidths.map((width,index)=><col key={index} style={{width}}/>)}</colgroup>
+    <table className="table-fixed border-collapse text-[11px] text-[#465775]" style={{width:renderedTotal,...(zoom&&tableScale!==100?{zoom:tableScale/100}:{})}}><colgroup><col style={{width:52}}/>{renderedWidths.map((width,index)=><col key={index} style={{width}}/>)}</colgroup>
      <thead className="sticky top-0 z-10 bg-[#EDF2F8]"><tr>
       <th className="sticky left-0 z-20 border-b border-r border-[#DCE5F1] bg-[#EDF2F8] px-2 py-2">행</th>
-      {headers.map((h,index)=>{
+      {grid.headers.map((h,index)=>{
         const col=grid.columns[index] as SortKey,active=sortBy===col;
         return <th key={h} aria-sort={active?(sortDirection==='asc'?'ascending':'descending'):'none'}
          className="overflow-hidden whitespace-nowrap border-b border-r border-[#DCE5F1] text-left">

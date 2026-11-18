@@ -2,9 +2,11 @@ import {unzipSync,zipSync,strFromU8,strToU8} from 'fflate';
 import {DOMParser} from '@xmldom/xmldom';
 import {workbookFromFile} from './kakaoExcelWorkbook';
 import {widenReportColumns,routeColumnWidth} from './reportExcelCellFormatting';
+import {visibleWorkbookColumns,MANUAL_ROW_HEIGHT} from './reportWorkbookStructure';
 
 const MAX_VALUE=2400;
-const COLS='ABCDEFGHIJKL';
+const COLS='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const DEFAULT_HEADERS=['날짜','차량번호','차종','거래처','운전자','타임','운행경로','셀프/의전','OT Hours','금액','결제방법','합계'];
 const rowExpression=(row:number)=>new RegExp('<row\\b(?=[^>]*\\br="'+row+'")[^>]*?(?:/>|>[\\s\\S]*?<\\/row>)');
 const cellExpression=(name:string)=>new RegExp('<c\\b(?=[^>]*\\br="'+name+'")[^>]*?(?:/>|>[\\s\\S]*?<\\/c>)');
 const xml=(value:string)=>value.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -22,7 +24,7 @@ function sheetEntry(entries:Record<string,Uint8Array>,sheet:string){
 export const excelCellColumn=(col:string)=>COLS.includes(col)&&col.length===1;
 export type WorkbookViewRow={row:number;cells:string[];locked:string[]};
 /** Read-only view options; sorting never changes a stored Excel row index. */
-export type WorkbookSortColumn='A'|'B'|'C'|'D'|'E'|'F'|'G'|'H'|'I'|'J'|'K'|'L';
+export type WorkbookSortColumn=string;
 export type WorkbookGridQuery={
  plate?:string;
  driver?:string;
@@ -37,8 +39,12 @@ export function readWorkbookGrid(bytes:Uint8Array,month:string,limit=300,offset=
  const entries=unzipSync(bytes),path=sheetEntry(entries,month),source=strFromU8(entries[path]);
  const parsed=new DOMParser().parseFromString(source,'application/xml');
  const formulas=new Set(Array.from(parsed.getElementsByTagName('c')).filter(c=>c.getElementsByTagName('f').length>0).map(c=>c.getAttribute('r')||''));
- const rowIds=[...new Set(Object.keys(sheet.cells).map(address=>Number(address.match(/\d+$/)?.[0])).filter(n=>n>=2&&Number.isInteger(n)))].sort((a,b)=>a-b);
- const live=rowIds.filter(n=>COLS.split('').some(col=>{
+ const columns=visibleWorkbookColumns(sheet.cells);
+ const addedRows=Array.from(parsed.getElementsByTagName('row'))
+  .filter(row=>row.getAttribute('customHeight')==='1'&&row.getAttribute('ht')===MANUAL_ROW_HEIGHT)
+  .map(row=>Number(row.getAttribute('r'))).filter(row=>row>=2&&row<=25000);
+ const rowIds=[...new Set([...addedRows,...Object.keys(sheet.cells).map(address=>Number(address.match(/\d+$/)?.[0])).filter(n=>n>=2&&Number.isInteger(n))])].sort((a,b)=>a-b);
+ const live=rowIds.filter(n=>addedRows.includes(n)||columns.some(col=>{
   const v=sheet.cells[col+n]?.v;
   return formulas.has(col+n)||v!==undefined&&v!==null&&String(v)!=='';
  }));
@@ -64,7 +70,7 @@ export function readWorkbookGrid(bytes:Uint8Array,month:string,limit=300,offset=
    if(!x)return 1;
    if(!y)return -1;
    // Dates, mileage, OT and amounts need numeric ordering, not lexical 100/20 ordering.
-   const asNumber=(raw:string)=>/^[-+]?\\d+(?:,?\\d{3})*(?:\\.\\d+)?$/.test(raw)?Number(raw.replace(/,/g,'')):NaN;
+   const asNumber=(raw:string)=>/^[-+]?\d+(?:,?\d{3})*(?:\.\d+)?$/.test(raw)?Number(raw.replace(/,/g,'')):NaN;
    if(['A','I','J','L'].includes(column)){
     const nx=asNumber(x),ny=asNumber(y);
     if(Number.isFinite(nx)&&Number.isFinite(ny))return sign*(nx-ny)||a-b;
@@ -79,10 +85,10 @@ export function readWorkbookGrid(bytes:Uint8Array,month:string,limit=300,offset=
   offset=Math.floor(target/limit)*limit;
  }
  const rows:WorkbookViewRow[]=visible.slice(offset,offset+limit).map(row=>({
-  row,cells:COLS.split('').map(col=>{const value=sheet.cells[col+row]?.v;if(col==='A'&&typeof value==='number'&&value>20000&&value<100000){return new Date((book.date1904?Date.UTC(1904,0,1):Date.UTC(1899,11,30))+value*86400000).toISOString().slice(0,10);}return String(value??'');}),
-  locked:COLS.split('').filter(col=>formulas.has(col+row))
+  row,cells:columns.map(col=>{const value=sheet.cells[col+row]?.v;if(col==='A'&&typeof value==='number'&&value>20000&&value<100000){return new Date((book.date1904?Date.UTC(1904,0,1):Date.UTC(1899,11,30))+value*86400000).toISOString().slice(0,10);}return String(value??'');}),
+  locked:columns.filter(col=>formulas.has(col+row))
  }));
- return {months:book.SheetNames.filter(m=>/^(?:[1-9]|1[0-2])월$/.test(m)),month,rows,total:visible.length,unfilteredTotal:live.length,filterOptions,offset,limit,columns:COLS.split('')};
+ return {months:book.SheetNames.filter(m=>/^(?:[1-9]|1[0-2])월$/.test(m)),month,rows,total:visible.length,unfilteredTotal:live.length,filterOptions,offset,limit,columns,headers:columns.map((col,i)=>i<12?DEFAULT_HEADERS[i]:String(sheet.cells[col+'1']?.v??col+'열'))};
 }
 /**
  * Add native Excel dropdown filter/sort arrows to a DOWNLOAD COPY only.
@@ -124,6 +130,7 @@ export function patchWorkbookCell(bytes:Uint8Array,month:string,row:number,col:s
  if(col==='A'&&!/^\d{4}-\d{2}-\d{2}$/.test(trimmed))throw new Error('날짜는 2026-11-04 형식으로 입력해 주세요.');
  const book=workbookFromFile(bytes);
  if(!book.Sheets[month])throw new Error('해당 월 시트가 없습니다.');
+ if(!visibleWorkbookColumns(book.Sheets[month].cells).includes(col))throw new Error('추가되지 않은 열은 수정할 수 없습니다.');
  if(col==='A'){
   const d=new Date(trimmed+'T00:00:00Z');
   if(Number.isNaN(d.getTime())||d.toISOString().slice(0,10)!==trimmed||Number(trimmed.slice(5,7))!==Number(month.replace('월','')))throw new Error('동일한 월의 올바른 날짜만 입력할 수 있습니다.');
@@ -137,7 +144,7 @@ export function patchWorkbookCell(bytes:Uint8Array,month:string,row:number,col:s
   if(x&&row>=Number(x[2])&&row<=Number(x[4])&&col>=x[1]&&col<=x[3])throw new Error('병합된 셀은 직접 수정할 수 없습니다.');
  }
  const original=source.match(rowExpression(row))?.[0];
- if(!original||!COLS.split('').some(c=>String(book.Sheets[month].cells[c+row]?.v??'')!==''))throw new Error('기존 데이터가 있는 행만 편집할 수 있습니다.');
+ if(!original||!(visibleWorkbookColumns(book.Sheets[month].cells).some(c=>String(book.Sheets[month].cells[c+row]?.v??'')!=='')||new RegExp('\\bht="'+MANUAL_ROW_HEIGHT+'"').test(original)&&/\bcustomHeight="1"/.test(original)))throw new Error('기존 데이터 또는 추가된 빈 행만 편집할 수 있습니다.');
  const address=col+row,existing=original.match(cellExpression(address))?.[0];
  if(existing&&/<f(?:\s|>)/.test(existing))throw new Error('수식이 포함된 셀은 수정할 수 없습니다.');
  const oldValue=String(book.Sheets[month].cells[address]?.v??'');
@@ -153,7 +160,18 @@ export function patchWorkbookCell(bytes:Uint8Array,month:string,row:number,col:s
  const newCell=trimmed===''?'<c'+attrs+'/>':numeric?
   '<c'+attrs+'><v>'+renderValue.replace(/,/g,'')+'</v></c>':
   '<c'+attrs+' t="inlineStr"><is><t xml:space="preserve">'+xml(trimmed)+'</t></is></c>';
- const revisedRow=existing?original.replace(existing,newCell):original.replace(/<\/row>$/,newCell+'</row>');
+ let revisedRow:string;
+ if(existing)revisedRow=original.replace(existing,newCell);
+ else if(original.endsWith('/>'))revisedRow=original.replace(/\/>$/,'>'+newCell+'</row>');
+ else{
+  const cells=original.match(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g)||[];
+  const targetIndex=[...col].reduce((n,x)=>n*26+x.charCodeAt(0)-64,0);
+  const later=cells.find(xml=>{
+   const addr=xml.match(/\br="([A-Z]+)\d+"/)?.[1]||'';
+   return [...addr].reduce((n,x)=>n*26+x.charCodeAt(0)-64,0)>targetIndex;
+  });
+  revisedRow=later?original.replace(later,newCell+later):original.replace('</row>',newCell+'</row>');
+ }
  if(revisedRow===original)throw new Error('셀 값을 변경하지 못했습니다.');
  let changedSource=source.replace(original,revisedRow);
  if(col==='G'){
