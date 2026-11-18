@@ -80,8 +80,8 @@ test('protected and special workbooks fail safely without modifying any member',
  const protectedFiles={...original};
  protectedFiles[path]=strToU8(strFromU8(original[path]).replace('</sheetData>','</sheetData><sheetProtection sheet="1"/>'));
  const protectedBook=zipSync(protectedFiles);
- assert.throws(()=>appendManualWorkbookRow(protectedBook,'4월'),/보호된 시트/);
- assert.throws(()=>appendManualWorkbookColumn(protectedBook,'4월','비고'),/보호된 시트/);
+ assert.throws(()=>appendManualWorkbookRow(protectedBook,'4월'),/편집 제한/);
+ assert.throws(()=>appendManualWorkbookColumn(protectedBook,'4월','비고'),/편집 제한/);
  assert.deepEqual(unzipSync(protectedBook)[path],protectedFiles[path]);
  assert.throws(()=>appendManualWorkbookRow(kakaoWorkbookFixture(),'13월'),/선택한 월/);
  assert.throws(()=>appendManualWorkbookColumn(kakaoWorkbookFixture(),'4월','=SUM(1)'),/열 이름/);
@@ -103,7 +103,8 @@ test('an existing native Excel auto-filter remains intact after safe row and col
 
 test('rich Excel metadata (drawings, hyperlinks, validations, conditional formats, extension tags) does not block no-shift additions',()=>{
  const zipped=unzipSync(kakaoWorkbookFixture());
- const original=strFromU8(zipped[path]);
+ let original=strFromU8(zipped[path]);
+ if(!/xmlns:r=/.test(original))original=original.replace('<worksheet','<worksheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"');
  const decorations='<conditionalFormatting sqref="B2:B3"><cfRule type="expression" priority="1"><formula>TRUE</formula></cfRule></conditionalFormatting>'
   +'<dataValidations count="1"><dataValidation sqref="D2" type="list" allowBlank="1"><formula1>"Y,N"</formula1></dataValidation></dataValidations>'
   +'<hyperlinks><hyperlink ref="D2" location="Sheet2!A1" display="goto"/></hyperlinks>'
