@@ -65,6 +65,22 @@ function dimension(source:string,row:number,col:number){
   return all.replace(range[0],'ref="'+range[1]+range[2]+':'+updated+'"');
  });
 }
+/**
+ * A worksheet may contain native Excel tables. Editing outside their defined
+ * range is harmless; changing a table-owned header would require updating
+ * tableColumn metadata too, so reject only that specific overlap.
+ */
+function rejectTableOwnedHeader(entries:Record<string,Uint8Array>,source:string,col:string){
+ if(!/<tableParts\b/i.test(source))return;
+ const index=alphaIndex(col);
+ for(const [name,bytes] of Object.entries(entries)){
+  if(!/^xl\/tables\/table[^/]*\.xml$/.test(name))continue;
+  const xml=strFromU8(bytes);
+  const ref=xml.match(/<table\b[^>]*\bref="([A-Z]+)\d+:([A-Z]+)\d+"/)?.slice(1);
+  if(ref&&index>=alphaIndex(ref[0])&&index<=alphaIndex(ref[1]))
+   throw new Error('기존 Excel 표가 '+col+'열을 사용하고 있어 구조를 변경할 수 없습니다.');
+ }
+}
 export function isManualRowXml(row:string){
  return /\bcustomHeight="1"/.test(row) && /\bht="22\.17"/.test(row);
 }
@@ -142,6 +158,9 @@ export function appendManualWorkbookColumn(bytes:Uint8Array,month:string,label:s
   !Object.entries(sheet.cells).some(([address,cell])=>cellColumn(address)===col&&String(cell.v??'').trim()));
  if(!next)throw new Error('사용자 추가 열은 Z열까지 지원합니다.');
  const entries=unzipSync(bytes),{path,source,part,fragments}=safeWorksheet(entries,month);
+ rejectTableOwnedHeader(entries,source,next);
+ if(sheet.merges.some(range=>range.s.r===0&&range.e.r>=0&&alphaIndex(next)-1>=range.s.c&&alphaIndex(next)-1<=range.e.c))
+  throw new Error('병합된 Excel 머리글에는 새 열을 추가할 수 없습니다.');
  let row=fragments.find(xml=>rowNumber(xml)===1);
  const formatted=escapeXml(trimmed);
  // Reuse preformatted, but empty, header cells where present.
@@ -206,6 +225,10 @@ export function deleteManualWorkbookColumn(bytes:Uint8Array,month:string,col:str
  // Excel formulas referencing the column anywhere in the workbook must remain
  // valid. Refuse deletion rather than silently leave #REF! errors.
  const entries=unzipSync(bytes),{path,source,part,fragments}=safeWorksheet(entries,month);
+ rejectTableOwnedHeader(entries,source,col);
+ const activeFilter=source.match(/<autoFilter\b[^>]*\bref="([A-Z]+)\d+:([A-Z]+)\d+"/)?.slice(1);
+ if(activeFilter&&alphaIndex(col)>=alphaIndex(activeFilter[0])&&alphaIndex(col)<=alphaIndex(activeFilter[1]))
+  throw new Error('Excel 필터 범위에 포함된 사용자 열은 삭제할 수 없습니다.');
  const formulaRef=new RegExp('(^|[^A-Z0-9_])\\$?'+col+'\\$?(?:[1-9]\\d*|:'+col+'\\b)','i');
  for(const [name,raw] of Object.entries(entries)){
   if(!/^xl\/worksheets\/sheet[^/]*\.xml$/.test(name))continue;
