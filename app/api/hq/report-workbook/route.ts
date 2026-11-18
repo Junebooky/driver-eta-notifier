@@ -9,6 +9,7 @@ import {readWorkbook,storeWorkbook} from '@/lib/driverReports/storage';
 import {readWorkbookGrid,patchWorkbookCell,addWorkbookDownloadAutoFilters} from '@/utils/reportWorkbookGrid';
 import {organizeManagedMonth} from '@/utils/reportWorkbookRowOrder';
 import {refitWorkbookRouteColumns} from '@/utils/reportWorkbookOperations';
+import {appendManualWorkbookRow,appendManualWorkbookColumn} from '@/utils/reportWorkbookStructure';
 import {boundedBody,UUID,privateJson,failure,sameOrigin} from '@/lib/driverReports/http';
 export const dynamic='force-dynamic';export const runtime='nodejs';
 export async function GET(req:NextRequest){
@@ -31,7 +32,7 @@ export async function GET(req:NextRequest){
    if(focusRow!==undefined&&(!/^\d{1,5}$/.test(focusText!)||!Number.isInteger(focusRow)||focusRow<2||focusRow>25000))throw new Error('이동할 Excel 행을 확인해 주세요.');
    const filter=(key:string)=>{const value=req.nextUrl.searchParams.get(key)||'';if(value.length>180)throw new Error('Excel 필터가 너무 깁니다.');return value;};
    const sortBy=filter('sortBy'),sortDirection=filter('sortDirection');
-   if(sortBy&&!/^[A-L]$/.test(sortBy))throw new Error('정렬 열을 확인해 주세요.');
+   if(sortBy&&!/^[A-Z]$/.test(sortBy))throw new Error('정렬 열을 확인해 주세요.');
    if(sortDirection&&!['asc','desc'].includes(sortDirection))throw new Error('정렬 방향을 확인해 주세요.');
    const view=readWorkbookGrid(w.bytes,month,300,offset,focusRow,{
     plate:filter('plate'),driver:filter('driver'),customer:filter('customer'),
@@ -66,6 +67,24 @@ export async function POST(req:NextRequest){
   let replacement:null|Awaited<ReturnType<typeof replaceWorkbook>>=null;
   if(req.headers.get('content-type')?.startsWith('application/json')){
    const b=JSON.parse(new TextDecoder().decode(await boundedBody(req,4096)));
+   if(b.action==='add_row'||b.action==='add_column'){
+    if(!Number.isInteger(b.year)||b.year<2000||b.year>2099||!UUID.test(b.expectedVersion||'')||typeof b.month!=='string')
+     throw new Error('Excel 버전 또는 월별 시트를 확인해 주세요.');
+    if(b.action==='add_column'&&typeof b.label!=='string')throw new Error('추가할 열 이름을 입력해 주세요.');
+    const w=await currentWorkbook(s.org,b.year);
+    if(!w||w.id!==b.expectedVersion)return privateJson({ok:false,error:'다른 관리자가 Excel을 변경했습니다. 다시 불러와 주세요.'},409);
+    const change=b.action==='add_row'?
+     appendManualWorkbookRow(w.bytes,b.month):
+     appendManualWorkbookColumn(w.bytes,b.month,b.label);
+    const changed=await db.rpc('commit_report_hq_sheet_change',{
+     p_org:s.org,p_actor:s.userId,p_year:w.year,p_expected:w.id,
+     p_storage:await storeWorkbook(s.org,change.bytes),p_sheet:b.month,
+     p_action:b.action,p_row:'rowNumber' in change?change.rowNumber:null,
+     p_column:'column' in change?change.column:null,p_label:'label' in change?change.label:null,
+    });check(changed.error);
+    if(!changed.data)return privateJson({ok:false,error:'Excel 버전이 변경됐습니다. 다시 불러와 주세요.'},409);
+    return privateJson({ok:true,...('rowNumber' in change?{row:change.rowNumber}:{column:change.column,label:change.label})});
+   }
    if(b.action==='sort_month'){
     if(!Number.isInteger(b.year)||!UUID.test(b.expectedVersion||'')||typeof b.month!=='string')throw new Error('정렬할 Excel 시트를 확인해 주세요.');
     const w=await currentWorkbook(s.org,b.year);
@@ -90,6 +109,16 @@ export async function POST(req:NextRequest){
     if(b.column==='A'&&Number(b.value.slice(0,4))!==w.year)throw new Error('장부와 같은 연도의 날짜만 입력해 주세요.');
     const edit=patchWorkbookCell(w.bytes,b.month,b.row,b.column,b.value);
     if(!edit.changed)return privateJson({ok:true,unchanged:true,version:w.id});
+    if(/^[M-Z]$/.test(b.column)){
+     // Extra custom columns never change the A–L chauffeur report payload.
+     const changed=await db.rpc('commit_report_hq_sheet_change',{
+      p_org:s.org,p_actor:s.userId,p_year:w.year,p_expected:w.id,
+      p_storage:await storeWorkbook(s.org,edit.bytes),p_sheet:b.month,
+      p_action:'edit_extra',p_row:b.row,p_column:b.column,p_label:null,
+     });check(changed.error);
+     if(!changed.data)return privateJson({ok:false,error:'Excel 버전이 변경됐습니다. 다시 불러와 주세요.'},409);
+     return privateJson({ok:true});
+    }
     const linked=Object.entries(w.manifest||{}).find(([,p])=>p.sheet===b.month&&p.row===b.row)?.[0];
     if(linked&&b.column==='H'&&!isReportServiceType(b.value))throw new Error('김포공항 샌딩 · 인천공항 샌딩 · 의전 중 선택해 주세요.');
     if(linked&&['F','B'].includes(b.column)){
