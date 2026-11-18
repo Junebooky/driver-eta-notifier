@@ -497,6 +497,44 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
    {grid&&grid.total>grid.limit&&<div className="flex gap-3"><button type="button" disabled={offset===0||busy} onClick={()=>{setEdit(null);setOffset(Math.max(0,offset-grid.limit));}} className="min-h-11 px-3 text-sm text-[#1E60F3] disabled:opacity-40">이전 행</button><button type="button" disabled={offset+grid.limit>=grid.total||busy} onClick={()=>{setEdit(null);setOffset(offset+grid.limit);}} className="min-h-11 px-3 text-sm text-[#1E60F3] disabled:opacity-40">다음 행</button></div>}
    {busy&&<p className="text-xs text-[#1E60F3]">저장 중...</p>}
   </div>}
+  {deleteTarget&&grid&&<div role="presentation" className="fixed inset-0 z-[280] flex items-center justify-center bg-[#162238]/40 p-4">
+   <div role="alertdialog" aria-modal="true" aria-labelledby="hq-excel-delete-title"
+    aria-describedby="hq-excel-delete-desc"
+    className="w-full max-w-[420px] rounded-[20px] bg-white p-5 shadow-[0_24px_65px_rgba(19,36,64,.2)] sm:p-6">
+    <div className="flex items-start justify-between gap-3">
+     <div className="flex min-w-0 items-center gap-2.5">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#F7F0EF] text-[#B96666]"><AlertTriangle size={19}/></span>
+      <h3 id="hq-excel-delete-title" className="text-[15px] font-bold text-[#354868]">{deleteTarget.action==='delete_row'?'행 삭제':'열 삭제'}</h3>
+     </div>
+     <button type="button" aria-label="삭제 취소" onClick={()=>setDeleteTarget(null)}
+      className="inline-flex size-8 items-center justify-center rounded-lg bg-[#F6F8FA] text-[#7A8BA0]"><X size={16}/></button>
+    </div>
+    <p id="hq-excel-delete-desc" className="mt-3 text-[12px] leading-6 text-[#63748A]">
+     해당 {deleteTarget.action==='delete_row'?'수기 행':'사용자 지정 열'}의 셀 내용이 Excel 작업본에서 삭제됩니다.
+     기존 행 번호와 자동 운행보고 연결은 변경되지 않으며, 이전 장부 버전은 보관됩니다.
+    </p>
+    <label htmlFor="hq-excel-delete-choice" className="mt-4 block text-[12px] font-semibold text-[#506681]">삭제할 {deleteTarget.action==='delete_row'?'행':'열'}</label>
+    <select id="hq-excel-delete-choice"
+     value={deleteTarget.action==='delete_row'?String(deleteTarget.row):deleteTarget.column}
+     onChange={e=>{
+      if(deleteTarget.action==='delete_row')setDeleteTarget({action:'delete_row',row:Number(e.target.value)});
+      else setDeleteTarget({action:'delete_column',column:e.target.value,label:grid.headers[grid.columns.indexOf(e.target.value)]});
+     }}
+     className="mt-2 h-11 w-full rounded-xl border border-[#E1E8F1] bg-white px-3 text-[13px] text-[#354868] outline-none focus:border-[#1E60F3]">
+     {deleteTarget.action==='delete_row'
+      ?grid.manualRows.map(r=><option key={r} value={r}>{r}행</option>)
+      :grid.columns.filter(c=>/^[M-Z]$/.test(c)).map(c=><option key={c} value={c}>{c} · {grid.headers[grid.columns.indexOf(c)]}</option>)}
+    </select>
+    <div className="mt-5 flex justify-end gap-2">
+     <button type="button" onClick={()=>setDeleteTarget(null)} disabled={busy}
+      className="min-h-10 rounded-xl bg-[#F2F5F9] px-4 text-[12px] font-semibold text-[#687B94]">취소</button>
+     <button type="button" disabled={busy} onClick={()=>void deleteStructure()}
+      className="min-h-10 rounded-xl bg-[#B76363] px-4 text-[12px] font-semibold text-white disabled:opacity-40">
+      {busy?'삭제 중...':'선택 항목 삭제'}
+     </button>
+    </div>
+   </div>
+  </div>}
   {sourceLink&&(
    <aside role="dialog" aria-label="연결된 기사 운행보고 원문"
     className="fixed inset-x-3 bottom-3 z-[210] flex max-h-[73dvh] flex-col overflow-hidden rounded-[19px] bg-white p-4 shadow-[0_16px_50px_rgba(25,42,76,0.19)] ring-1 ring-[#E7ECF4] sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-24 sm:w-[375px] sm:max-h-[min(74dvh,650px)] sm:p-5">
