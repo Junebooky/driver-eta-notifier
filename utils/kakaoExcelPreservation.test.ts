@@ -14,7 +14,7 @@ test('Existing cells, formulas, styles, footer and all other ZIP members survive
  const strip=(s:string)=>s.replace(/<dimension[^>]*\/>/,'').replace(/<cols\b[^>]*>[\s\S]*?<\/cols>/,'').replace(/<row\b(?=[^>]*\br="4")[^>]*>[\s\S]*?<\/row>/,'');
  assert.equal(strip(strFromU8(a['xl/worksheets/sheet1.xml'])),strip(strFromU8(b['xl/worksheets/sheet1.xml'])));
  const after=workbookFromFile(result.bytes).Sheets['4월'];
- assert.equal(after.cells.A245.v,46117); assert.equal(after.cells.M245,undefined);
+ assert.equal(after.cells.A4.v,46117); assert.equal(after.cells.M4,undefined);
  assert.throws(()=>appendKakaoExcelReport(result.bytes,draft),/중복/);
  assert.throws(()=>appendKakaoExcelReport(result.bytes,{...draft,time:'9:15~17:20'}),/중복/);
  assert.equal(appendKakaoExcelReport(result.bytes,{...draft,time:'18:00~19:00'}).rowNumber,5);
@@ -29,12 +29,12 @@ test('Strings stay literal, optional billing cells absent, leading zero plates a
  const bytes=kakaoWorkbookFixture();
  const result=appendKakaoExcelReport(bytes,{...draft,customer:'=1+1',plate:'12가0123'});
  const after=workbookFromFile(result.bytes).Sheets['4월'];
- assert.equal(after.cells.D245.v,'=1+1'); assert.equal(after.cells.B245.v,'0123');
- assert.equal(after.cells.I245.v,''); // Blank OT cell still has the requested 10pt style.
+ assert.equal(after.cells.D4.v,'=1+1'); assert.equal(after.cells.B4.v,'0123');
+ assert.equal(after.cells.I4.v,''); // Blank OT cell still has the requested 10pt style.
  for(const c of ['J','K','L']) assert.equal(after.cells[c+'4'],undefined);
  const entries=unzipSync(bytes);entries['xl/workbook.xml']=strToU8(strFromU8(entries['xl/workbook.xml']).replace('<sheets>','<workbookPr date1904="1"/><sheets>'));
  const converted=workbookFromFile(appendKakaoExcelReport(zipSync(entries),draft).bytes);
- assert.equal(converted.Sheets['4월'].cells.A245.v,46117-1462);
+ assert.equal(converted.Sheets['4월'].cells.A4.v,46117-1462);
 });
 test('Malformed XML, over-limit files, signed files and table targets fail closed',()=>{
  assert.throws(()=>workbookFromFile(new Uint8Array()));
