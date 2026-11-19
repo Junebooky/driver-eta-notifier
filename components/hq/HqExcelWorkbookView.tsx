@@ -327,6 +327,16 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
     {grid?.months.map(name=><button type="button" role="tab" aria-selected={month===name} key={name} onClick={()=>{setEdit(null);setError('');setHighlightedRow(null);setNavigateTo(null);resetFilters();setMonth(name);}}
      className={'shrink-0 rounded-xl px-3 py-2 text-xs font-semibold '+(month===name?'bg-[#1E60F3] text-white':'bg-[#F2F4F6] text-[#6F809A]')}>{name}</button>)}
    </div>
+   {grid?.rowGap&&<div role="status" className="flex flex-wrap items-center gap-2 rounded-xl bg-[#F7F9FC] px-3 py-2.5">
+    <span className="min-w-0 flex-1 text-[12px] leading-5 text-[#63768E]">
+     실제 Excel 행 번호가 <strong className="text-[#3E5574]">{grid.rowGap.after} → {grid.rowGap.before}</strong>으로 건너뛰었어.
+     기존 수식·원본은 유지하면서 기록과 연결 번호를 함께 정리할 수 있어.
+    </span>
+    <button type="button" disabled={busy} onClick={()=>void sortMonth()}
+     className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-xl bg-white px-3 text-[12px] font-semibold text-[#1E60F3] shadow-[0_2px_10px_rgba(26,47,85,.06)] hover:bg-[#EEF3FC] disabled:opacity-40">
+     <ArrowUpDown size={14}/>날짜·행 번호 맞추기
+    </button>
+   </div>}
    {grid&&<div className="flex flex-wrap items-center gap-2 rounded-xl bg-white">
     <button type="button" aria-label="Excel 새 행 추가" disabled={busy}
      onClick={()=>void addStructure('add_row')}
@@ -445,27 +455,24 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
      </tr></thead>
      <tbody>{grid.rows.map(row=><tr key={row.row+(highlightedRow===row.row?'-'+flashSequence:'')}
       data-excel-row={row.row}
-      onMouseEnter={()=>{if(grid.linkedRows?.includes(row.row))scheduleSource(row.row);}}
-      onMouseLeave={()=>{if(hoverTimer.current)clearTimeout(hoverTimer.current);}}
-      className={highlightedRow===row.row?'hq-excel-target-row':'hover:bg-[#F8FAFD]'}>
-      <td className="sticky left-0 z-[1] border-b border-r border-[#E8EDF3] bg-[#F7F9FC] px-1 py-1 text-center font-medium text-[#8B9BB1]">
-       {grid.linkedRows?.includes(row.row)
-        ?<button type="button" onClick={()=>openSource(row.row)} title="기사 운행보고 원문 보기"
-          aria-label={row.row+'행 기사 운행보고 원문 보기'}
-          className="flex min-h-9 w-full flex-col items-center justify-center gap-0.5 rounded-md text-[#1E60F3] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30">
-          <span>{row.row}</span><MessageSquareText size={12} strokeWidth={1.7}/>
-         </button>
-        :grid.manualRows?.includes(row.row)?
-         <div className="flex min-h-9 items-center justify-center gap-0.5">
-          <span className="text-[11px]">{row.row}</span>
-          <button type="button" disabled={busy} title={row.row+'행 삭제'}
-           aria-label={row.row+'행 삭제'}
-           onClick={()=>setDeleteTarget({action:'delete_row',row:row.row})}
-           className="inline-flex size-7 items-center justify-center rounded-md text-[#93A1B3] hover:bg-white hover:text-[#B76363] disabled:opacity-40">
-           <Trash2 size={12}/>
-          </button>
-         </div>
-        :<span className="block px-1 py-2">{row.row}</span>}
+      className={(highlightedRow===row.row?'hq-excel-target-row':'hover:bg-[#F8FAFD]')+' group/row'}>
+      <td className="sticky left-0 z-[1] border-b border-r border-[#E8EDF3] bg-[#F7F9FC] px-1 py-0.5 text-center font-medium text-[#8B9BB1]">
+       <div className="relative flex min-h-9 items-center justify-start px-1">
+        <span className={grid.linkedRows?.includes(row.row)?'font-semibold text-[#1E60F3]':''}>{row.row}</span>
+        {grid.linkedRows?.includes(row.row)&&
+         <button type="button" onClick={()=>openSource(row.row)} title="클릭해서 기사 운행보고 원문 보기"
+          aria-label={row.row+'행 기사 원문 보기'}
+          aria-expanded={sourceLink?.row===row.row&&sourceLink?.month===grid.month}
+          className="absolute right-0 top-1/2 inline-flex size-[21px] -translate-y-1/2 items-center justify-center rounded-md text-[#1E60F3] opacity-60 transition-opacity hover:bg-white hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30 sm:opacity-0 sm:group-hover/row:opacity-100 sm:group-focus-within/row:opacity-100">
+          <MessageSquareText size={13} strokeWidth={1.8}/>
+         </button>}
+        {!grid.linkedRows?.includes(row.row)&&grid.manualRows?.includes(row.row)&&
+         <button type="button" disabled={busy} title={row.row+'행 삭제'} aria-label={row.row+'행 삭제'}
+          onClick={()=>setDeleteTarget({action:'delete_row',row:row.row})}
+          className="absolute right-0 top-1/2 inline-flex size-[21px] -translate-y-1/2 items-center justify-center rounded-md text-[#8B9DB1] opacity-60 transition-opacity hover:bg-white hover:text-[#B76363] hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30 disabled:opacity-25 sm:opacity-0 sm:group-hover/row:opacity-100 sm:group-focus-within/row:opacity-100">
+          <Trash2 size={12}/>
+         </button>}
+       </div>
       </td>
       {row.cells.map((value,i)=>{
        const col=grid.columns[i],active=edit?.row===row.row&&edit.col===col,locked=row.locked.includes(col);
