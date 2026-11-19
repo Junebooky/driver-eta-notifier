@@ -67,8 +67,11 @@ export function organizeManagedMonth(bytes:Uint8Array,month:string,year:number,m
  const unchanged=(reason:string):ReorderedMonth=>({bytes,rowNumber:incoming?.row??0,moves:{},changed:false,reason});
  const entries=unzipSync(bytes),path=sheetPath(entries,month),source=strFromU8(entries[path]||new Uint8Array());
  if(Object.keys(entries).some(k=>/_xmlsignatures\//i.test(k)))return unchanged('서명된 Excel은 안전하게 행을 이동할 수 없습니다.');
- if(/<(?:tableParts|pivotTableParts|hyperlinks|drawing|legacyDrawing|conditionalFormatting|dataValidations|autoFilter|sheetProtection|extLst)\b/.test(source))
-  return unchanged('외부 연결·특수 서식이 있는 시트는 수기 행 이동을 지원하지 않습니다.');
+ // Preserve ordinary sheet drawings, conditional formatting, validations,
+ // hyperlinks and auto filters; no sheet coordinates are shifted except records.
+ // Complex tables, pivots and protected sheets need a full relationship rewrite.
+ if(/<(?:tableParts|pivotTableParts|sheetProtection)\b/.test(source))
+  return unchanged('보호된 시트나 Excel 표/피벗은 자동 행 번호 정리를 지원하지 않습니다.');
  const block=source.match(/<sheetData\b[^>]*>([\s\S]*?)<\/sheetData>/);
  if(!block||block[1].replace(ROW,'').trim())return unchanged('표준 Excel 행 구조가 아닙니다.');
  const rowMap=new Map<number,string>();
@@ -158,6 +161,33 @@ export function organizeManagedMonth(bytes:Uint8Array,month:string,year:number,m
    if(item.id&&item.id!=='__incoming__')moves[item.id]=dest;
   }
   if(item.id==='__incoming__')incomingRow=dest;
+ }
+ const movesToCheck=sorted.flatMap((record,i)=>record.row!==targets[i]?
+  [{from:record.row,to:targets[i]}]:[]);
+ if(movesToCheck.length){
+  const fromRows=new Set(movesToCheck.map(move=>move.from));
+  // Never strand hyperlinks, explicit formula references or anchored drawings
+  // at their former row positions. Such cases require a richer Excel rewrite.
+  const hyperlinkRows=[...source.matchAll(/<hyperlink\b[^>]*\bref="[A-Z]{1,3}(\d+)"/g)]
+   .map(m=>Number(m[1]));
+  if(hyperlinkRows.some(row=>fromRows.has(row)))
+   return unchanged('이동할 기록에 연결된 하이퍼링크가 있어 행 번호를 변경할 수 없습니다.');
+  for(const [name,content] of Object.entries(entries)){
+   if(/^xl\/worksheets\/sheet[^/]*\.xml$/.test(name)){
+    const formulas=strFromU8(content).match(/<f(?:\s[^>]*)?>[\s\S]*?<\/f>/g)||[];
+    for(const move of movesToCheck){
+     const reference=new RegExp('(^|[^A-Z0-9_])\\$?[A-Z]{1,3}\\$?'+move.from+'(?!\\d)','i');
+     if(formulas.some(formula=>reference.test(formula)))
+      return unchanged(move.from+'행을 참조하는 수식이 있어 자동 정리할 수 없습니다.');
+    }
+   }
+   if(/^xl\/drawings\/drawing[^/]*\.xml$/.test(name)){
+    const anchors=[...strFromU8(content).matchAll(/<(?:xdr:)?row>(\d+)<\/(?:xdr:)?row>/g)]
+     .map(m=>Number(m[1])+1);
+    if(anchors.some(row=>fromRows.has(row)))
+     return unchanged('이동할 행에 고정된 그림이 있어 자동 정리할 수 없습니다.');
+   }
+  }
  }
  const touched=new Set([...sourceRows,...targets]);
  const finalRows=new Map(rowMap);
