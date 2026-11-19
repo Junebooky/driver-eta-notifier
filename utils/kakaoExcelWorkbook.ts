@@ -111,7 +111,7 @@ export function appendKakaoExcelReport(bytes: Uint8Array, draft: KakaoExcelDraft
       const oldTime=canonicalTime(value('F')),newTime=canonicalTime(draft.time);
       if(oldTime===newTime||/[\\/,~]/.test(String(value('A')))||
          plateParts(value('B')).length>1||
-         !/^\\d{2}:\\d{2}~\\d{2}:\\d{2}$/.test(oldTime))
+         !/^\d{2}:\d{2}~\d{2}:\d{2}$/.test(oldTime))
         throw new Error('중복 또는 기간·복수 차량의 기존 기록과 겹칩니다. 기존 장부를 확인해 주세요.');
     }
   }
