@@ -49,6 +49,14 @@ export function readWorkbookGrid(bytes:Uint8Array,month:string,limit=300,offset=
   return formulas.has(col+n)||v!==undefined&&v!==null&&String(v)!=='';
  }));
  const cell=(col:WorkbookSortColumn,row:number)=>String(sheet.cells[col+row]?.v??'').trim();
+ // A genuine customer record can be followed by another at an accidentally
+ // distant XLSX row, even when the UI displays them next to one another.
+ const actualRecords=live.filter(row=>cell('A',row)&&cell('B',row)&&
+  (cell('D',row)||cell('E',row))&&!formulas.has('A'+row));
+ const discontinuities=actualRecords.slice(1).map((row,index)=>({
+  after:actualRecords[index],before:row,gap:row-actualRecords[index]-1,
+ })).filter(x=>x.gap>=3).sort((x,y)=>y.gap-x.gap);
+ const rowGap=discontinuities[0]??null;
  const collator=new Intl.Collator('ko-KR',{numeric:true,sensitivity:'base'});
  // Footer calculations and detached handwritten notes are not vehicle/customer
  // filter choices. A report row has a person/company or a date plus a plate.
@@ -88,7 +96,7 @@ export function readWorkbookGrid(bytes:Uint8Array,month:string,limit=300,offset=
   row,cells:columns.map(col=>{const value=sheet.cells[col+row]?.v;if(col==='A'&&typeof value==='number'&&value>20000&&value<100000){return new Date((book.date1904?Date.UTC(1904,0,1):Date.UTC(1899,11,30))+value*86400000).toISOString().slice(0,10);}return String(value??'');}),
   locked:columns.filter(col=>formulas.has(col+row))
  }));
- return {months:book.SheetNames.filter(m=>/^(?:[1-9]|1[0-2])월$/.test(m)),month,rows,total:visible.length,unfilteredTotal:live.length,filterOptions,manualRows:addedRows,offset,limit,columns,headers:columns.map((col,i)=>i<12?DEFAULT_HEADERS[i]:String(sheet.cells[col+'1']?.v??col+'열'))};
+ return {months:book.SheetNames.filter(m=>/^(?:[1-9]|1[0-2])월$/.test(m)),month,rows,total:visible.length,unfilteredTotal:live.length,filterOptions,rowGap,manualRows:addedRows,offset,limit,columns,headers:columns.map((col,i)=>i<12?DEFAULT_HEADERS[i]:String(sheet.cells[col+'1']?.v??col+'열'))};
 }
 /**
  * Add native Excel dropdown filter/sort arrows to a DOWNLOAD COPY only.
