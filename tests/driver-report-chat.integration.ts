@@ -38,7 +38,13 @@ export async function verifyDriverReportChat(admin:Client,connectionString:strin
  assert.ok(conflicts>=4);
  const records=(await admin.query('SELECT * FROM cockpit.report_submissions WHERE org_id=$1',[org])).rows;assert.ok(records.every(r=>r.excel_status==='applied'));assert.equal(new Set(records.map(r=>r.excel_row_number)).size,5);
  const latest=(await admin.query('SELECT v.* FROM cockpit.report_workbooks w JOIN cockpit.report_workbook_versions v ON w.active_version=v.id WHERE w.org_id=$1',[org])).rows[0];
- const wb=workbookFromFile(new Uint8Array(latest.bytes));assert.equal(wb.Sheets['4월'].ref.e.r+1,249);assert.equal(Object.keys(latest.manifest).length,5);
+ const wb=workbookFromFile(new Uint8Array(latest.bytes));
+ // Preformatted template ends at row 244. Five fresh reports occupy real rows
+ // 4–8, not 245–249 after that decorative worksheet dimension.
+ assert.equal(wb.Sheets['4월'].ref.e.r+1,244);
+ assert.deepEqual(records.map(r=>r.excel_row_number).sort((a,b)=>a-b),[4,5,6,7,8]);
+ assert.equal(wb.Sheets['4월'].cells.B244.v,'원본 비표준 메모');
+ assert.equal(Object.keys(latest.manifest).length,5);
  assert.deepEqual((await admin.query('SELECT bytes FROM cockpit.report_workbook_versions WHERE id=$1',[first])).rows[0].bytes,Buffer.from(source));
  assert.equal(await rpc(admin,'commit_report_workbook',[org,actor,latest.id,Buffer.from(source),'company.xlsx',ids[0],1,'4월',250]),false);
  // Restore initial backup, then replay one, then restore the five-report snapshot: manifest repairs statuses.
