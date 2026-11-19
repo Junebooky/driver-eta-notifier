@@ -4,7 +4,7 @@ import {ChevronDown,ChevronUp,ChevronLeft,ChevronRight,Expand,Minimize2,FileSpre
 import {HqSearchSelect} from './ui/HqSearchSelect';
 export type ReportExcelFocus={year:number;sheet:string;row:number;requestId:number};
 type Row={row:number;cells:string[];locked:string[]};
-type Grid={version:string;year:number;filename:string;month:string;months:string[];total:number;unfilteredTotal:number;filterOptions:{plate:string[];driver:string[];customer:string[]};offset:number;limit:number;rows:Row[];columns:string[];headers:string[];linkedRows:number[];manualRows:number[]};
+type Grid={version:string;year:number;filename:string;month:string;months:string[];total:number;unfilteredTotal:number;filterOptions:{plate:string[];driver:string[];customer:string[]};offset:number;limit:number;rows:Row[];columns:string[];headers:string[];linkedRows:number[];manualRows:number[];rowGap:{after:number;before:number;gap:number}|null};
 type DeleteTarget={action:'delete_row';row:number}|{action:'delete_column';column:string;label:string};
 type FilterKey='plate'|'driver'|'customer';
 type SortKey=string;
@@ -33,11 +33,11 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
  const scrollRef=useRef<HTMLDivElement>(null);
  const gridRequestSequence=useRef(0);
  const [sourceLink,setSourceLink]=useState<SourceLink|null>(null);
+ const [sourceExpanded,setSourceExpanded]=useState(false);
  const [sourceText,setSourceText]=useState<OriginalSource|null>(null);
  const [sourceLoading,setSourceLoading]=useState(false);
  const [sourceError,setSourceError]=useState('');
  const sourceCache=useRef(new Map<string,OriginalSource>());
- const hoverTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
  const [zoom,setZoom]=useState(false);
  const [tableScale,setTableScale]=useState(100);
  const [scrollEdges,setScrollEdges]=useState({left:true,right:true});
@@ -45,21 +45,13 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
  useEffect(()=>{syncScroll();const node=scrollRef.current;if(!node)return;const observer=new ResizeObserver(syncScroll);observer.observe(node);return()=>observer.disconnect();},[syncScroll,grid,zoom,tableScale]);
  useEffect(()=>{if(!zoom)return;const key=(event:KeyboardEvent)=>{if(event.key==='Escape'){setZoom(false);setEdit(null);setTableScale(100);}};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[zoom]);
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[edit,setEdit]=useState<{row:number;col:string;value:string}|null>(null);
- const dismissSource=useCallback(()=>{
-  if(hoverTimer.current)clearTimeout(hoverTimer.current);
-  setSourceLink(null);
- },[]);
+ const dismissSource=useCallback(()=>setSourceLink(null),[]);
  const openSource=(row:number)=>{
   if(!grid||!grid.linkedRows?.includes(row))return;
   const candidate={year:grid.year,month:grid.month,row,version:grid.version};
-  setSourceLink(previous=>previous&&sourceLinkKey(previous)===sourceLinkKey(candidate)?previous:candidate);
+  setSourceExpanded(false);
+  setSourceLink(previous=>previous&&sourceLinkKey(previous)===sourceLinkKey(candidate)?null:candidate);
  };
- const scheduleSource=(row:number)=>{
-  if(hoverTimer.current)clearTimeout(hoverTimer.current);
-  if(typeof window==='undefined'||!window.matchMedia('(hover: hover) and (pointer: fine)').matches)return;
-  hoverTimer.current=setTimeout(()=>openSource(row),180);
- };
- useEffect(()=>()=>{if(hoverTimer.current)clearTimeout(hoverTimer.current);},[]);
  useEffect(()=>{
   if(!sourceLink){setSourceLoading(false);setSourceError('');setSourceText(null);return;}
   let cancelled=false;
@@ -135,12 +127,14 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
  },[open,month,load,navigateTo]);
  async function sortMonth(){
   if(!grid||busy)return;
-  setBusy(true);setError('');
+  setBusy(true);setError('');setSuccess('');
   try{
    const r=await fetch('/api/hq/report-workbook',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({action:'sort_month',year,month:grid.month,expectedVersion:grid.version})});
    const data=await r.json();if(!r.ok)throw Error(data.error||'날짜순 정리를 완료하지 못했습니다.');
-   if(data.unchanged)setError(data.message||'이미 날짜순으로 정리돼 있습니다.');
+   if(data.unchanged)setSuccess(data.message||'이미 날짜순으로 정리돼 있습니다.');
+   else setSuccess('날짜·행 번호 정리 완료 · 기사 보고 '+(data.moved??0)+'건 연결 위치 갱신');
+   resetFilters();
    await load(grid.month);await onCommitted();
   }catch(e){setError((e as Error).message);}finally{setBusy(false);}
  }
@@ -266,8 +260,8 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
      <div className="relative group/sort">
       <button
        type="button"
-       aria-label="날짜순 정리"
-       title="날짜순 정리"
+       aria-label="날짜·행 번호 정리"
+       title="날짜·행 번호 정리"
        disabled={!grid||busy}
        onClick={()=>void sortMonth()}
        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#DBE5F2] bg-white text-[#597294] shadow-2xs transition-all hover:bg-[#F5F8FC] hover:border-slate-300 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30 disabled:opacity-40 cursor-pointer"
@@ -276,7 +270,7 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
       </button>
       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/sort:flex flex-col items-center pointer-events-none z-[160]">
        <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
-        날짜순 정리
+        날짜·행 번호 정리
        </span>
        <div className="w-1.5 h-1.5 bg-slate-900 rotate-45 -mt-0.5 shadow-xs"/>
       </div>
