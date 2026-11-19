@@ -538,7 +538,7 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
   </div>}
   {sourceLink&&(
    <aside role="dialog" aria-label="연결된 기사 운행보고 원문"
-    className="fixed inset-x-3 bottom-3 z-[210] flex max-h-[73dvh] flex-col overflow-hidden rounded-[19px] bg-white p-4 shadow-[0_16px_50px_rgba(25,42,76,0.19)] ring-1 ring-[#E7ECF4] sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-24 sm:w-[375px] sm:max-h-[min(74dvh,650px)] sm:p-5">
+    className={'fixed inset-x-3 bottom-3 z-[210] flex min-w-0 flex-col overflow-hidden rounded-[17px] bg-white p-3.5 shadow-[0_14px_40px_rgba(25,42,76,0.16)] ring-1 ring-[#E7ECF4] sm:inset-x-auto sm:bottom-5 sm:right-5 sm:top-auto sm:p-4 '+(sourceExpanded?'max-h-[78dvh] sm:w-[410px]':'max-h-[43dvh] sm:w-[310px]')}
     <div className="flex items-start justify-between gap-3">
      <div className="min-w-0">
       <p className="flex items-center gap-2 text-[13px] font-semibold text-[#17233B]">
@@ -546,10 +546,18 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
       </p>
       <p className="mt-1 text-[11px] font-medium text-[#8898AF]">{sourceLink.year}년 · {sourceLink.month} · {sourceLink.row}행</p>
      </div>
-     <button type="button" onClick={dismissSource} aria-label="원문 미리보기 닫기"
-      className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-[#F5F7FA] text-[#657B95] hover:bg-[#EDF1F6]">
-      <X size={16}/>
-     </button>
+     <div className="flex shrink-0 items-center gap-1.5">
+      <button type="button" aria-label={sourceExpanded?'기사 원문 접기':'기사 원문 전체 보기'}
+       title={sourceExpanded?'간단히 보기':'원문 전체 펼치기'}
+       onClick={()=>setSourceExpanded(v=>!v)}
+       className="inline-flex size-8 items-center justify-center rounded-[10px] bg-[#F5F7FA] text-[#657B95] hover:bg-[#EDF1F6]">
+       {sourceExpanded?<Minimize2 size={15}/>:<Expand size={15}/>}
+      </button>
+      <button type="button" onClick={dismissSource} aria-label="원문 미리보기 닫기"
+       className="flex size-8 items-center justify-center rounded-[10px] bg-[#F5F7FA] text-[#657B95] hover:bg-[#EDF1F6]">
+       <X size={16}/>
+      </button>
+     </div>
     </div>
     {sourceLoading&&<p role="status" className="mt-4 rounded-[12px] bg-[#F6F8FC] p-3 text-[12px] text-[#7789A3]">원문을 불러오는 중…</p>}
     {sourceError&&<div role="alert" className="mt-4 rounded-[12px] bg-[#FBF4F3] p-3 text-[12px] text-[#A85C54]">
@@ -561,9 +569,13 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
       <span>기사 {sourceText.driver||'미확인'}</span><span>거래처 {sourceText.customer||'미확인'}</span>
       {sourceText.plate&&<span>차량 {sourceText.plate}</span>}
      </div>
-     <div className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-[13px] bg-[#F8FAFC] px-3.5 py-3">
-      <p className="whitespace-pre-wrap break-words text-[12px] leading-[1.85] text-[#475C76]">{sourceText.rawMessage}</p>
+     <div className={'mt-2 min-h-0 rounded-[12px] bg-[#F8FAFC] px-3 py-2.5 '+(sourceExpanded?'max-h-[58dvh] overflow-y-auto overscroll-contain':'max-h-[128px] overflow-hidden')}>
+      <p className="whitespace-pre-wrap break-words text-[12px] leading-[1.8] text-[#475C76]">{sourceText.rawMessage}</p>
      </div>
+     {!sourceExpanded&&<button type="button" onClick={()=>setSourceExpanded(true)}
+      className="mt-2 inline-flex min-h-7 items-center justify-center gap-1 rounded-lg text-[12px] font-semibold text-[#1E60F3] hover:bg-[#F5F8FD]">
+      <Expand size={12}/>기사 원문 전체 보기
+     </button>}
      <p className="mt-2 text-[10px] text-[#9AA7B8]">기사 제출 당시 원문 · Excel 수정 내용과 다를 수 있습니다.</p>
     </>}
    </aside>
