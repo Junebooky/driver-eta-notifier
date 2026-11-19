@@ -60,7 +60,9 @@ export async function verifyReportCompletion(c:Client,url:string){
  const correctionJob=(await call(c,'claim_report_jobs',[1,org,first.id]))[0];await write(c,correctionJob);
  const fixed=(await c.query('SELECT * FROM cockpit.report_submissions WHERE id=$1',[first.id])).rows[0];assert.equal(fixed.excel_row_number,location);assert.equal(fixed.raw_message,raw(0));
  const latest=(await c.query('SELECT v.* FROM cockpit.report_ledgers l JOIN cockpit.report_workbook_versions v ON l.active_version=v.id WHERE l.org_id=$1 AND l.year=2026',[org])).rows[0];
- assert.equal(workbookFromFile(new Uint8Array(latest.bytes)).Sheets['4월'].ref.e.r+1,279);
+ assert.equal(workbookFromFile(new Uint8Array(latest.bytes)).Sheets['4월'].ref.e.r+1,244);
+ const physical=(await c.query("SELECT excel_row_number FROM cockpit.report_submissions WHERE org_id=$1 AND excel_status='applied' AND ledger_year=2026 ORDER BY excel_row_number",[org])).rows.map(row=>row.excel_row_number);
+ assert.deepEqual(physical,Array.from({length:35},(_,i)=>i+4),'35 reports should occupy actual Excel rows 4–38, not begin after formatted row 244');
  const withMonth=addApprovedMonth(new Uint8Array(latest.bytes),'4월',10);assert.equal(await call(c,'commit_report_template',[org,2026,10,'4월',actor,latest.id,storage(withMonth)]),true);
  assert.ok(workbookFromFile(withMonth).Sheets['10월']);
  const entries=unzipSync(kakaoWorkbookFixture());entries['xl/worksheets/sheet1.xml']=strToU8(strFromU8(entries['xl/worksheets/sheet1.xml']).replace('<v>46113</v>','<v>46478</v>'));
