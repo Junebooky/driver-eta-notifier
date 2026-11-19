@@ -538,7 +538,7 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
   </div>}
   {sourceLink&&(
    <aside role="dialog" aria-label="연결된 기사 운행보고 원문"
-    className={'fixed inset-x-3 bottom-3 z-[210] flex min-w-0 flex-col overflow-hidden rounded-[17px] bg-white p-3.5 shadow-[0_14px_40px_rgba(25,42,76,0.16)] ring-1 ring-[#E7ECF4] sm:inset-x-auto sm:bottom-5 sm:right-5 sm:top-auto sm:p-4 '+(sourceExpanded?'max-h-[78dvh] sm:w-[410px]':'max-h-[43dvh] sm:w-[310px]')}
+    className={'fixed inset-x-3 bottom-3 z-[210] flex min-w-0 flex-col overflow-hidden rounded-[17px] bg-white p-3.5 shadow-[0_14px_40px_rgba(25,42,76,0.16)] ring-1 ring-[#E7ECF4] sm:inset-x-auto sm:bottom-5 sm:right-5 sm:top-auto sm:p-4 '+(sourceExpanded?'max-h-[78dvh] sm:w-[410px]':'max-h-[43dvh] sm:w-[310px]')}>
     <div className="flex items-start justify-between gap-3">
      <div className="min-w-0">
       <p className="flex items-center gap-2 text-[13px] font-semibold text-[#17233B]">
