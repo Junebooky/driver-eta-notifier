@@ -80,10 +80,10 @@ test('G expands to the longest service route in the month, remains one line, and
  assert.equal(Number(col),routeColumnWidth([firstRoute,secondRoute]));
  assert.equal(Number(col),EXCEL_MAX_COL_WIDTH);
  const book=workbookFromFile(output.bytes);
- assert.equal(book.Sheets['4월'].cells.G245.v,firstRoute);
- assert.equal(book.Sheets['4월'].cells.H245.v,'김포공항 샌딩');
- assert.equal(book.Sheets['4월'].cells.G246.v,secondRoute);
- assert.equal(book.Sheets['4월'].cells.H246.v,'인천공항 샌딩');
+ assert.equal(book.Sheets['4월'].cells.G4.v,firstRoute);
+ assert.equal(book.Sheets['4월'].cells.H4.v,'김포공항 샌딩');
+ assert.equal(book.Sheets['4월'].cells.G5.v,secondRoute);
+ assert.equal(book.Sheets['4월'].cells.H5.v,'인천공항 샌딩');
  assert.equal(cellStyle(output.bytes,'G',4).wrap,'0');
  assert.equal(cellStyle(output.bytes,'G',5).wrap,'0');
 });
@@ -113,6 +113,6 @@ test('G width shrinks after the previously longest route is shortened, keeping o
  const newWidth=Number(strFromU8(after['xl/worksheets/sheet1.xml']).match(/<col min="7" max="7" width="([^"]+)"/)?.[1]);
  assert.equal(newWidth,routeColumnWidth(['차고지 - 호텔']));
  assert.ok(newWidth<previous);
- assert.equal(workbookFromFile(edited.bytes).Sheets['4월'].cells.G245.v,'차고지 - 호텔');
+ assert.equal(workbookFromFile(edited.bytes).Sheets['4월'].cells.G4.v,'차고지 - 호텔');
  for(const part of Object.keys(before))if(part!=='xl/worksheets/sheet1.xml')assert.deepEqual(before[part],after[part]);
 });
