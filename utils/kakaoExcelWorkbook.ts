@@ -107,7 +107,6 @@ export function appendKakaoExcelReport(bytes: Uint8Array, draft: KakaoExcelDraft
     const n=Number(address.match(/\d+$/)?.[0]||0);
     if(n>=2&&String(cell.v??'').trim())occupied.add(n);
   }
-  const rows=Array.from(doc.getElementsByTagName('row'));
   const rowByNumber=new Map(rows.map(row=>[Number(row.getAttribute('r')),row]));
   const reserved=new Set<number>();
   for(const row of rows){
