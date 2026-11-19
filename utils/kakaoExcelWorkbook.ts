@@ -99,6 +99,22 @@ export function appendKakaoExcelReport(bytes: Uint8Array, draft: KakaoExcelDraft
   if (doc.getElementsByTagName('tableParts').length || /<\w+:sheetData/.test(source)) throw new Error('표 또는 특수 시트는 Excel에서 검토해 주세요.');
   const date1904 = wb.date1904;
   const rows = Array.from(doc.getElementsByTagName('row'));
+  // Keep the original duplicate/overlapping-period guard before choosing an
+  // empty slot. Compact placement must not permit duplicate chauffeur reports.
+  for(const row of rows){
+    const r=Number(row.getAttribute('r'));
+    if(!Number.isInteger(r)||r<1)throw new Error('행 번호가 올바르지 않습니다.');
+    if(r===1)continue;
+    const value=(c:string)=>sheet.cells[c+r]?.v;
+    if(sameDate(value('A'),draft.date,date1904)&&samePlate(value('B'),draft.plate)&&
+       clean(value('D'))===clean(draft.customer)&&clean(value('E'))===clean(draft.driver)){
+      const oldTime=canonicalTime(value('F')),newTime=canonicalTime(draft.time);
+      if(oldTime===newTime||/[\\/,~]/.test(String(value('A')))||
+         plateParts(value('B')).length>1||
+         !/^\\d{2}:\\d{2}~\\d{2}:\\d{2}$/.test(oldTime))
+        throw new Error('중복 또는 기간·복수 차량의 기존 기록과 겹칩니다. 기존 장부를 확인해 주세요.');
+    }
+  }
   // The worksheet dimension includes hundreds of preformatted empty cells,
   // notes and footer formulas. It is NOT the last customer report row.
   // Place each new chauffeur report in the earliest genuinely empty, safe row.
