@@ -177,8 +177,21 @@ export function organizeManagedMonth(bytes:Uint8Array,month:string,year:number,m
     const formulas=strFromU8(content).match(/<f(?:\s[^>]*)?>[\s\S]*?<\/f>/g)||[];
     for(const move of movesToCheck){
      const reference=new RegExp('(^|[^A-Z0-9_])\\$?[A-Z]{1,3}\\$?'+move.from+'(?!\\d)','i');
-     if(formulas.some(formula=>reference.test(formula)))
-      return unchanged(move.from+'행을 참조하는 수식이 있어 자동 정리할 수 없습니다.');
+     const unsafe=formulas.some(formula=>{
+      let rangeExcludesDestination=false;
+      // A range such as SUM(J2:J112) is safe when both the old and new
+      // report positions are included; don't mistake its endpoint J2
+      // for a direct link to one specific report.
+      const withoutRanges=formula.replace(/\$?[A-Z]{1,3}\$?(\d+):\$?[A-Z]{1,3}\$?(\d+)/gi,
+       (_range,first:string,last:string)=>{
+        const low=Math.min(Number(first),Number(last)),high=Math.max(Number(first),Number(last));
+        if(move.from>=low&&move.from<=high&&(move.to<low||move.to>high))
+         rangeExcludesDestination=true;
+        return ' ';
+       });
+      return rangeExcludesDestination||reference.test(withoutRanges);
+     });
+     if(unsafe)return unchanged(move.from+'행을 참조하는 수식이 있어 자동 정리할 수 없습니다.');
     }
    }
    if(/^xl\/drawings\/drawing[^/]*\.xml$/.test(name)){
