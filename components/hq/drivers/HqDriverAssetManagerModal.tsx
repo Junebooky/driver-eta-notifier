@@ -1,7 +1,7 @@
 'use client';
 
 import React, {useEffect,useMemo,useState} from 'react';
-import {AlertTriangle,ExternalLink,Pencil,Loader2,RefreshCw,Share2} from 'lucide-react';
+import {AlertTriangle,ExternalLink,Pencil,Loader2,Share2} from 'lucide-react';
 import type {HqDriverSummary} from '@/types/driverHq';
 import type {DriverVehicleAssetBundle} from '@/types/driverVehicleAsset';
 import {resolveDispatchCardPhotos} from '@/lib/dispatchCards/dispatchCardAssets';
@@ -241,13 +241,6 @@ export function HqDriverAssetManagerModal({
       title="기사 배차카드" subtitle="기사·차량을 선택해 배차카드를 확인하세요."
       className="max-w-[920px]"
       headerActions={<>
-        <HqIconButton variant="subtle" size="sm"
-          aria-label="배차카드 새로고침" title="새로고침"
-          disabled={loading||summaryLoading||sharing}
-          onClick={()=>setRevision(value=>value+1)}>
-          {loading||summaryLoading?<Loader2 className="size-4 animate-spin" aria-hidden="true"/>:
-            <RefreshCw className="size-4" aria-hidden="true"/>}
-        </HqIconButton>
         <HqIconButton variant="subtle" size="sm"
           aria-label="배차카드 만들기 또는 수정" title="카드 만들기·수정"
           disabled={!driver||!selectedVehicle||!selectedVehiclePhotoReady||fleet.loading||sharing}
