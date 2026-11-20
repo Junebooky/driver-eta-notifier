@@ -31,13 +31,9 @@ export function HqMobileNav({activeTab,formOpen,menuOpen,actionCount,onNavigate,
         aria-expanded={id==='menu'?menuOpen:undefined}
         aria-label={id==='quick'?'빠른 예약 등록':id==='menu'?'전체 메뉴 열기':undefined}
         className={'relative flex min-h-14 min-w-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#1E60F3] '+
-          (active&&id!=='quick'?'bg-[#F3F7FF] text-[#1E60F3]':'text-[#73839D] hover:bg-[#F7F9FC]')}>
-        {id==='quick'
-          ? <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#1E60F3] text-white shadow-[0_2px_7px_rgba(30,96,243,0.13)]">
-              <Plus className="size-5" aria-hidden="true"/>
-            </span>
-          : <Icon className="size-5" aria-hidden="true"/>}
-        <span className={id==='quick'?'text-[#17233B]':undefined}>{label}</span>
+          (active?'bg-[#F3F7FF] text-[#1E60F3]':'text-[#73839D] hover:bg-[#F7F9FC]')}>
+        <Icon className="size-5" aria-hidden="true"/>
+        <span>{label}</span>
         {id==='dispatch'&&actionCount>0&&
           <span aria-label={'확인 필요 '+actionCount+'건'}
             className="absolute right-1 top-0 rounded-full bg-[#1E60F3] px-1.5 text-[10px] text-white">

@@ -3,7 +3,6 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   Calendar,
-  ContactRound,
   LayoutList,
   Plus,
   Search,
@@ -493,7 +492,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             <HqButton variant="subtle" size="sm" onClick={onOpenDispatchCard}
               className="flex min-h-10 items-center gap-1.5 px-2.5 sm:px-3"
               aria-label="배차카드 빠른 검색" title="기사 배차카드 찾기">
-              <ContactRound className="size-4 shrink-0" aria-hidden="true"/>
+              <img src="/images/icons/drivers/icon_driver.png" alt="" aria-hidden="true" className="size-5 shrink-0 object-contain"/>
               <span className="text-[12px]">배차카드</span>
             </HqButton>
           )}
