@@ -1,8 +1,10 @@
 'use client';
 
+import type {ChangeEvent} from 'react';
 import {Plus,Trash2} from 'lucide-react';
 import {HqButton,HqInput} from '@/components/hq/ui';
 import type {ContactChannelDraft} from '@/lib/customers/contactChannels';
+import {formatPhoneNumber} from '@/utils/formatters';
 
 interface Props{
   value:ContactChannelDraft;
@@ -14,6 +16,22 @@ export function HqContactChannelFields({value,onChange,disabled=false,autoFocusN
   const setText=(key:'name'|'role'|'department',text:string)=>onChange({...value,[key]:text});
   const setItem=(key:'phones'|'emails',index:number,text:string)=>
     onChange({...value,[key]:value[key].map((v,i)=>i===index?text:v)});
+  const handlePhoneChange=(event:ChangeEvent<HTMLInputElement>,index:number)=>{
+    const input=event.currentTarget;
+    const entered=input.value;
+    const formatted=formatPhoneNumber(entered);
+    // Keep the cursor near the edited digit when a dash is inserted, instead
+    // of jumping to the end of a controlled field after mid-string edits.
+    const cursor=input.selectionStart;
+    const nextCursor=cursor===null?null:formatPhoneNumber(entered.slice(0,cursor)).length;
+    setItem('phones',index,formatted);
+    if(nextCursor!==null&&formatted!==entered){
+      requestAnimationFrame(()=>{
+        if(document.activeElement===input&&input.value===formatted)
+          input.setSelectionRange(nextCursor,nextCursor);
+      });
+    }
+  };
   const removeItem=(key:'phones'|'emails',index:number)=>{
     const items=value[key].filter((_,i)=>i!==index);
     onChange({...value,[key]:items.length?items:['']});
@@ -63,7 +81,7 @@ export function HqContactChannelFields({value,onChange,disabled=false,autoFocusN
               autoComplete={index===0?(isPhone?'tel':'email'):'off'}
               maxLength={isPhone?40:254} value={text}
               placeholder={isPhone?'010-0000-0000':'name@company.com'}
-              onChange={event=>setItem(key,index,event.target.value)}
+              onChange={event=>isPhone?handlePhoneChange(event,index):setItem('emails',index,event.target.value)}
               className="mt-1.5"/>
           </label>
           <HqButton variant="subtle" size="sm" disabled={disabled}
