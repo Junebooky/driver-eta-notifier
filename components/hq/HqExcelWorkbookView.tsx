@@ -2,6 +2,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {ChevronDown,ChevronUp,ChevronLeft,ChevronRight,Expand,Minimize2,FileSpreadsheet,Pencil,Save,X,ArrowUpDown,ZoomIn,ZoomOut,MessageSquareText,Filter,RotateCcw,Rows3,Columns3,Plus,Check,Trash2,AlertTriangle} from 'lucide-react';
 import {HqSearchSelect} from './ui/HqSearchSelect';
+import {HqButton,HqIconButton} from '@/components/hq/ui';
 import {workbookMonthLabel} from '@/utils/reportWorkbookMonth';
 export type ReportExcelFocus={year:number;sheet:string;row:number;requestId:number};
 type Row={row:number;cells:string[];locked:string[]};
@@ -349,16 +350,14 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
      className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[#E4EAF2] bg-white px-3.5 text-[12px] font-semibold text-[#536985] shadow-[0_3px_10px_rgba(25,40,66,.035)] transition-colors hover:bg-[#F6F9FC] disabled:opacity-40">
      <Columns3 size={15}/><Plus size={12}/>열 추가
     </button>
-    <button type="button" aria-label="Excel 수기 행 삭제" disabled={busy||!grid.manualRows?.length}
-     onClick={()=>{const row=grid.manualRows.at(-1);if(row)setDeleteTarget({action:'delete_row',row});}}
-     className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[#E4EAF2] bg-white px-3.5 text-[12px] font-semibold text-[#708098] transition-colors hover:bg-[#F8F5F5] disabled:opacity-35">
+    <HqButton variant="danger" size="sm" aria-label="Excel 수기 행 삭제" disabled={busy||!grid.manualRows?.length}
+     onClick={()=>{const row=grid.manualRows.at(-1);if(row)setDeleteTarget({action:'delete_row',row});}}>
      <Rows3 size={15}/><Trash2 size={13}/>행 삭제
-    </button>
-    <button type="button" aria-label="Excel 사용자 열 삭제" disabled={busy||!grid.columns.some(col=>/^[M-Z]$/.test(col))}
-     onClick={()=>{const col=grid.columns.filter(x=>/^[M-Z]$/.test(x)).at(-1);if(col)setDeleteTarget({action:'delete_column',column:col,label:grid.headers[grid.columns.indexOf(col)]});}}
-     className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[#E4EAF2] bg-white px-3.5 text-[12px] font-semibold text-[#708098] transition-colors hover:bg-[#F8F5F5] disabled:opacity-35">
+    </HqButton>
+    <HqButton variant="danger" size="sm" aria-label="Excel 사용자 열 삭제" disabled={busy||!grid.columns.some(col=>/^[M-Z]$/.test(col))}
+     onClick={()=>{const col=grid.columns.filter(x=>/^[M-Z]$/.test(x)).at(-1);if(col)setDeleteTarget({action:'delete_column',column:col,label:grid.headers[grid.columns.indexOf(col)]});}}>
      <Columns3 size={15}/><Trash2 size={13}/>열 삭제
-    </button>
+    </HqButton>
     <span className="text-[11px] text-[#92A0B2]">자동입력 열(A~L)·기사 보고 연결 행은 삭제 보호</span>
    </div>}
    {grid&&showColumnForm&&<form onSubmit={e=>{e.preventDefault();void addStructure('add_column');}}
@@ -444,12 +443,12 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
           <span className="truncate">{h}</span>
           <ArrowUpDown size={12} className={active?'shrink-0 opacity-90':'shrink-0 opacity-35 group-hover:opacity-75'}/>
          </button>
-         {/^[M-Z]$/.test(col)&&<button type="button" disabled={busy}
+         {/^[M-Z]$/.test(col)&&<HqIconButton variant="danger" size="sm" disabled={busy}
           aria-label={h+' 열 삭제'} title={h+' 사용자 열 삭제'}
           onClick={()=>setDeleteTarget({action:'delete_column',column:col,label:h})}
-          className="mx-1 inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-[#94A1B2] hover:bg-white hover:text-[#B76363] disabled:opacity-40">
+          className="mx-1 !size-7 !min-h-7 !min-w-7 !w-7 !rounded-lg">
           <Trash2 size={13}/>
-         </button>}
+         </HqIconButton>}
          </div>
         </th>;
        })}
@@ -468,11 +467,11 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
           <MessageSquareText size={13} strokeWidth={1.8}/>
          </button>}
         {!grid.linkedRows?.includes(row.row)&&grid.manualRows?.includes(row.row)&&
-         <button type="button" disabled={busy} title={row.row+'행 삭제'} aria-label={row.row+'행 삭제'}
+         <HqIconButton variant="danger" size="sm" disabled={busy} title={row.row+'행 삭제'} aria-label={row.row+'행 삭제'}
           onClick={()=>setDeleteTarget({action:'delete_row',row:row.row})}
-          className="absolute right-0 top-1/2 inline-flex size-[21px] -translate-y-1/2 items-center justify-center rounded-md text-[#8B9DB1] opacity-60 transition-opacity hover:bg-white hover:text-[#B76363] hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30 disabled:opacity-25 sm:opacity-0 sm:group-hover/row:opacity-100 sm:group-focus-within/row:opacity-100">
+          className="absolute right-0 top-1/2 -translate-y-1/2 !size-[21px] !min-h-[21px] !min-w-[21px] !w-[21px] !rounded-md opacity-60 transition-opacity focus-visible:opacity-100 sm:opacity-0 sm:group-hover/row:opacity-100 sm:group-focus-within/row:opacity-100">
           <Trash2 size={12}/>
-         </button>}
+         </HqIconButton>}
        </div>
       </td>
       {row.cells.map((value,i)=>{
@@ -528,12 +527,12 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
       :grid.columns.filter(c=>/^[M-Z]$/.test(c)).map(c=><option key={c} value={c}>{c} · {grid.headers[grid.columns.indexOf(c)]}</option>)}
     </select>
     <div className="mt-5 flex justify-end gap-2">
-     <button type="button" onClick={()=>setDeleteTarget(null)} disabled={busy}
-      className="min-h-10 rounded-xl bg-[#F2F5F9] px-4 text-[12px] font-semibold text-[#687B94]">취소</button>
-     <button type="button" disabled={busy} onClick={()=>void deleteStructure()}
-      className="min-h-10 rounded-xl bg-[#B76363] px-4 text-[12px] font-semibold text-white disabled:opacity-40">
+     <HqButton variant="subtle" size="sm" onClick={()=>setDeleteTarget(null)} disabled={busy}>
+      취소
+     </HqButton>
+     <HqButton variant="danger" size="sm" loading={busy} onClick={()=>void deleteStructure()}>
       {busy?'삭제 중...':'선택 항목 삭제'}
-     </button>
+     </HqButton>
     </div>
    </div>
   </div>}

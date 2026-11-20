@@ -8,6 +8,7 @@ import { EXPENSE_CATEGORIES, PAYMENT_METHODS, formatKRW } from '@/utils/expense'
 import { approvalProblem, expenseCorrectionFields, normalizeExpenseCorrections, pendingReceipt, receiptApprovalShortcut, type ExpenseReviewPatch } from '@/utils/expenseReview';
 import { checkDuplicateReceipt } from '@/utils/settlementCalculator';
 import { updateHqExpenseReviewDb } from '@/utils/expenseHqStorage';
+import { HqButton } from '@/components/hq/ui';
 import { HqDispatchTimeField } from '@/components/hq/ui/HqDispatchTimeField';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 import { TossDatePicker } from '@/components/common/TossDatePicker';
@@ -227,7 +228,14 @@ export default function HqReceiptReviewWorkspace({ expense, expenses, bookings, 
           <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={checked} disabled={busy || !proofReady || dirty || stale} onChange={event => setChecked(event.target.checked)}/>원본과 저장된 항목을 대조했습니다</label>
           <button ref={approveButton} className={`${buttonClass} flex w-full items-center justify-center gap-2 bg-[#1E60F3] text-white hover:bg-[#1757DC]`} disabled={!canApprove} onClick={() => void persist({ status: '승인 완료' }, true)}><Check size={18}/>승인 후 다음 영수증</button>
           <p className="text-xs text-slate-500">저장되지 않은 수정이 있으면 승인할 수 없습니다. 입력 칸 밖에서 Ctrl/Cmd+Enter로 승인할 수 있습니다.</p>
-          <div className="flex flex-wrap gap-2"><button className={buttonClass} disabled={busy || dirty || stale} onClick={() => void persist({ status: '금액 확인' })}>보완 요청</button><button className={buttonClass} disabled={busy || dirty || stale} onClick={() => void persist({ status: '반려' })}>반려</button></div>
+          <div className="flex flex-wrap gap-2">
+            <HqButton variant="secondary" disabled={busy || dirty || stale} onClick={() => void persist({ status: '금액 확인' })}>
+              보완 요청
+            </HqButton>
+            <HqButton variant="danger" disabled={busy || dirty || stale} onClick={() => void persist({ status: '반려' })}>
+              반려
+            </HqButton>
+          </div>
         </section>
       </div>
       {busy && <p role="status" className="border-t p-3 text-center text-sm">서버 저장 결과를 확인하고 있습니다.</p>}

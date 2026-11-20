@@ -84,7 +84,7 @@ export function HqContactChannelFields({value,onChange,disabled=false,autoFocusN
               onChange={event=>isPhone?handlePhoneChange(event,index):setItem('emails',index,event.target.value)}
               className="mt-1.5"/>
           </label>
-          <HqButton variant="subtle" size="sm" disabled={disabled}
+          <HqButton variant="danger" size="sm" disabled={disabled}
             aria-label={label+' '+(index+1)+' 삭제'}
             title={label+' 삭제'} onClick={()=>removeItem(key,index)}>
             <Trash2 className="size-4"/>

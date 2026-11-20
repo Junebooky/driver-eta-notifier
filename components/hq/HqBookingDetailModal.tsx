@@ -25,6 +25,7 @@ import { createRetryableJsonMutation } from '@/utils/retryableJsonMutation';
 import { haptics } from '@/utils/haptics';
 import { getVehicleImage, stripManufacturerName } from '@/utils/vehicleData';
 import { HqDispatchTimeField } from './ui/HqDispatchTimeField';
+import { HqButton } from '@/components/hq/ui';
 import { HqSearchSelect } from './ui/HqSearchSelect';
 import { HqInlineFeedback } from './ui/HqInlineFeedback';
 import { parseFlexibleTimeInput, formatTimeKoreanAmPm, getDriverProfileImage } from './HqQuickDispatch';
@@ -943,14 +944,14 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
               {!isNewBooking && !isCancelled && (
                 <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 space-y-2">
                   {!showCancelConfirm ? (
-                    <button
-                      type="button"
+                    <HqButton
+                      variant="danger"
                       onClick={() => setShowCancelConfirm(true)}
-                      className="w-full py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-sm font-bold flex items-center justify-center gap-2 cursor-pointer transition-all"
+                      className="w-full"
                     >
-                      <Ban className="w-3.5 h-3.5 text-slate-500" />
+                      <Ban className="w-3.5 h-3.5" />
                       <span>이 배차/예약 취소 처리</span>
-                    </button>
+                    </HqButton>
                   ) : (
                     <div className="space-y-2">
                       <label className="block text-[11px] font-black text-slate-700">
@@ -963,21 +964,23 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                         className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-900"
                       />
                       <div className="flex items-center gap-2">
-                        <button
-                          type="button"
+                        <HqButton
+                          variant="subtle"
+                          size="sm"
                           onClick={() => setShowCancelConfirm(false)}
-                          className="flex-1 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 text-xs font-bold cursor-pointer"
+                          className="flex-1"
                         >
                           돌아가기
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isSaving}
+                        </HqButton>
+                        <HqButton
+                          variant="danger"
+                          size="sm"
+                          loading={isSaving}
                           onClick={handleCancelDispatch}
-                          className="min-h-10 flex-1 cursor-pointer rounded-[13px] bg-white text-[12px] font-semibold text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.045)] transition-colors hover:bg-[#F5F8FF] disabled:opacity-50"
+                          className="flex-1"
                         >
                           배차 취소 확정
-                        </button>
+                        </HqButton>
                       </div>
                     </div>
                   )}

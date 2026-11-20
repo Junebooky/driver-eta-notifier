@@ -318,10 +318,6 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
         <HqLogExpenseDetailModal
           log={selectedExpenseLog}
           onClose={() => setSelectedExpenseLog(null)}
-          onNavigateToExpenses={() => {
-            setSelectedExpenseLog(null);
-            window.location.assign('/hq?tab=expenses');
-          }}
         />
       )}
 

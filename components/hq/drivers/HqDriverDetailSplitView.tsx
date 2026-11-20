@@ -28,7 +28,7 @@ import { HqDriverAssetManagerModal } from './HqDriverAssetManagerModal';
 import { sanitizeInitialDispatchCardPlate } from '@/utils/driverDispatchCardVehicles';
 import { HqDriverEditModal } from './HqDriverEditModal';
 import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
-import { HqTextarea } from '@/components/hq/ui';
+import { HqButton, HqTextarea } from '@/components/hq/ui';
 import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
 import { HqModal } from '@/components/hq/ui/HqModal';
 
@@ -755,10 +755,9 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
             )}
           </div>
           <div className="border-t border-[#EEF1F5] pt-3">
-            <button type="button" onClick={()=>{setRemoveError('');setShowRemoveConfirm(true);}}
-              className="inline-flex min-h-11 items-center gap-2 rounded-[12px] px-2 text-[12px] font-medium text-[#A35E59] hover:bg-[#FFF7F5]">
+            <HqButton variant="danger" size="sm" onClick={()=>{setRemoveError('');setShowRemoveConfirm(true);}}>
               <Trash2 className="size-4"/> 기사 등록 해제
-            </button>
+            </HqButton>
           </div>
         </div>
 
@@ -962,9 +961,10 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
         subtitle={activeDriver.name+' 기사님의 등록을 해제하시겠습니까?'}
         onClose={()=>{if(!removingDriver){setShowRemoveConfirm(false);setRemoveError('');}}}
         footer={<>
-          <button type="button" disabled={removingDriver} onClick={()=>setShowRemoveConfirm(false)}
-            className="min-h-11 rounded-[12px] bg-[#F6F8FA] px-4 text-[12px] font-semibold text-[#60728B] disabled:opacity-50">취소</button>
-          <button type="button" disabled={removingDriver} onClick={async()=>{
+          <HqButton variant="subtle" disabled={removingDriver} onClick={()=>setShowRemoveConfirm(false)}>
+            취소
+          </HqButton>
+          <HqButton variant="danger" loading={removingDriver} onClick={async()=>{
             if(removingDriver)return;
             setRemovingDriver(true);setRemoveError('');
             try{
@@ -976,9 +976,9 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
             }catch(error){
               setRemoveError(error instanceof Error?error.message:'등록 해제에 실패했습니다.');
             }finally{setRemovingDriver(false);}
-          }} className="min-h-11 rounded-[12px] bg-[#A85C54] px-4 text-[12px] font-semibold text-white disabled:opacity-50">
+          }}>
             {removingDriver?'등록 해제 중…':'등록 해제'}
-          </button>
+          </HqButton>
         </>}>
         <p className="text-[13px] leading-relaxed text-[#60728B]">
           등록 해제 후에는 새 배차에 지정할 수 없습니다. 기존 운행 기록은 유지되며,

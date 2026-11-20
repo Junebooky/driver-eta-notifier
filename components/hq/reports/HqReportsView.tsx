@@ -517,11 +517,10 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
               haptics.lightTap();
               setActiveSubTab("events");
             }}
-            className={`pb-2.5 font-bold transition-all relative cursor-pointer ${
-              activeSubTab === "events"
+            className={`pb-2.5 font-bold transition-all relative cursor-pointer ${activeSubTab === "events"
                 ? "text-[#1E60F3]"
                 : "text-slate-500 hover:text-slate-800"
-            }`}
+              }`}
           >
             <span>행사별 정산</span>
             {activeSubTab === "events" && (
@@ -534,11 +533,10 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
               haptics.lightTap();
               setActiveSubTab("profitability");
             }}
-            className={`pb-2.5 font-bold transition-all relative cursor-pointer ${
-              activeSubTab === "profitability"
+            className={`pb-2.5 font-bold transition-all relative cursor-pointer ${activeSubTab === "profitability"
                 ? "text-[#1E60F3]"
                 : "text-slate-500 hover:text-slate-800"
-            }`}
+              }`}
           >
             <span>수익성 분석</span>
             {activeSubTab === "profitability" && (
@@ -551,11 +549,10 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
               haptics.lightTap();
               setActiveSubTab("comprehensive");
             }}
-            className={`pb-2.5 font-bold transition-all relative cursor-pointer ${
-              activeSubTab === "comprehensive"
+            className={`pb-2.5 font-bold transition-all relative cursor-pointer ${activeSubTab === "comprehensive"
                 ? "text-[#1E60F3]"
                 : "text-slate-500 hover:text-slate-800"
-            }`}
+              }`}
           >
             <span>종합 리포트</span>
             {activeSubTab === "comprehensive" && (
@@ -618,11 +615,10 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                       haptics.lightTap();
                       setSelectedReportId(rep.id);
                     }}
-                    className={`w-full text-left p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                      isSelected
+                    className={`w-full text-left p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${isSelected
                         ? "bg-blue-50/70 border-blue-200/80 shadow-xs"
                         : "bg-white hover:bg-slate-50/80 border-slate-100 shadow-2xs"
-                    }`}
+                      }`}
                   >
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="font-bold text-sm text-slate-900 truncate">
@@ -660,11 +656,10 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                         haptics.selection();
                         setReportViewMode("admin_internal");
                       }}
-                      className={`px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all border ${
-                        reportViewMode === "admin_internal"
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all border ${reportViewMode === "admin_internal"
                           ? "bg-white border-slate-900 text-slate-900 shadow-xs font-bold"
                           : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                      }`}
+                        }`}
                     >
                       <FileText className="w-3.5 h-3.5 text-slate-700" />
                       <span>내부 정산서</span>
@@ -675,11 +670,10 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                         haptics.selection();
                         setReportViewMode("client_external");
                       }}
-                      className={`px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all border ${
-                        reportViewMode === "client_external"
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all border ${reportViewMode === "client_external"
                           ? "bg-white border-slate-900 text-slate-900 shadow-xs font-bold"
                           : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                      }`}
+                        }`}
                     >
                       <Eye className="w-3.5 h-3.5 text-slate-700" />
                       <span>고객사 양식 미리보기</span>
@@ -788,8 +782,8 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                         {selectedReport.vatMode === "excluded"
                           ? "부가세(VAT) 별도 (+10%)"
                           : selectedReport.vatMode === "included"
-                          ? "부가세(VAT) 포함"
-                          : "부가세(VAT) 포함 여부 미확정"}
+                            ? "부가세(VAT) 포함"
+                            : "부가세(VAT) 포함 여부 미확정"}
                       </div>
                     </div>
                   </div>
@@ -837,9 +831,8 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                       투입 차량 및 정산 ({selectedReport.totalVehiclesCount}대)
                     </h4>
                     <ChevronDown
-                      className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
-                        isVehiclesExpanded ? "rotate-180" : ""
-                      }`}
+                      className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isVehiclesExpanded ? "rotate-180" : ""
+                        }`}
                     />
                   </button>
 
@@ -892,10 +885,10 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                               <span className="text-xs sm:text-sm font-bold text-slate-900 mt-0.5 block">
                                 {reportViewMode === "client_external"
                                   ? formatKRW(
-                                      v.expenses
-                                        .filter((e) => e.status === "승인 완료" && e.billableToCustomer !== false)
-                                        .reduce((s, e) => s + e.amount, 0)
-                                    )
+                                    v.expenses
+                                      .filter((e) => e.status === "승인 완료" && e.billableToCustomer !== false)
+                                      .reduce((s, e) => s + e.amount, 0)
+                                  )
                                   : `-${formatKRW(v.vehicleDirectCost + v.otherDirectCost)}`}
                               </span>
                             </div>
@@ -941,9 +934,8 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                       <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-slate-700">
                         <span>{formatKRW(selectedReport.totalApprovedExpenses)}</span>
                         <ChevronRight
-                          className={`w-4 h-4 text-slate-400 transition-transform duration-150 ${
-                            isExpensesExpanded ? "rotate-90" : ""
-                          }`}
+                          className={`w-4 h-4 text-slate-400 transition-transform duration-150 ${isExpensesExpanded ? "rotate-90" : ""
+                            }`}
                         />
                       </div>
                     </button>
@@ -1041,9 +1033,8 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                       <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-slate-700">
                         <span>{formatKRW(selectedReport.grandTotal)}</span>
                         <ChevronRight
-                          className={`w-4 h-4 text-slate-400 transition-transform duration-150 ${
-                            isBillingExpanded ? "rotate-90" : ""
-                          }`}
+                          className={`w-4 h-4 text-slate-400 transition-transform duration-150 ${isBillingExpanded ? "rotate-90" : ""
+                            }`}
                         />
                       </div>
                     </button>
@@ -1077,8 +1068,8 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                             {selectedReport.vatMode === "excluded"
                               ? formatKRW(selectedReport.vatAmount)
                               : selectedReport.vatMode === "included"
-                              ? "공급가에 포함됨"
-                              : "별도 확인 (미포함)"}
+                                ? "공급가에 포함됨"
+                                : "별도 확인 (미포함)"}
                           </span>
                         </div>
                         <div className="flex justify-between text-sm font-black text-[#1E60F3] pt-2 border-t border-slate-200">
@@ -1105,9 +1096,8 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                         </div>
                         <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-slate-700">
                           <ChevronRight
-                            className={`w-4 h-4 text-slate-400 transition-transform duration-150 ${
-                              isProfitExpanded ? "rotate-90" : ""
-                            }`}
+                            className={`w-4 h-4 text-slate-400 transition-transform duration-150 ${isProfitExpanded ? "rotate-90" : ""
+                              }`}
                           />
                         </div>
                       </button>
@@ -1517,11 +1507,10 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                         </td>
                         <td className="py-2 px-3">
                           <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              preset.vehicleTier === 'sprinter'
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${preset.vehicleTier === 'sprinter'
                                 ? 'bg-blue-50 text-[#1E60F3]'
                                 : 'bg-slate-100 text-slate-700'
-                            }`}
+                              }`}
                           >
                             {preset.vehicleTier === 'sprinter' ? '스프린터급' : '일반 의전차량'}
                           </span>
@@ -1602,12 +1591,12 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                                   const next = driverProfiles.map((d, i) =>
                                     i === idx
                                       ? {
-                                          ...d,
-                                          isEnglishVerified: checked,
-                                          languageLabel: checked
-                                            ? '영어 가능 (검증됨)'
-                                            : '한국어 서비스',
-                                        }
+                                        ...d,
+                                        isEnglishVerified: checked,
+                                        languageLabel: checked
+                                          ? '영어 가능 (검증됨)'
+                                          : '한국어 서비스',
+                                      }
                                       : d
                                   );
                                   saveDriverProfiles(next);

@@ -29,6 +29,7 @@ import { haptics } from '@/utils/haptics';
 import { hardDeleteHqSchedule, inspectHqScheduleDeletion } from '@/utils/hqScheduleHardDelete';
 import type { HqScheduleDeleteInspection, HqScheduleDeleteMode } from '@/utils/hqScheduleHardDelete';
 import { HqScheduleDeleteChoices } from '@/components/hq/ui/HqScheduleDeleteChoices';
+import { HqButton } from '@/components/hq/ui';
 import { groupOperationsByCustomer } from '@/utils/hqOperationsCustomerGroups';
 
 export interface HqOperationsBoardProps {
@@ -1022,8 +1023,9 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
 
                   {/* Right Actions: Event Info & Accordion Toggle */}
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
+                    <HqButton
+                      variant="danger"
+                      size="sm"
                       onClick={() => {
                         haptics.lightTap();
                         setDeleteError(null);
@@ -1032,11 +1034,10 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                         setEventToDelete(eventGroups.find(item => item.id === group.id) || group);
                       }}
                       aria-label={`${group.customerTag} 행사 삭제`}
-                      className="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[13px] bg-[#F7F9FC] px-3 text-[12px] font-medium text-[#73839D] transition-colors hover:bg-[#FFF4F2] hover:text-[#A34E45]"
                     >
                       <Trash2 className="h-3.5 w-3.5" strokeWidth={1.7} />
                       <span>행사 삭제</span>
-                    </button>
+                    </HqButton>
                     <button
                       type="button"
                       onClick={() => {
@@ -1455,22 +1456,21 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
             )}
 
             <div className="grid grid-cols-2 gap-2.5 pt-1">
-              <button
-                type="button"
+              <HqButton
+                variant="subtle"
                 disabled={deletingEvent}
                 onClick={() => { setEventToDelete(null); setDeleteError(null); }}
-                className="h-11 rounded-xl bg-[#F1F5F9] text-sm font-semibold text-slate-700 hover:bg-slate-200 transition-colors disabled:opacity-50 cursor-pointer"
               >
                 취소
-              </button>
-              <button
-                type="button"
+              </HqButton>
+              <HqButton
+                variant="danger"
+                loading={deletingEvent}
                 disabled={deletingEvent || !deleteInspection || Boolean(deleteError)}
                 onClick={() => void confirmDeleteEvent()}
-                className="h-11 rounded-xl bg-[#EF4444] text-sm font-semibold text-white hover:bg-red-600 transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
               >
                 {deletingEvent ? '삭제 중…' : '삭제하기'}
-              </button>
+              </HqButton>
             </div>
           </div>
         </div>

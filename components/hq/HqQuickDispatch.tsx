@@ -40,7 +40,7 @@ import {
   getVehicleImage,
 } from '@/utils/vehicleData';
 import { HqDispatchTimeField } from './ui/HqDispatchTimeField';
-import { HqSearchInput, HqSegmentedTabs } from '@/components/hq/ui';
+import { HqButton, HqSearchInput, HqSegmentedTabs } from '@/components/hq/ui';
 import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
 import { HqCustomer } from '@/types/customerHq';
 import {
@@ -1386,14 +1386,15 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
               {/* Unassign Option */}
               {allocation.selectedVehiclePlate && (
-                <button
-                  type="button"
+                <HqButton
+                  variant="danger"
+                  size="sm"
                   onClick={() => handleSelectVehicle(allocation.id, null)}
-                  className="w-full mt-1.5 mb-1 px-2.5 py-1.5 text-left text-xs font-medium text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-between cursor-pointer"
+                  className="mt-2 mb-1 w-full justify-between"
                 >
                   <span>배정 해제 (미배정)</span>
                   <X className="w-3.5 h-3.5" />
-                </button>
+                </HqButton>
               )}
 
               {/* Vehicle List */}
@@ -1541,14 +1542,15 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
               {/* Unassign Option */}
               {allocation.selectedDriver && (
-                <button
-                  type="button"
+                <HqButton
+                  variant="danger"
+                  size="sm"
                   onClick={() => handleSelectDriver(allocation.id, null)}
-                  className="w-full mt-1.5 mb-1 px-2.5 py-1.5 text-left text-xs font-medium text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-between cursor-pointer"
+                  className="mt-2 mb-1 w-full justify-between"
                 >
                   <span>배정 해제 (미배정)</span>
                   <X className="w-3.5 h-3.5" />
-                </button>
+                </HqButton>
               )}
 
               {/* Driver List */}
@@ -2608,13 +2610,16 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             {deleteSucceeded ? (
               <p role="status" className="py-2 text-center text-xs font-medium text-slate-500">배차가 삭제됐습니다.</p>
             ) : !isDeleteConfirmOpen ? (
-              <button type="button"
+              <HqButton
+                variant="danger"
+                size="sm"
                 onClick={() => { haptics.lightTap(); setErrorMsg(null); setIsDeleteConfirmOpen(true); }}
                 disabled={isSubmitting || isDeleting}
-                className="ml-auto flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[13px] px-3.5 text-[12px] font-medium text-[#73839D] transition-colors hover:bg-[#FFF4F2] hover:text-[#A34E45] disabled:opacity-40">
-                <Ban className="h-3.5 w-3.5 text-slate-400" strokeWidth={1.7} />
+                className="ml-auto flex"
+              >
+                <Ban className="h-3.5 w-3.5" strokeWidth={1.7} />
                 배차 삭제
-              </button>
+              </HqButton>
             ) : (
               <section
                 aria-label="배차 완전 삭제 확인"
@@ -2647,23 +2652,21 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 {!deleteInspectError && <HqScheduleDeleteChoices inspection={deleteInspection} mode={deleteMode} onModeChange={setDeleteMode} />}
 
                 <div className="grid grid-cols-2 gap-2.5 pt-1">
-                  <button
-                    type="button"
+                  <HqButton
+                    variant="subtle"
                     disabled={isDeleting}
                     onClick={() => { haptics.lightTap(); setIsDeleteConfirmOpen(false); }}
-                    className="h-11 rounded-xl bg-[#F1F5F9] text-sm font-semibold text-slate-700 hover:bg-slate-200 transition-colors disabled:opacity-50 cursor-pointer"
                   >
                     취소
-                  </button>
-                  <button
-                    type="button"
+                  </HqButton>
+                  <HqButton
+                    variant="danger"
+                    loading={isDeleting}
                     disabled={isDeleting || isSubmitting || !deleteInspection || Boolean(deleteInspectError)}
                     onClick={handleDeleteDispatch}
-                    className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#EF4444] px-3 text-sm font-semibold text-white hover:bg-red-600 transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
                   >
-                    {isDeleting && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
                     {isDeleting ? '삭제 중…' : '삭제하기'}
-                  </button>
+                  </HqButton>
                 </div>
               </section>
             )}

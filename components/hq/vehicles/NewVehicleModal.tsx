@@ -17,6 +17,7 @@ import {
   Fuel,
 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
+import { HqIconButton } from '@/components/hq/ui';
 
 export type UiVehicleCategory = 'sedan' | 'suv' | 'van' | 'sprinter';
 export type FuelTypeChoice = '경유' | '휘발유' | '하이브리드' | '전기';
@@ -450,14 +451,15 @@ export const NewVehicleModal: React.FC<NewVehicleModalProps> = ({
                       >
                         사진 변경
                       </button>
-                      <button
-                        type="button"
+                      <HqIconButton
+                        variant="danger"
+                        size="sm"
                         onClick={handleDeleteUploadedPhoto}
-                        className="p-1.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 cursor-pointer transition-colors"
+                        aria-label="업로드 사진 삭제"
                         title="업로드 사진 삭제"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      </HqIconButton>
                     </div>
                   </div>
                 )}

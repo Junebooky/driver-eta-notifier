@@ -372,7 +372,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
                     <p className="text-[12px] font-semibold text-[#243750]">기사 프로필 사진</p>
                     <p className="mt-1 text-[11px] font-normal text-[#8190A5]">선택사항 · 배차카드에도 자동 연결</p>
                   </div>
-                  {newProfileFile && <HqButton variant="subtle" size="sm"
+                  {newProfileFile && <HqButton variant="danger" size="sm"
                     disabled={isSubmitting} onClick={() => setRegistrationPhoto(null)}>
                     <Trash2 className="size-4" /> 제거
                   </HqButton>}

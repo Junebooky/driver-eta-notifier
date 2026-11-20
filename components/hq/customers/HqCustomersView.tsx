@@ -694,7 +694,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                       </button>
 
                       <HqIconButton
-                        variant="ghost"
+                        variant="danger"
                         size="sm"
                         aria-label={`${cust.name} 고객사 삭제`}
                         title="고객사 삭제"
@@ -831,7 +831,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                     />
                   </button>
                   <HqButton
-                    variant="subtle"
+                    variant="danger"
                     size="sm"
                     onClick={() => openDeleteCustomerModal(selectedCustomer)}
                     aria-label={`${selectedCustomer.name} 고객사 삭제`}

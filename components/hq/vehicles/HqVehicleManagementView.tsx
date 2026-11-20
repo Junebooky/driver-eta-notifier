@@ -49,7 +49,7 @@ import type { FleetAvailabilityResult } from '@/utils/availabilityEngine';
 import { VEHICLE_STATUS_LABELS } from '@/utils/fleetVehicleStatus';
 import { haptics } from '@/utils/haptics';
 import { NewVehicleModal, NewVehicleFormData } from './NewVehicleModal';
-import { HqSearchInput } from '@/components/hq/ui';
+import { HqButton, HqIconButton, HqSearchInput } from '@/components/hq/ui';
 
 export interface HqVehicleManagementViewProps {
   initialSearchQuery?: string;
@@ -1113,18 +1113,18 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                         </button>
 
                         {/* Minimal Delete Icon Button */}
-                        <button
-                          type="button"
+                        <HqIconButton
+                          variant="danger"
+                          size="sm"
                           onClick={() => {
                             haptics.warningPulse();
                             setVehicleToDelete(selectedVehicle);
                           }}
-                          className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-2 rounded-xl transition-colors cursor-pointer shadow-2xs border border-transparent hover:border-rose-100"
                           title="차량 삭제"
                           aria-label="차량 삭제"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        </HqIconButton>
                       </div>
                     </div>
 
@@ -1528,19 +1528,19 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
             </div>
 
             <div className="flex items-center justify-between pt-3">
-              <button
-                type="button"
+              <HqButton
+                variant="danger"
+                size="sm"
                 disabled={isSavingEdit}
                 onClick={() => {
                   setIsEditModalOpen(false);
                   haptics.warningPulse();
                   setVehicleToDelete(selectedVehicle);
                 }}
-                className="px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-xl cursor-pointer disabled:opacity-50 flex items-center gap-1.5 transition-colors"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>차량 삭제</span>
-              </button>
+              </HqButton>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -1704,22 +1704,22 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
             </p>
 
             <div className="flex items-center gap-2 pt-1">
-              <button
-                type="button"
+              <HqButton
+                variant="subtle"
                 onClick={() => setVehicleToDelete(null)}
-                className="min-h-11 flex-1 cursor-pointer rounded-[14px] bg-[#F7F9FC] text-[12px] font-semibold text-[#4D607C] transition-colors hover:bg-[#EDF1F6]"
+                className="flex-1"
               >
                 취소
-              </button>
-              <button
-                type="button"
+              </HqButton>
+              <HqButton
+                variant="danger"
+                loading={registryBusy}
                 onClick={() => void handleConfirmDeleteVehicle(vehicleToDelete)}
-                disabled={registryBusy}
-                className="flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[14px] bg-[#FFF4F2] text-[12px] font-semibold text-[#A34E45] transition-colors hover:bg-[#FFE9E5]"
+                className="flex-1"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>삭제 완료</span>
-              </button>
+              </HqButton>
             </div>
           </div>
         </div>

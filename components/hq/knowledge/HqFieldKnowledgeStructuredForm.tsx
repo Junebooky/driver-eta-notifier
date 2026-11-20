@@ -193,7 +193,7 @@ export function HqFieldKnowledgeStructuredForm({guide,onChange,legacyItem}:Props
             {restroomItems.length>1&&(
               <div className="flex items-center justify-between">
                 <span className="text-[12px] font-semibold text-[#4D607C]">화장실 위치 {idx+1}</span>
-                <HqButton variant="subtle" size="sm" aria-label={'화장실 위치 '+(idx+1)+' 삭제'}
+                <HqButton variant="danger" size="sm" aria-label={'화장실 위치 '+(idx+1)+' 삭제'}
                   onClick={()=>setRestroomItems(restroomItems.filter((_,i)=>i!==idx))}>
                   <Trash2 className="size-3.5"/>
                 </HqButton>
@@ -284,7 +284,7 @@ export function HqFieldKnowledgeStructuredForm({guide,onChange,legacyItem}:Props
           placeholder="예: 11월 공사 기간에는 후문만 이용 가능"
           onChange={event=>onChange({...guide,notices:guide.notices.map((item,i)=>i===index?
             {...item,detail:event.target.value}:item)})}/>
-        <HqButton variant="subtle" size="sm" aria-label={'추가 안내 '+(index+1)+' 삭제'}
+        <HqButton variant="danger" size="sm" aria-label={'추가 안내 '+(index+1)+' 삭제'}
           onClick={()=>onChange({...guide,notices:guide.notices.filter((_,i)=>i!==index)})}>
           <Trash2 className="size-4"/>
         </HqButton>

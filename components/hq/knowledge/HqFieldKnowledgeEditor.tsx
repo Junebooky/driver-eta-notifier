@@ -67,7 +67,7 @@ export function HqFieldKnowledgeEditor({item,onChange,onSave,onCancel,onDelete,s
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        {item.version&&<HqButton variant="secondary" size="sm" disabled={saving} onClick={onDelete}>
+        {item.version&&<HqButton variant="danger" size="sm" disabled={saving} onClick={onDelete}>
           <Trash2 className="size-4"/> 삭제
         </HqButton>}
         <HqButton variant="secondary" size="sm" disabled={saving} onClick={onCancel}>
@@ -176,7 +176,7 @@ export function HqFieldKnowledgeEditor({item,onChange,onSave,onCancel,onDelete,s
           <img src={photo.url} alt={'현장 사진 '+(photo.index+1)}
             className="size-full object-cover"/>
           {photo.pending&&<span className="absolute bottom-2 left-2 rounded-lg bg-white/90 px-2 py-1 text-[10px] text-[#526680]">저장 대기</span>}
-          <HqButton variant="secondary" size="sm" disabled={saving}
+          <HqButton variant="danger" size="sm" disabled={saving}
             className="absolute right-1.5 top-1.5"
             aria-label={'사진 '+(photo.index+1)+' 제거'}
             onClick={()=>photo.pending?setExtra(previous=>previous.filter((_,i)=>i!==photo.index)):

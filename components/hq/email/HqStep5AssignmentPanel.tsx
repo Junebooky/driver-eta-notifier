@@ -119,12 +119,12 @@ export const HqStep5AssignmentPanel: React.FC<HqStep5AssignmentPanelProps> = ({
                   <div className="flex items-center justify-between gap-3 px-1">
                     <HqBadge tone="neutral">{index + 1}호차</HqBadge>
                     <HqIconButton
-                      variant="ghost"
+                      variant="danger"
                       size="sm"
                       onClick={() => removeSlot(index)}
                       aria-label={`${index + 1}호차 삭제`}
                     >
-                      <Trash2 className="h-4 w-4 text-[#73839D]" strokeWidth={1.7} />
+                      <Trash2 className="h-4 w-4" strokeWidth={1.7} />
                     </HqIconButton>
                   </div>
                 )}

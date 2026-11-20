@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import { HqEmailSummary, HqEmailDetail, HqEmailExtractedDraft, RouteWaypointItem } from '@/types/emailHq';
 import { haptics } from '@/utils/haptics';
-import { HqBadge, HqButton, HqCard, HqSegmentedTabs } from '@/components/hq/ui';
+import { HqBadge, HqButton, HqCard, HqIconButton, HqSegmentedTabs } from '@/components/hq/ui';
 import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 import { HqSourceText } from '@/components/hq/ui/HqSourceText';
@@ -1521,17 +1521,18 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                                     <Edit3 className="w-3.5 h-3.5" />
                                                   </button>
                                                   {waypoints.length > 2 && (
-                                                    <button
-                                                      type="button"
+                                                    <HqIconButton
+                                                      variant="danger"
+                                                      size="sm"
+                                                      className="!size-7 !min-h-7 !min-w-7 !w-7 !rounded-lg"
                                                       onClick={(e) => {
                                                         e.stopPropagation();
                                                         handleRemoveWaypoint(wp.id);
                                                       }}
-                                                      className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
                                                       aria-label="경유지 삭제"
                                                     >
                                                       <X className="w-3.5 h-3.5" />
-                                                    </button>
+                                                    </HqIconButton>
                                                   )}
                                                 </div>
                                               </div>

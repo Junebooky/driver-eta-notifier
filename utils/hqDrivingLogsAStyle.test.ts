@@ -15,18 +15,26 @@ test('driving reports A-plan retains review status selections and keyboard-acces
   assert.doesNotMatch(table,/bg-slate-900/);
   assert.match(list,/HqDrivingLogsTable/);
 });
-test('driving log detail retains original report and approval/revision/reject dispatch',()=>{
+test('driving log detail retains original report and approval/revision/reject dispatch using shared HQ UI primitives',()=>{
   assert.match(detail,/onRequestRevision\(log\.id/);
   assert.match(detail,/onReject\(log\.id/);
-  assert.match(detail,/onClose\(\)/);
-  assert.match(detail,/log\.status === '승인 완료'/);
+  assert.match(detail,/onClose\?\.\(\)/);
+  assert.match(detail,/case '승인 완료':/);
+  assert.match(detail,/<HqModal/);
+  assert.match(detail,/<HqCard/);
+  assert.match(detail,/<HqBadge/);
+  assert.match(detail,/<HqButton/);
+  assert.match(detail,/<HqTextarea/);
   assert.match(detail,/shadow-\[0_6px_20px/);
-  assert.doesNotMatch(detail,/shadow-2xl/);
+  assert.doesNotMatch(detail,/shadow-2xl|\(ID: \{log\.id\}\)|<span>전체보기<\/span>/);
 });
-test('expense details retain matched amounts, receipt links and case-specific navigation',()=>{
+test('expense details retain matched amounts, receipt previews and use shared HQ modal/card/badge primitives',()=>{
   assert.match(expense,/matchingExpenses\.map/);
   assert.match(expense,/totalAmount\.toLocaleString\(\)/);
   assert.match(expense,/onClose\(\)/);
-  assert.match(expense,/hq\?tab=expenses/);
-  assert.doesNotMatch(expense,/shadow-2xl|bg-gradient-to-r/);
+  assert.match(expense,/<HqModal/);
+  assert.match(expense,/<HqCard/);
+  assert.match(expense,/<HqBadge/);
+  assert.match(expense,/<HqButton/);
+  assert.doesNotMatch(expense,/hq\?tab=expenses|경비 관리 탭에서 전체 확인|shadow-2xl|bg-gradient-to-r/);
 });
