@@ -129,8 +129,9 @@ test('customer UI uses shared HQ add/edit form, multiple methods and edit by sta
   assert.match(overview,/onEditContact\(person\)/);
   assert.match(overview,/contactPhones\(person\)\.map/);
   assert.match(overview,/contactEmails\(person\)\.map/);
-  assert.match(fields,/전화번호 추가/);
-  assert.match(fields,/이메일 추가/);
+  assert.match(fields,/const isPhone=key==='phones',label=isPhone\?'전화번호':'이메일'/);
+  assert.match(fields,/onClick=\{\(\)=>addItem\(key\)\}/);
+  assert.match(fields,/\{label\} 추가/);
   assert.match(fields,/removeItem/);
   assert.match(fields,/HqInput/);
   assert.match(add,/<HqContactChannelFields/);
