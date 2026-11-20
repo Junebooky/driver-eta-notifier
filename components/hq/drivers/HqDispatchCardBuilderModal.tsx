@@ -33,6 +33,7 @@ import { HqModal } from '@/components/hq/ui/HqModal';
 import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
 import { CHAUFFEUR_POSITION_OPTIONS, formatBilingualChauffeurName, getEnglishPosition, validateDispatchCardProfile, type ChauffeurPositionCode } from '@/lib/dispatchCards/chauffeurIdentity';
 import { formatKoreanMobileInternationalInput, KOREA_MOBILE_PREFIX } from '@/utils/koreanInternationalPhone';
+import { suggestKoreanEnglishNames } from '@/utils/koreanNameRomanization';
 
 interface Props {
   isOpen: boolean;
@@ -78,6 +79,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [name, setName] = useState(driver.name);
   const [englishName, setEnglishName] = useState('');
+  const englishNameSuggestions = useMemo(() => suggestKoreanEnglishNames(name), [name]);
   const [positionCode, setPositionCode] = useState<ChauffeurPositionCode | ''>('');
   const [savedIdentity, setSavedIdentity] = useState('');
   const [phone, setPhone] = useState(formatKoreanMobileInternationalInput(driver.phone || KOREA_MOBILE_PREFIX));
@@ -599,6 +601,29 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
                     inputMode={field.label === '전화번호' ? 'tel' : 'text'} />
                 </label>
               ))}
+              {englishNameSuggestions.length > 0 && (
+                <div className="rounded-[14px] bg-[#F7F9FC] p-3">
+                  <p className="text-[12px] font-semibold text-[#455B78]">영문 성명 추천</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {englishNameSuggestions.map(candidate => (
+                      <button type="button" key={candidate}
+                        disabled={busy || portraitSaving}
+                        aria-pressed={englishName === candidate}
+                        onClick={() => setEnglishName(candidate)}
+                        className={'min-h-10 rounded-[11px] px-3 text-[12px] font-medium transition-colors ' +
+                          (englishName === candidate
+                            ? 'bg-[#1E60F3] text-white'
+                            : 'bg-white text-[#455B78] shadow-[0_2px_8px_rgba(25,42,67,0.05)] hover:bg-[#EEF2F8]')}>
+                        {candidate}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[11px] leading-relaxed text-[#7A8AA1]">
+                    발음 기준 자동 추천이에요. 여권·본인이 사용하는 영문 이름이 있다면 직접 입력한 표기를 우선하세요.
+                    추천을 눌러도 저장 전까지는 기존 배차카드에 반영되지 않아요.
+                  </p>
+                </div>
+              )}
               <div className="space-y-1.5">
                 <span className="block text-[12px] font-medium text-[#526680]">직책</span>
                 <HqSearchSelect
