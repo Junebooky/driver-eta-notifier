@@ -56,7 +56,11 @@ import { HqExpenseRecord, HqExpenseStatus } from '@/types/expenseHq';
 import { formatKRW } from '@/utils/expense';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
-import { HqBadge, HqButton, HqCard, HqIconButton } from '@/components/hq/ui';
+import { HqBadge, HqButton, HqCard, HqIconButton, HqSegmentedTabs } from '@/components/hq/ui';
+import { HqCustomerOverview } from './HqCustomerOverview';
+import { HqCustomerActivityPanels } from './HqCustomerActivityPanels';
+import { HqCustomerContactMemoModal } from './HqCustomerContactMemoModal';
+import { saveCustomerContactMemoInDb } from '@/utils/crmCustomerSync';
 import { HqModal } from '@/components/hq/ui/HqModal';
 
 export interface HqCustomersViewProps {
@@ -80,6 +84,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
   const [deleteTargetCustomer, setDeleteTargetCustomer] = useState<HqCustomer | null>(null);
   const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [contactMemoTarget, setContactMemoTarget] = useState<{customerId:string;contactId:string}|null>(null);
 
   const isFetchingRef = React.useRef(false);
 
@@ -140,10 +145,8 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
 
-  // Active Detail Tab ('overview' | 'billing' | 'contacts' | 'history' | 'events' | 'requests' | 'communications')
-  const [activeTab, setActiveTab] = useState<
-    'overview' | 'billing' | 'contacts' | 'history' | 'events' | 'requests' | 'communications'
-  >('overview');
+  // Focused four-section layout. Contacts and individual notes live in Overview.
+  const [activeTab, setActiveTab] = useState<'overview'|'operations'|'billing'|'conversations'>('overview');
 
   // Live HQ Expenses subscription
   const allExpenses = useSyncExternalStore(
@@ -221,57 +224,9 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
     };
   }, [customerExpenses]);
 
-  // Category badge helper
-  const getCategoryBadge = (category: string) => {
-    switch (category) {
-      case '주유비':
-        return <span className="px-2 py-0.5 rounded-md font-bold bg-amber-50 text-amber-700 border border-amber-200">주유비</span>;
-      case '통행료':
-        return <span className="px-2 py-0.5 rounded-md font-bold bg-blue-50 text-blue-700 border border-blue-200">통행료</span>;
-      case '주차비':
-        return <span className="px-2 py-0.5 rounded-md font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">주차비</span>;
-      case '세차비':
-        return <span className="px-2 py-0.5 rounded-md font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">세차비</span>;
-      case '식대':
-        return <span className="px-2 py-0.5 rounded-md font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">식대</span>;
-      default:
-        return <span className="px-2 py-0.5 rounded-md font-bold bg-slate-100 text-slate-700 border border-slate-200">{category}</span>;
-    }
-  };
-
-  // Status badge helper
-  const getStatusBadge = (status: HqExpenseStatus) => {
-    switch (status) {
-      case '승인 완료':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <CheckCircle2 className="w-3 h-3" />
-            승인 완료
-          </span>
-        );
-      case '반려':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-            <AlertCircle className="w-3 h-3" />
-            반려
-          </span>
-        );
-      case '금액 확인':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-            <AlertCircle className="w-3 h-3" />
-            금액 확인
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
-            <Clock3 className="w-3 h-3" />
-            검수 대기
-          </span>
-        );
-    }
-  };
+  // Consistent neutral HQ badges rather than one-off colored labels.
+  const getCategoryBadge = (category:string) => <HqBadge>{category}</HqBadge>;
+  const getStatusBadge = (status:HqExpenseStatus) => <HqBadge tone={status==='반려'?'critical':status==='금액 확인'||status==='검수 대기'?'warning':'neutral'}>{status}</HqBadge>;
 
   // Filtered customers
   const filteredCustomers = useMemo(() => {
@@ -439,8 +394,23 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
     }
     setCustomers(refreshed.customers);
     setSelectedCustomerId(result.clientId);
-    setActiveTab('contacts');
+    setActiveTab('overview');
     setDbErrorMessage(null);
+    return null;
+  };
+
+  const handleSaveContactMemo=async(contactId:string,memo:string):Promise<string|null>=>{
+    if(!selectedCustomer||contactMemoTarget?.customerId!==selectedCustomer.id||
+      contactMemoTarget.contactId!==contactId)return '선택된 담당자가 변경됐습니다. 다시 열어 주세요.';
+    const id=selectedCustomer.id;
+    const result=await saveCustomerContactMemoInDb(id,contactId,memo);
+    if(!result.ok)return result.error||'메모 저장 실패';
+    setCustomers(previous=>previous.map(customer=>customer.id!==id?customer:{
+      ...customer,contacts:customer.contacts.map(person=>
+        person.id===contactId?{...person,memo}:person),
+    }));
+    setOperationFeedbackTone('success');
+    setOperationMessage('담당자 개인 메모가 저장되었습니다.');
     return null;
   };
 
@@ -836,395 +806,40 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                 </div>
               </div>
 
-              {/* Sub-Navigation Tabs with Active Blue Underline */}
-              <div className="mt-6 flex items-center gap-1 overflow-x-auto rounded-[15px] bg-[#F7F9FC] p-1 text-[12px] font-medium text-[#73839D]">
-                {[
-                  { id: 'overview', label: '개요', icon: LayoutGrid },
-                  { id: 'billing', label: '청구 내역', icon: Receipt },
-                  { id: 'contacts', label: '담당자', icon: Users },
-                  { id: 'history', label: '예약 이력', icon: Clock },
-                  { id: 'events', label: '행사', icon: Calendar },
-                  { id: 'requests', label: '요청사항', icon: Heart },
-                  { id: 'communications', label: '소통 기록', icon: MessageSquare },
-                ].map((tab) => {
-                  const Icon = tab.icon;
-                  const isActive = activeTab === tab.id;
+              <HqSegmentedTabs aria-label="고객사 상세 정보 탭"
+                className="mt-5 w-full overflow-x-auto" value={activeTab}
+                onValueChange={value=>setActiveTab(value as typeof activeTab)}
+                tabs={[
+                  {id:'overview',label:'개요'},
+                  {id:'operations',label:'운행·행사'},
+                  {id:'billing',label:'경비·정산',count:customerExpenses.length||undefined},
+                  {id:'conversations',label:'요청·소통'},
+                ]}/>
 
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => {
-                        haptics.lightTap();
-                        setActiveTab(
-                          tab.id as
-                          | 'overview'
-                          | 'billing'
-                          | 'contacts'
-                          | 'history'
-                          | 'events'
-                          | 'requests'
-                          | 'communications'
-                        );
-                      }}
-                      className={`relative flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-[12px] px-3.5 transition-colors ${isActive ? 'bg-white text-[#1E60F3] shadow-[0_3px_10px_rgba(35,49,78,0.065)]' : 'hover:text-[#17233B]'
-                        }`}
-                    >
-                      <Icon className="w-3.5 h-3.5" />
-                      <span>{tab.label}</span>
-                      {tab.id === 'billing' && customerExpenses.length > 0 && (
-                        <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-[#EEF3FF] text-[#31598F]">
-                          {customerExpenses.length}
-                        </span>
-                      )}
-                      
-                    </button>
-                  );
-                })}
-              </div>
             </div>
 
-            {/* TAB 1: 개요 (Overview) - 6 Modular Cards Grid (Matches Screenshot) */}
-            {activeTab === 'overview' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* 1. 최근 요청 사항 */}
-                <div className="flex flex-col justify-between rounded-[21px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)]">
-                  <div>
-                    <div className="flex items-center justify-between pb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-lg bg-rose-50 text-rose-500 flex items-center justify-center">
-                          <AlertCircle className="w-3.5 h-3.5" />
-                        </div>
-                        <h3 className="text-[13px] font-semibold text-[#17233B]">최근 요청 사항</h3>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('requests')}
-                        className="text-[11px] font-bold text-[#1E60F3] hover:underline cursor-pointer"
-                      >
-                        전체 보기
-                      </button>
-                    </div>
-
-                    <div className="divide-y divide-slate-50 mt-1">
-                      {selectedCustomer.recentRequests.length > 0 ? (
-                        selectedCustomer.recentRequests.map((req) => (
-                          <div key={req.id} className="py-2.5 flex items-center justify-between gap-2 text-xs">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
-                              <span className="font-semibold text-slate-800 truncate">
-                                {req.content}
-                              </span>
-                            </div>
-                            <span className="text-[11px] text-slate-400 shrink-0 font-medium">
-                              {req.date}
-                            </span>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-xs text-slate-400 py-6 text-center">등록된 최근 요청사항이 없습니다.</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. 다음 행사 */}
-                <div className="flex flex-col justify-between rounded-[21px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)]">
-                  <div>
-                    <div className="flex items-center justify-between pb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-lg bg-blue-50 text-[#1E60F3] flex items-center justify-center">
-                          <Calendar className="w-3.5 h-3.5" />
-                        </div>
-                        <h3 className="text-[13px] font-semibold text-[#17233B]">다음 행사</h3>
-                      </div>
-                    </div>
-
-                    {selectedCustomer.nextEvent ? (
-                      <div className="mt-3 space-y-2.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-black text-slate-900">
-                            {selectedCustomer.nextEvent.date}
-                          </span>
-                          <span className="px-2 py-0.5 rounded-full bg-[#EEF3FF] text-[#31598F] text-[10px] font-black">
-                            {selectedCustomer.nextEvent.dDay}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
-                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span>{selectedCustomer.nextEvent.location}</span>
-                        </div>
-
-                        <div className="flex items-center gap-3 text-xs text-slate-500 font-semibold pt-1">
-                          <div className="flex items-center gap-1">
-                            <Car className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{selectedCustomer.nextEvent.vehiclesRequired}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Users className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{selectedCustomer.nextEvent.passengerCount}명</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{selectedCustomer.nextEvent.timeRange}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-slate-400 py-6 text-center">예정된 다음 행사가 없습니다.</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* 3. 주요 선호사항 */}
-                <div className="flex flex-col justify-between rounded-[21px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)]">
-                  <div>
-                    <div className="flex items-center justify-between pb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-lg bg-rose-50 text-rose-500 flex items-center justify-center">
-                          <Heart className="w-3.5 h-3.5" />
-                        </div>
-                        <h3 className="text-[13px] font-semibold text-[#17233B]">주요 선호사항</h3>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          haptics.lightTap();
-                          setEditModalConfig({ isOpen: true, mode: 'preferences' });
-                        }}
-                        className="text-[11px] font-bold text-[#1E60F3] hover:underline cursor-pointer"
-                      >
-                        수정
-                      </button>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1.5 mt-3">
-                      {selectedCustomer.preferences.map((pref) => (
-                        <span
-                          key={pref}
-                          className="px-2.5 py-1 rounded-lg bg-slate-100/90 text-slate-700 text-xs font-bold border border-slate-200/60"
-                        >
-                          {pref}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 4. 최근 운행 */}
-                <div className="flex flex-col justify-between rounded-[21px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)]">
-                  <div>
-                    <div className="flex items-center justify-between pb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center">
-                          <Clock className="w-3.5 h-3.5" />
-                        </div>
-                        <h3 className="text-[13px] font-semibold text-[#17233B]">최근 운행</h3>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('history')}
-                        className="text-[11px] font-bold text-[#1E60F3] hover:underline cursor-pointer"
-                      >
-                        전체 보기
-                      </button>
-                    </div>
-
-                    {selectedCustomer.recentTrip ? (
-                      <div className="flex items-center gap-3 mt-3">
-                        {/* Car Thumbnail */}
-                        <div className="w-16 h-12 rounded-xl bg-gradient-to-br from-slate-900 to-slate-800 text-white flex items-center justify-center shrink-0 border border-slate-700 shadow-2xs">
-                          <Car className="w-6 h-6 text-slate-300" />
-                        </div>
-
-                        <div className="min-w-0 flex-1 text-xs">
-                          <p className="font-black text-slate-900">
-                            {selectedCustomer.recentTrip.date}
-                          </p>
-                          <p className="font-semibold text-slate-700 mt-0.5 truncate">
-                            {selectedCustomer.recentTrip.route}
-                          </p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">
-                            {selectedCustomer.recentTrip.vehicleDetails}
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-slate-400 py-6 text-center">최근 운행 이력이 없습니다.</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* 5. 담당자 (3) */}
-                <div className="flex flex-col justify-between rounded-[21px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)]">
-                  <div>
-                    <div className="flex items-center justify-between pb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-lg bg-blue-50 text-[#1E60F3] flex items-center justify-center">
-                          <Users className="w-3.5 h-3.5" />
-                        </div>
-                        <h3 className="text-[13px] font-semibold text-[#17233B]">
-                          담당자 ({selectedCustomer.contacts.length})
-                        </h3>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('contacts')}
-                        className="text-[11px] font-bold text-[#1E60F3] hover:underline cursor-pointer"
-                      >
-                        전체 보기
-                      </button>
-                    </div>
-
-                    <div className="divide-y divide-slate-50 mt-1">
-                      {selectedCustomer.contacts.map((contact) => {
-                        const initials = contact.name
-                          .split(' ')
-                          .map((n) => n[0])
-                          .join('')
-                          .slice(0, 2)
-                          .toUpperCase();
-
-                        return (
-                          <div
-                            key={contact.id}
-                            className="py-2.5 flex items-center justify-between gap-2"
-                          >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-7 h-7 rounded-full bg-[#EEF3FF] text-[#31598F] font-black text-[10px] flex items-center justify-center shrink-0">
-                                {initials}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-[13px] font-semibold text-[#17233B] truncate">
-                                  {contact.name}
-                                </p>
-                                <p className="text-[10px] text-slate-400 truncate">
-                                  {contact.role}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-1 shrink-0">
-                              <a
-                                href={`tel:${contact.phone}`}
-                                className="w-7 h-7 rounded-lg border border-slate-200 hover:bg-slate-50 text-blue-600 flex items-center justify-center transition-colors"
-                                title="전화 걸기"
-                              >
-                                <Phone className="w-3 h-3" />
-                              </a>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  haptics.lightTap();
-                                  setComposeModalState({
-                                    isOpen: true,
-                                    to: contact.email,
-                                    subject: `[VIP LIMOUSINE] ${selectedCustomer.name} 의전 일정 안내`,
-                                  });
-                                }}
-                                className="w-7 h-7 rounded-lg border border-slate-200 hover:bg-slate-50 text-blue-600 flex items-center justify-center transition-colors cursor-pointer"
-                                title="이메일 작성"
-                              >
-                                <Mail className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 6. 메모 */}
-                <div className="flex flex-col justify-between rounded-[21px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)]">
-                  <div>
-                    <div className="flex items-center justify-between pb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-                          <FileText className="w-3.5 h-3.5" />
-                        </div>
-                        <h3 className="text-[13px] font-semibold text-[#17233B]">메모</h3>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          haptics.lightTap();
-                          setEditModalConfig({ isOpen: true, mode: 'notes' });
-                        }}
-                        className="text-[11px] font-bold text-[#1E60F3] hover:underline cursor-pointer"
-                      >
-                        수정
-                      </button>
-                    </div>
-
-                    <ul className="mt-3 space-y-1.5 text-xs text-slate-700 font-medium">
-                      {selectedCustomer.notes.map((note, idx) => (
-                        <li key={idx} className="flex items-start gap-2 leading-relaxed">
-                          <span className="text-slate-400 shrink-0 font-bold">•</span>
-                          <span>{note}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-
-                {/* 7. 배차 경비 청구 요약 카드 (Full width) */}
-                <div className="md:col-span-2 rounded-[21px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055)] flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center shrink-0 shadow-sm">
-                      <Receipt className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-[13px] font-semibold text-[#17233B]">
-                          {selectedCustomer.name} 배차 경비 청구 요약
-                        </h3>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#EEF3FF] text-[#31598F]">
-                          {billingStats.count}건 제출
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                        기사가 제출한 유류비/통행료/주차비 영수증이 고객사 배차 스케줄과 자동 맵핑됩니다.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
-                    <div className="text-right">
-                      <div className="text-[10px] text-slate-400 font-medium">총 청구 금액</div>
-                      <div className="text-base font-black text-[#1E60F3]">
-                        {formatKRW(billingStats.total)}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        haptics.lightTap();
-                        setActiveTab('billing');
-                      }}
-                      className="px-3.5 py-2 rounded-xl bg-white hover:bg-blue-50 text-[#1E60F3] border border-blue-200 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                    >
-                      <span>청구 내역 전체보기</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+            {activeTab==='overview'&&<HqCustomerOverview
+              customer={selectedCustomer}
+              expenseCount={billingStats.count} expenseTotal={billingStats.total}
+              onAddContact={()=>setIsAddContactOpen(true)}
+              onEditContactMemo={person=>setContactMemoTarget({customerId:selectedCustomer.id,contactId:person.id})}
+              onEditCompanyNotes={()=>setEditModalConfig({isOpen:true,mode:'notes'})}
+              onEditPreferences={()=>setEditModalConfig({isOpen:true,mode:'preferences'})}
+              onComposeEmail={email=>setComposeModalState({isOpen:true,to:email,
+                subject:'[VIP LIMOUSINE] '+selectedCustomer.name+' 의전 안내'})}
+              onNavigate={setActiveTab}
+            />}
 
             {/* TAB: 청구 내역 (Billing & Dispatched Expenses) */}
             {activeTab === 'billing' && (
-              <div className="rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] space-y-5">
+              <HqCard className="min-w-0 space-y-5 p-4 sm:p-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3">
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-black text-slate-900">
-                        {selectedCustomer.name} 배차 경비 청구 내역
+                        {selectedCustomer.name} 배차 경비 내역
                       </h3>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-[#EEF3FF] text-[#31598F]">
-                        자동 맵핑 완료
-                      </span>
+                      <HqBadge>연결된 경비 내역</HqBadge>
                     </div>
                     <p className="text-xs text-slate-400 mt-0.5">
                       배차된 스케줄 및 기사 운행 내역을 기반으로 자동 분류된 영수증과 경비 지출 명세입니다.
@@ -1236,50 +851,25 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                       총 <strong className="text-slate-900">{customerExpenses.length}</strong>건
                     </span>
                     {onOpenSettlementReport && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          haptics.lightTap();
-                          onOpenSettlementReport(selectedCustomer.id);
-                        }}
-                        className="px-3 py-1.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
-                      >
-                        <span>행사 종합 정산·수익성 리포트</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
+                      <HqButton variant="primary" size="sm"
+                        onClick={()=>onOpenSettlementReport(selectedCustomer.id)}>
+                        행사 종합 정산 리포트 <ChevronRight className="size-4"/>
+                      </HqButton>
                     )}
                   </div>
                 </div>
 
-                {/* KPI Metrics */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/70">
-                    <span className="text-[11px] font-bold text-slate-400">총 청구 금액</span>
-                    <p className="text-base font-black text-slate-900 mt-1">
-                      {formatKRW(billingStats.total)}
-                    </p>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-emerald-50/50 border border-emerald-100">
-                    <span className="text-[11px] font-bold text-emerald-600">승인 완료 금액</span>
-                    <p className="text-base font-black text-emerald-700 mt-1">
-                      {formatKRW(billingStats.approved)}
-                    </p>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-amber-50/50 border border-amber-100">
-                    <span className="text-[11px] font-bold text-amber-600">검수 대기 금액</span>
-                    <p className="text-base font-black text-amber-700 mt-1">
-                      {formatKRW(billingStats.pending)}
-                    </p>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-blue-50/50 border border-blue-100">
-                    <span className="text-[11px] font-bold text-[#1E60F3]">첨부 영수증 증빙</span>
-                    <p className="text-base font-black text-blue-700 mt-1">
-                      {billingStats.receiptCount}건 <span className="text-xs font-normal text-slate-400">/ {billingStats.count}건</span>
-                    </p>
-                  </div>
+                {/* KPI blocks share the neutral HQ card component. */}
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                  {[
+                    {label:'총 제출 경비',value:formatKRW(billingStats.total)},
+                    {label:'승인 완료',value:formatKRW(billingStats.approved)},
+                    {label:'검수 대기',value:formatKRW(billingStats.pending)},
+                    {label:'증빙 영수증',value:billingStats.receiptCount+' / '+billingStats.count+'건'},
+                  ].map(metric=><HqCard key={metric.label} tone="muted" className="min-w-0 p-3.5">
+                    <p className="text-[11px] text-[#8190A4]">{metric.label}</p>
+                    <p className="mt-1 break-words text-[14px] font-semibold tabular-nums text-[#243750]">{metric.value}</p>
+                  </HqCard>)}
                 </div>
 
                 {/* Table of Dispatched Expenses for Customer */}
@@ -1292,7 +882,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                         <th className="py-2.5 px-3">기사 / 차량</th>
                         <th className="py-2.5 px-3">항목</th>
                         <th className="py-2.5 px-3">상호 / 가맹점</th>
-                        <th className="py-2.5 px-3 text-right">청구 금액</th>
+                        <th className="py-2.5 px-3 text-right">제출 경비</th>
                         <th className="py-2.5 px-3 text-center">영수증</th>
                         <th className="py-2.5 px-3 text-center">상태</th>
                       </tr>
@@ -1331,7 +921,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                                     haptics.lightTap();
                                     setPreviewReceipt(item);
                                   }}
-                                  className="inline-flex items-center gap-1 text-[11px] bg-blue-50 text-[#1E60F3] hover:bg-blue-100 px-2 py-0.5 rounded font-bold border border-blue-200 transition-colors cursor-pointer"
+                                  className="hq-ui-button text-[11px]"
                                 >
                                   <Eye className="w-3 h-3" />
                                   <span>확인</span>
@@ -1349,7 +939,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                         <tr>
                           <td colSpan={8} className="py-12 text-center text-slate-400">
                             <Receipt className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                            <p className="font-bold text-slate-600">배차 경비 청구 내역이 없습니다</p>
+                            <p className="font-bold text-slate-600">배차 경비 내역이 없습니다</p>
                             <p className="text-[11px] text-slate-400 mt-1">
                               기사가 영수증을 등록하거나 배차가 완료되면 자동으로 이곳에 매핑되어 집계됩니다.
                             </p>
@@ -1359,218 +949,15 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                     </tbody>
                   </table>
                 </div>
-              </div>
+              </HqCard>
             )}
 
-            {/* TAB 2: 담당자 상세 탭 */}
-            {activeTab === 'contacts' && (
-              <div className="rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-black text-slate-900">
-                    전체 담당자 및 비서실 연락처 ({selectedCustomer.contacts.length})
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => setIsAddContactOpen(true)}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-50 text-[#1E60F3] hover:bg-blue-100 text-xs font-bold transition-all cursor-pointer"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>+ 담당자 추가</span>
-                  </button>
-                </div>
+            {(activeTab==='operations'||activeTab==='conversations')&&
+              <HqCustomerActivityPanels customer={selectedCustomer} tab={activeTab}
+                onComposeEmail={email=>setComposeModalState({isOpen:true,to:email,
+                  subject:'[VIP LIMOUSINE] '+selectedCustomer.name+' 업무 연락'})}/>
+            }
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {selectedCustomer.contacts.map((contact) => (
-                    <div
-                      key={contact.id}
-                      className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/40 space-y-2 text-xs"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-black text-slate-900 text-sm">{contact.name}</p>
-                          <p className="text-slate-500 font-medium">{contact.role}</p>
-                        </div>
-                        {contact.isPrimary && (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-black bg-[#EEF3FF] text-[#31598F]">
-                            대표 담당자
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="space-y-1 text-slate-600 font-medium pt-1 border-t border-slate-100">
-                        <p className="flex items-center gap-1.5">
-                          <Phone className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{contact.phone}</span>
-                        </p>
-                        <p className="flex items-center gap-1.5">
-                          <Mail className="w-3.5 h-3.5 text-slate-400" />
-                          <span className="text-blue-600">{contact.email}</span>
-                        </p>
-                      </div>
-
-                      <div className="pt-2 flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            haptics.lightTap();
-                            setComposeModalState({
-                              isOpen: true,
-                              to: contact.email,
-                              subject: `[VIP LIMOUSINE] ${selectedCustomer.name} 의전 안내`,
-                            });
-                          }}
-                          className="flex-1 py-1.5 rounded-lg bg-[#1E60F3] hover:bg-blue-600 text-white font-bold text-center transition-all cursor-pointer"
-                        >
-                          메일 발송
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* TAB 3: 예약 이력 탭 */}
-            {activeTab === 'history' && (
-              <div className="rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] space-y-4">
-                <h3 className="text-sm font-black text-slate-900">
-                  {selectedCustomer.name} 과거 및 진행 중 운행 이력
-                </h3>
-
-                <div className="divide-y divide-slate-100 text-xs">
-                  {selectedCustomer.tripsHistory.length > 0 ? (
-                    selectedCustomer.tripsHistory.map((trip) => (
-                      <div key={trip.id} className="py-3 flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-blue-50 text-[#1E60F3] flex items-center justify-center shrink-0">
-                            <Car className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <p className="font-black text-slate-900">{trip.route}</p>
-                            <p className="text-slate-400 text-[11px] mt-0.5">
-                              {trip.date} • 배정: {trip.driverName} 기사 ({trip.vehicleModel})
-                            </p>
-                          </div>
-                        </div>
-                        <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">
-                          운행 완료
-                        </span>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-xs text-slate-400 py-8 text-center">기록된 운행 이력이 없습니다.</p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* TAB 4: 행사 탭 */}
-            {activeTab === 'events' && (
-              <div className="rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] space-y-4">
-                <h3 className="text-sm font-black text-slate-900">
-                  {selectedCustomer.name} 전담 행사 및 VIP 프로젝트 타임라인
-                </h3>
-
-                <div className="space-y-3">
-                  {selectedCustomer.eventsHistory.length > 0 ? (
-                    selectedCustomer.eventsHistory.map((ev) => (
-                      <div
-                        key={ev.id}
-                        className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/50 space-y-2 text-xs"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="font-black text-slate-900 text-sm">{ev.title}</span>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-[#EEF3FF] text-[#31598F]">
-                              {ev.dDay}
-                            </span>
-                          </div>
-                          <span className="text-slate-500 font-semibold">{ev.date}</span>
-                        </div>
-
-                        <div className="flex items-center gap-4 text-slate-600 font-medium pt-1">
-                          <span>장소: {ev.location}</span>
-                          <span>차량: {ev.vehiclesRequired}</span>
-                          <span>인원: {ev.passengerCount}명</span>
-                          <span>시간: {ev.timeRange}</span>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-xs text-slate-400 py-8 text-center">등록된 행사 일정이 없습니다.</p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* TAB 5: 요청사항 탭 */}
-            {activeTab === 'requests' && (
-              <div className="rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] space-y-4">
-                <h3 className="text-sm font-black text-slate-900">
-                  {selectedCustomer.name} 특별 요청사항 히스토리
-                </h3>
-
-                <div className="divide-y divide-slate-100 text-xs">
-                  {selectedCustomer.recentRequests.map((req) => (
-                    <div key={req.id} className="py-3 flex items-center justify-between">
-                      <div>
-                        <p className="font-bold text-slate-800">{req.content}</p>
-                        <p className="text-[11px] text-slate-400 mt-0.5">접수 일시: {req.date}</p>
-                      </div>
-                      <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-50 text-blue-700">
-                        {req.status === 'resolved' ? '반영 완료' : '접수 확인'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* TAB 6: 소통 기록 탭 */}
-            {activeTab === 'communications' && (
-              <div className="rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-black text-slate-900">
-                    {selectedCustomer.name} 의전 소통 및 연락 타임라인
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      haptics.lightTap();
-                      setComposeModalState({
-                        isOpen: true,
-                        to: selectedCustomer.mainEmail,
-                        subject: `[VIP LIMOUSINE] ${selectedCustomer.name} 공식 업무 연락`,
-                      });
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1E60F3] text-white text-xs font-bold hover:bg-blue-600 transition-all cursor-pointer"
-                  >
-                    <Mail className="w-3.5 h-3.5" />
-                    <span>새 메일 작성</span>
-                  </button>
-                </div>
-
-                <div className="divide-y divide-slate-100 text-xs">
-                  {selectedCustomer.communications.length > 0 ? (
-                    selectedCustomer.communications.map((comm) => (
-                      <div key={comm.id} className="py-3 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-slate-900">
-                            [{comm.channel.toUpperCase()}] {comm.sender}
-                          </span>
-                          <span className="text-[11px] text-slate-400 font-medium">
-                            {comm.date}
-                          </span>
-                        </div>
-                        <p className="text-slate-600 leading-relaxed">{comm.summary}</p>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-xs text-slate-400 py-8 text-center">기록된 소통 내역이 없습니다.</p>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         ) : (
           <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/80 p-12 text-center text-slate-400">
@@ -1603,6 +990,19 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
         onClose={() => setIsAddContactOpen(false)}
         onSave={handleAddContact}
       />
+
+      {/* Contact-specific note, separate from company-wide memo. */}
+      {contactMemoTarget&&selectedCustomer?.id===contactMemoTarget.customerId&&
+        selectedCustomer.contacts.find(person=>person.id===contactMemoTarget.contactId)&&(
+          <HqCustomerContactMemoModal isOpen
+            customerName={selectedCustomer.name}
+            contactId={contactMemoTarget.contactId}
+            contactName={selectedCustomer.contacts.find(person=>person.id===contactMemoTarget.contactId)!.name}
+            initialMemo={selectedCustomer.contacts.find(person=>person.id===contactMemoTarget.contactId)!.memo||''}
+            onClose={()=>setContactMemoTarget(null)}
+            onSave={handleSaveContactMemo}
+          />
+        )}
 
       {/* 2. Modal: 선호사항 / 메모 수정 */}
       {selectedCustomer && (

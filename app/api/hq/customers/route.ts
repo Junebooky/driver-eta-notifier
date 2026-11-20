@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { requireHqAdmin } from '@/lib/auth/serverAuth';
 import { HqCustomer, CustomerContact } from '@/types/customerHq';
+import {readPersistedCustomerContacts,updateContactMemoById} from '@/lib/customers/contactMemo';
 import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
 
 export const dynamic = 'force-dynamic';
@@ -488,6 +489,45 @@ export async function PUT(req: NextRequest) {
   } catch (err: any) {
     console.error('[HQ Customers PUT] Unhandled error:', err);
     return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
+  }
+}
+
+/**
+ * PATCH: Update exactly one contact's internal memo. Keep company-wide notes,
+ * other contacts and all other pricing_preset keys intact.
+ */
+export async function PATCH(req:NextRequest){
+  try{
+    const auth=await requireHqAdmin(req);
+    if(!auth.ok||!auth.session)return NextResponse.json({ok:false,error:auth.error},{status:auth.statusCode});
+    const body=await req.json().catch(()=>null);
+    const id=typeof body?.id==='string'?body.id.trim():'';
+    const contactId=typeof body?.contactId==='string'?body.contactId.trim():'';
+    const memo=body?.memo;
+    if(!id||!contactId||typeof memo!=='string'||memo.length>3000){
+      return NextResponse.json({ok:false,error:'고객사·담당자 ID와 3,000자 이내 메모를 입력해 주세요.'},{status:400});
+    }
+    const {data:row,error:readError}=await supabaseAdmin.from('customers')
+      .select('id,pricing_preset,contact_person,phone,email,updated_at')
+      .eq('id',id).maybeSingle();
+    if(readError)return NextResponse.json({ok:false,error:readError.message},{status:500});
+    if(!row)return NextResponse.json({ok:false,error:'고객사를 찾을 수 없습니다.'},{status:404});
+    const preset=row.pricing_preset&&typeof row.pricing_preset==='object'
+      ?row.pricing_preset as Record<string,unknown>:{};
+    const contacts=readPersistedCustomerContacts({...row,pricing_preset:preset});
+    const updated=updateContactMemoById(contacts,contactId,memo);
+    if(!updated.found)return NextResponse.json({ok:false,error:'해당 담당자를 찾을 수 없습니다.'},{status:404});
+    // Guard against overwriting concurrent changes to contacts or company notes.
+    let write=supabaseAdmin.from('customers')
+      .update({pricing_preset:{...preset,contacts:updated.contacts},updated_at:new Date().toISOString()})
+      .eq('id',id);
+    write=row.updated_at?write.eq('updated_at',row.updated_at):write.is('updated_at',null);
+    const {data:saved,error:writeError}=await write.select('id').maybeSingle();
+    if(writeError)return NextResponse.json({ok:false,error:writeError.message},{status:500});
+    if(!saved)return NextResponse.json({ok:false,error:'다른 관리자가 고객사를 수정했습니다. 새로고침한 뒤 다시 저장해 주세요.'},{status:409});
+    return NextResponse.json({ok:true,contactId,memo});
+  }catch(error){
+    return NextResponse.json({ok:false,error:error instanceof Error?error.message:'메모 저장 오류'},{status:500});
   }
 }
 

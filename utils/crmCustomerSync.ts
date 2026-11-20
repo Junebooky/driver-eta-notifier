@@ -139,6 +139,30 @@ export async function updateHqCustomerInDb(customer: HqCustomer): Promise<boolea
   }
 }
 
+/**
+ * Narrow write path for a single contact note. Other customer fields are never
+ * submitted from the possibly-stale editing form.
+ */
+export async function saveCustomerContactMemoInDb(
+  customerId:string,contactId:string,memo:string,
+):Promise<{ok:boolean;error?:string}>{
+  try{
+    await ensureClientAuth('hq');
+    const response=await fetch('/api/hq/customers',{
+      method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:customerId,contactId,memo}),
+    });
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok||!payload.ok)return {ok:false,error:payload.error||'담당자 메모를 저장하지 못했습니다.'};
+    const fresh=await fetchHqCustomersFromDb();
+    if(!fresh.ok)return {ok:false,error:'메모는 저장됐지만 고객사 목록을 새로고침하지 못했습니다.'};
+    broadcastCrmCustomersUpdate();
+    return {ok:true};
+  }catch(error){
+    return {ok:false,error:error instanceof Error?error.message:'서버 연결을 확인해 주세요.'};
+  }
+}
+
 export interface DeleteHqCustomerResult {
   ok: boolean;
   deletedId?: string;
