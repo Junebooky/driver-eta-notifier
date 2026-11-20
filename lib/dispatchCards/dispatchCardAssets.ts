@@ -39,7 +39,44 @@ export function dispatchCardModelFolder(vehicle: Car): string {
   return modelSlug || vehicle.category.replace(/[^a-z0-9_-]/gi, '');
 }
 
+/** Resolve the DB vehicle to the new kebab-case <brand>/<model> folder under public/images/dispatch-cards/. */
+export function dispatchCardKebabPath(vehicle: Car): string | null {
+  const model = vehicle.model.toLowerCase();
+  if (vehicle.category === 'staria') return 'hyundai/staria-limousine';
+  if (vehicle.category === 'sprinter') {
+    const canonical = findVipVehicle(vehicle.plate);
+    if (canonical?.category === 'sprinter') {
+      return canonical.model.includes('319') ? 'mercedes-benz/sprinter-319-cdi' : 'mercedes-benz/sprinter-519-cdi';
+    }
+    if (model.includes('519')) return 'mercedes-benz/sprinter-519-cdi';
+    if (model.includes('319')) return 'mercedes-benz/sprinter-319-cdi';
+  }
+  if (vehicle.category === 's_class' && model.includes('560')) return 'mercedes-benz/s560';
+  if (vehicle.category === 'carnival') {
+    return /하이|high/.test(model) ? 'kia/carnival-hi-limousine' : 'kia/carnival-limousine';
+  }
+  if (vehicle.category === 'genesis') {
+    if (model.includes('gv80')) return 'genesis/gv80';
+    if (/g90l|lwb|롱휠/.test(model)) return 'genesis/g90-lwb';
+    if (/리무진|limousine/.test(model)) return 'genesis/g90-limousine';
+    if (model.includes('g90')) return 'genesis/g90-standard';
+  }
+  return null;
+}
+
 export function resolveDispatchCardPhotos(vehicle: Car): DispatchCardPhotoSet | null {
+  const kebabBase = dispatchCardKebabPath(vehicle);
+  if (kebabBase) {
+    if (vehicle.plateShort) {
+      const kebabVehicle = sets[`${kebabBase}/${vehicle.plateShort}`];
+      if (kebabVehicle) return { ...kebabVehicle, source: 'vehicle' };
+    }
+    if (kebabBase !== 'mercedes-benz/sprinter-519-cdi') {
+      const kebabModel = sets[kebabBase];
+      if (kebabModel) return { ...kebabModel, source: 'model' };
+    }
+  }
+
   const folder = dispatchCardModelFolder(vehicle);
   const fullPlate = vehicle.plate.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9가-힣]/g, '');
   const keys = [folder + '/' + fullPlate, folder + '/' + vehicle.plateShort];
