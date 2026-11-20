@@ -5,6 +5,7 @@ import {join} from 'node:path';
 import {unzipSync} from 'fflate';
 import {
   createDispatchCardPairZip,shareDispatchCardPngPair,supportsDispatchCardPairShare,
+  DISPATCH_CARD_SHARE_TITLE,DISPATCH_CARD_PAIR_SHARE_TEXT,
 } from '@/utils/shareDispatchCardPng';
 
 const read=(p:string)=>readFileSync(join(process.cwd(),p),'utf8');
@@ -47,6 +48,9 @@ test('native share receives two different PNG attachments in one call',async()=>
     assert.equal(captured.shared?.files?.length,2);
     assert.equal(captured.shared?.files?.[0],files[0]);
     assert.equal(captured.shared?.files?.[1],files[1]);
+    assert.equal(captured.shared?.title,DISPATCH_CARD_SHARE_TITLE);
+    assert.equal(captured.shared?.text,DISPATCH_CARD_PAIR_SHARE_TEXT);
+    assert.doesNotMatch(captured.shared?.title||'',/VIP LIMOUSINE KOREA 배차카드/);
   }finally{
     if(previous)Object.defineProperty(globalThis,'navigator',previous);
     else Reflect.deleteProperty(globalThis,'navigator');
@@ -76,9 +80,18 @@ test('asset manager uses one pair action, requires both current cards, removes n
   assert.match(source,/prepared\.pc\?\.path===bundle\?\.pcInfo\?\.filePath/);
   assert.match(source,/prepared\.mobile\?\.path===bundle\?\.mobileInfo\?\.filePath/);
   assert.match(source,/!bothFilesPrepared\|\|preparing\.pc\|\|preparing\.mobile/);
-  assert.match(source,/두 카드 생성 후 공유/);
+  assert.match(source,/PC·모바일 두 장 생성 후 공유/);
   assert.match(source,/PC·모바일 함께 공유/);
   assert.match(source,/PC·모바일 ZIP 저장/);
+  assert.equal((source.match(/<HqIconButton/g)||[]).length,3);
+  assert.match(source,/headerActions=\{<>/);
+  assert.match(source,/<Pencil className="size-4"/);
+  assert.match(source,/<Share2 className="size-4"/);
+  assert.doesNotMatch(source,/ImageIcon className/);
+  assert.doesNotMatch(source,/footer=\{<HqButton variant="secondary" onClick=\{onClose\}>닫기/);
+  const modal=read('components/hq/ui/HqModal.tsx');
+  assert.match(modal,/headerActions\?: React.ReactNode/);
+  assert.match(modal,/\{headerActions\}/);
   assert.match(source,/기사 정보·사진 변경 시, 배차카드를 다시 갱신해 주세요/);
   assert.doesNotMatch(source,/PC·모바일 사용 가능/);
   assert.doesNotMatch(source,/PNG 이미지 공유/);
