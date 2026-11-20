@@ -42,6 +42,7 @@ import {
   CRM_CUSTOMERS_UPDATE_EVENT,
 } from '@/utils/crmCustomerSync';
 import { HqCustomer } from '@/types/customerHq';
+import { HqSearchInput } from '@/components/hq/ui';
 
 export type HqDispatchTabKey = 'action' | 'today' | 'tomorrow' | 'all' | 'past';
 
@@ -606,16 +607,15 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
 
       {/* 3. Search Bar (White Background) + Filter Icon Button */}
       <div className="pt-3 pb-2 flex items-center gap-2 text-xs">
-        <div className="relative flex-1 min-w-0">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="고객사, 승객, 목적지 검색"
-            className="h-12 w-full rounded-[16px] border border-[#E1E7F0]/25 bg-white pl-10 pr-4 text-[14px] font-medium text-[#17233B] placeholder:text-[#95A3B9] shadow-[0_5px_16px_rgba(35,49,78,0.045),0_2px_5px_rgba(35,49,78,0.02)] outline-none transition-shadow hover:shadow-[0_6px_18px_rgba(35,49,78,0.06)] focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20"
-          />
-        </div>
+        <HqSearchInput
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onClear={() => setSearchQuery('')}
+          placeholder="고객사, 승객, 목적지 검색"
+          containerClassName="flex-1"
+          className="sm:h-12 rounded-[16px] border border-[#E1E7F0]/25 shadow-[0_5px_16px_rgba(35,49,78,0.045),0_2px_5px_rgba(35,49,78,0.02)] hover:shadow-[0_6px_18px_rgba(35,49,78,0.06)]"
+        />
 
         <button
           type="button"

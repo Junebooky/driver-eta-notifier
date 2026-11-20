@@ -97,4 +97,9 @@ test('Step 5 removes redundant verification cards, groups routes by date in 2 co
   assert.match(placeSearch,/hq-place-search-input/);
   assert.match(placeSearch,/placeholder:text-\[11px\]/);
   assert.match(css,/input\.hq-place-search-input.*placeholder|input\.hq-place-search-input:not\(:focus\):placeholder-shown/);
+
+  const flightHint=r('components/hq/email/HqFlightInfoHint.tsx');
+  assert.match(flightHint,/const hasDirection = Boolean\(direction\);/);
+  assert.match(flightHint,/\[normalizedCode, queryType, date, role, hasDirection\]/);
+  assert.doesNotMatch(flightHint,/\[normalizedCode, queryType, date, role, direction\]/);
 });

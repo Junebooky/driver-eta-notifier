@@ -13,7 +13,6 @@ import {
   ChevronDown,
   ChevronUp,
   Building2,
-  Search,
   Users,
   X,
   Globe,
@@ -41,6 +40,7 @@ import {
   getVehicleImage,
 } from '@/utils/vehicleData';
 import { HqDispatchTimeField } from './ui/HqDispatchTimeField';
+import { HqSearchInput } from '@/components/hq/ui';
 import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
 import { HqCustomer } from '@/types/customerHq';
 import {
@@ -1355,25 +1355,15 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               {/* Top Bar: Search Input & Category Pills */}
               <div className="flex flex-col gap-2 pb-2.5 border-b border-slate-100">
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 relative">
-                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      value={vehicleSearchQuery}
-                      onChange={(e) => setVehicleSearchQuery(e.target.value)}
-                      placeholder="차량명 또는 차량번호 검색"
-                      className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:bg-white"
-                    />
-                    {vehicleSearchQuery && (
-                      <button
-                        type="button"
-                        onClick={() => setVehicleSearchQuery('')}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
+                  <HqSearchInput
+                    type="text"
+                    value={vehicleSearchQuery}
+                    onChange={(e) => setVehicleSearchQuery(e.target.value)}
+                    onClear={() => setVehicleSearchQuery('')}
+                    placeholder="차량명 또는 차량번호 검색"
+                    containerClassName="flex-1"
+                    className="sm:h-9 rounded-lg border border-slate-200/80 bg-slate-50 shadow-none focus:bg-white"
+                  />
 
                   <div className="flex items-center gap-1 shrink-0">
                     {(
@@ -1544,25 +1534,14 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             >
               {/* Top Search Area */}
               <div className="pb-2.5 border-b border-slate-100">
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={driverSearchQuery}
-                    onChange={(e) => setDriverSearchQuery(e.target.value)}
-                    placeholder="기사명 또는 연락처 검색"
-                    className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:bg-white"
-                  />
-                  {driverSearchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setDriverSearchQuery('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
+                <HqSearchInput
+                  type="text"
+                  value={driverSearchQuery}
+                  onChange={(e) => setDriverSearchQuery(e.target.value)}
+                  onClear={() => setDriverSearchQuery('')}
+                  placeholder="기사명 또는 연락처 검색"
+                  className="sm:h-9 rounded-lg border border-slate-200/80 bg-slate-50 shadow-none focus:bg-white"
+                />
               </div>
 
               {/* Unassign Option */}

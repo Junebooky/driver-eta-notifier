@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 const sidebar = readFileSync(new URL('../components/hq/HqSidebar.tsx', import.meta.url),'utf8');
 const header = readFileSync(new URL('../components/hq/HqHeader.tsx', import.meta.url),'utf8');
+const css = readFileSync(new URL('../app/globals.css', import.meta.url),'utf8');
 
 test('all configured HQ navigation tabs share one quiet active state', () => {
   assert.match(sidebar,/const activeNavClass = 'bg-\[#F3F7FF\] text-\[#17233B\]/);
@@ -29,5 +30,7 @@ test('HQ header controls use light tooltips without removing their actions',()=>
   assert.match(header,/onOpenQuoteModal\(\)/);
   assert.match(header,/onRefresh\(\)/);
   assert.match(header,/onOpenMobileMenu\(\)/);
+  assert.match(header,/className="flex items-center gap-2 lg:hidden"/);
+  assert.match(css,/\.hq-ui-button\.lg\\:hidden,\s*\.hq-ui-icon-button\.lg\\:hidden\s*\{\s*display:\s*none;\s*\}/);
   assert.match(header,/onOpenAdminLogin\(\)/);
 });

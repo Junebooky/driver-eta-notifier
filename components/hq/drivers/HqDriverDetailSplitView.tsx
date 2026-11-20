@@ -468,8 +468,8 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
               </div>
             </div>
 
-            {/* Compact language chips and quick actions on one balanced row. */}
-            <div className="flex flex-wrap items-center gap-2 border-t border-slate-200/60 pt-2.5">
+            {/* Compact language chips and quick actions aligned to opposite ends. */}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/60 pt-2.5">
               {/* 언어 뱃지 */}
               <div className="inline-flex flex-wrap items-center gap-1.5">
                 <span className="bg-white border border-slate-200/80 px-2 py-0.5 rounded-full text-[11px] font-medium text-slate-700 shadow-2xs">
@@ -482,8 +482,8 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                 )}
               </div>
 
-              {/* 액션 아이콘: 전화 & VIP 의전카드 나란히 */}
-              <div className="ml-0.5 inline-flex shrink-0 items-center gap-1">
+              {/* 액션 아이콘: 우측 끝 배치 (전화 & VIP 의전카드) */}
+              <div className="ml-auto inline-flex shrink-0 items-center gap-1">
                 {/* 1. 전화 걸기 아이콘 */}
                 <div className="relative group/phone inline-flex items-center justify-center">
                   {getDialablePhoneHref(activeDriver.phone) ? (

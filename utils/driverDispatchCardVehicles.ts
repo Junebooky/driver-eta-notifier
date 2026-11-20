@@ -183,9 +183,10 @@ export interface DriverCardVehicleGroup {
   missing:number;
   photos_missing:number;
 }
-const GROUP_LABELS:Record<DriverCardGroupKey,string>={
+export const DRIVER_CARD_GROUP_LABELS:Record<DriverCardGroupKey,string>={
   sprinter:'스프린터',van:'밴',sedan:'세단',suv:'SUV',other:'기타 차량',
 };
+const GROUP_LABELS=DRIVER_CARD_GROUP_LABELS;
 export function groupDriverCardVehicles(
   slots:readonly DispatchCardCoverageSlot[],
   vehicles:readonly VipRealVehicle[],

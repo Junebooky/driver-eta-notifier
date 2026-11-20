@@ -119,7 +119,7 @@ export function HqSearchSelect({
               <input ref={searchInput} type="search" aria-label={`${label} 검색`}
                 value={search} onChange={event => setSearch(event.target.value)}
                 placeholder="이름 또는 번호 검색"
-                className="min-h-10 w-full rounded-[11px] bg-[#F7F9FC] py-2 pl-9 pr-8 text-[12px] font-medium text-[#17233B] outline-none focus:ring-2 focus:ring-[#1E60F3]/15"/>
+                className="hq-ui-search-input hq-ui-search-inline min-h-10 w-full rounded-[11px] bg-[#F7F9FC] py-2 pl-9 pr-8 text-[15px] sm:text-[14px] font-medium text-[#17233B] placeholder:text-[14px] sm:placeholder:text-[14px] outline-none focus:ring-2 focus:ring-[#1E60F3]/15"/>
               {search && <button type="button" onClick={() => setSearch('')} aria-label="검색 지우기"
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#94A1B2]"><X size={14}/></button>}
             </div>

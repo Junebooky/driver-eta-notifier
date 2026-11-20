@@ -5,7 +5,6 @@ import { useSearchParams } from 'next/navigation';
 import {
   Mail,
   ArrowLeft,
-  Search,
   RefreshCw,
   Plus,
   Send,
@@ -16,8 +15,8 @@ import {
   AlertCircle,
   CheckCircle2,
   Lock,
-  X,
 } from 'lucide-react';
+import { HqSearchInput } from '@/components/hq/ui';
 import { HqBooking } from '@/types/hq';
 import {
   HqEmailSummary,
@@ -1244,29 +1243,17 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
 
           {/* Search Input */}
           <div className="bg-white px-4 pb-4">
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="보낸 사람, 제목 또는 내용 검색"
-                className="h-11 w-full rounded-[15px] bg-white pl-9 pr-7 text-[13px] font-medium text-[#17233B] placeholder:text-[#95A3B9] shadow-[0_4px_14px_rgba(35,49,78,0.045)] outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptics.lightTap();
-                    setSearchQuery('');
-                  }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5 rounded-md hover:bg-slate-100 transition-colors"
-                  title="검색어 지우기"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
+            <HqSearchInput
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onClear={() => {
+                haptics.lightTap();
+                setSearchQuery('');
+              }}
+              placeholder="보낸 사람, 제목 또는 내용 검색"
+              className="rounded-[15px]"
+            />
           </div>
 
           {/* Scrollable Email Cards List */}

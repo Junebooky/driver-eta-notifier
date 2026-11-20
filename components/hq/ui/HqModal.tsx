@@ -110,7 +110,7 @@ export function HqModal({ isOpen, title, subtitle, icon, children, footer, heade
           </div>
           {headerActions && subtitle && <p className="mt-1.5 text-[12px] font-medium text-[#73839D]">{subtitle}</p>}
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-5 sm:p-6">{children}</div>
         {footer && <div className="flex shrink-0 items-center justify-end gap-2 bg-white px-5 py-4 sm:px-6">{footer}</div>}
       </div>
     </div>,

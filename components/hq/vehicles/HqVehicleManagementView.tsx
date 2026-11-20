@@ -7,7 +7,6 @@ import {
   Car,
   Truck,
   Bus,
-  Search,
   Check,
   X,
   ChevronRight,
@@ -50,6 +49,7 @@ import type { FleetAvailabilityResult } from '@/utils/availabilityEngine';
 import { VEHICLE_STATUS_LABELS } from '@/utils/fleetVehicleStatus';
 import { haptics } from '@/utils/haptics';
 import { NewVehicleModal, NewVehicleFormData } from './NewVehicleModal';
+import { HqSearchInput } from '@/components/hq/ui';
 
 export interface HqVehicleManagementViewProps {
   initialSearchQuery?: string;
@@ -883,25 +883,15 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
             </div>
 
             {/* Search Input */}
-            <div className="relative min-w-0 flex-1 sm:w-60 sm:flex-none">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[#95A3B9]" />
-              <input
-                type="text"
-                placeholder="차량명이나 번호로 검색"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-11 w-full rounded-[14px] border border-[#E1E7F0]/25 bg-white pl-10 pr-8 text-[13px] font-medium text-[#17233B] placeholder:text-[#95A3B9] shadow-[0_4px_14px_rgba(35,49,78,0.045)] outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-[#95A3B9] hover:text-[#4D607C]"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
+            <HqSearchInput
+              type="text"
+              placeholder="차량명이나 번호로 검색"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onClear={() => setSearchQuery("")}
+              containerClassName="flex-1 sm:w-60 sm:flex-none"
+              className="border border-[#E1E7F0]/25"
+            />
           </div>
         </div>
       </div>

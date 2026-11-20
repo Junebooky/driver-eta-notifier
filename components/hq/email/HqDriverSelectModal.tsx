@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Search, Check, Loader2, Globe2, UserRound, Phone, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Check, Loader2, Globe2, UserRound, Phone, ChevronLeft, ChevronRight } from 'lucide-react';
+import { HqSearchInput } from '@/components/hq/ui';
 import { haptics } from '@/utils/haptics';
 import { HqDriverSummary } from '@/types/driverHq';
 import { useHqDrivers } from '@/utils/useHqDrivers';
@@ -176,29 +177,19 @@ export const HqDriverSelectModal: React.FC<HqDriverSelectModalProps> = ({
           </div>
 
           {/* Search Box */}
-          <div className="flex h-[52px] items-center gap-3 rounded-[16px] bg-white px-4 shadow-[0_5px_16px_rgba(35,49,78,0.045),0_2px_5px_rgba(35,49,78,0.02)] focus-within:ring-2 focus-within:ring-[#1E60F3]/20 transition-shadow">
-            <Search className="h-4 w-4 shrink-0 text-slate-400" />
-            <input
-              ref={searchRef}
-              type="search"
-              autoComplete="off"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="기사명, 소속, 연락처 검색"
-              aria-label="기사님 검색"
-              className="min-w-0 w-full bg-transparent text-sm font-medium text-slate-800 outline-none placeholder:text-slate-400"
-            />
-            {search && (
-              <button
-                type="button"
-                aria-label="검색어 지우기"
-                onClick={() => { setSearch(''); searchRef.current?.focus(); }}
-                className="p-1 text-slate-400 hover:text-slate-700"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
+          <HqSearchInput
+            ref={searchRef}
+            autoComplete="off"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            onClear={() => {
+              setSearch('');
+              searchRef.current?.focus();
+            }}
+            placeholder="기사명, 소속, 연락처 검색"
+            aria-label="기사님 검색"
+            className="sm:h-[52px] rounded-[16px]"
+          />
 
           {/* Filter Chips & Count */}
           <div className="flex items-center justify-between gap-2 pt-0.5">

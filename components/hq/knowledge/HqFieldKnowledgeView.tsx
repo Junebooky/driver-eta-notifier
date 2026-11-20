@@ -4,7 +4,6 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import {
   BookOpen,
-  Search,
   Plus,
   Trash2,
   ChevronLeft,
@@ -20,7 +19,6 @@ import {
   Info,
   CheckCircle2,
   Camera,
-  X,
   Clock,
   Sparkles,
 } from 'lucide-react';
@@ -33,7 +31,7 @@ import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 import { HqModal } from '@/components/hq/ui/HqModal';
 import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
 import { isValidFieldKnowledgeImageUrl } from '@/utils/hqKnowledgeImageUrl';
-import {HqButton,HqCard,HqBadge,HqInput,HqSegmentedTabs} from '@/components/hq/ui';
+import {HqButton,HqCard,HqBadge,HqInput,HqSearchInput,HqSegmentedTabs} from '@/components/hq/ui';
 import {HqFieldKnowledgeEditor} from './HqFieldKnowledgeEditor';
 import {emptyFieldKnowledgeGuide,validateFieldKnowledgeGuide} from '@/utils/fieldKnowledgeGuide';
 import {uploadKnowledgePhoto,cleanupUncommittedKnowledgePhotos,type UploadedKnowledgeImage} from '@/utils/fieldKnowledgeImageUpload';
@@ -312,21 +310,14 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
 
         {/* Search Input & Add Button */}
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <div className="relative flex-1 sm:w-72">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <HqInput type="search" aria-label="현장 지식 검색" value={searchQuery}
-              onChange={event=>setSearchQuery(event.target.value)}
-              placeholder="현장명, 주소, 안내사항 검색" className="w-full pl-10 pr-9"/>
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
+          <HqSearchInput
+            aria-label="현장 지식 검색"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            onClear={() => setSearchQuery('')}
+            placeholder="현장명, 주소, 안내사항 검색"
+            containerClassName="flex-1 sm:w-72"
+          />
 
           <HqButton variant="secondary" size="sm" onClick={openLegacyDialog}
             title="기존 브라우저 지식을 검토한 뒤 수동 이전">

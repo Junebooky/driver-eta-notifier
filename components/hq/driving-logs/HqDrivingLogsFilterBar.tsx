@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Search, X } from 'lucide-react';
 import { HqDrivingLogStatus } from '@/types/drivingLogHq';
+import { HqSearchInput } from '@/components/hq/ui';
 import { HqDateRangePicker } from '@/components/hq/ui/HqDateRangePicker';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 import { type HqDateRange } from '@/utils/hqDateRange';
@@ -57,15 +57,15 @@ export const HqDrivingLogsFilterBar: React.FC<HqDrivingLogsFilterBarProps> = ({
             ]} />
         </div>
         <div className="flex w-full items-center gap-2 sm:w-auto">
-          <div className="relative min-w-0 flex-1 sm:w-60">
-            <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#94A1B2]" />
-            <input type="search" value={searchQuery} onChange={event => onSearchChange(event.target.value)}
-              placeholder="고객명, 기사명, 차량번호 검색"
-              aria-label="운행일지 검색"
-              className="min-h-10 w-full rounded-[13px] bg-[#F7F9FC] py-2 pl-9 pr-8 text-[12px] font-medium text-[#253552] outline-none placeholder:text-[#A2AEBD] focus:bg-white focus:ring-2 focus:ring-[#1E60F3]/15" />
-            {searchQuery && <button type="button" aria-label="검색어 지우기" onClick={() => onSearchChange('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#94A1B2]"><X size={13}/></button>}
-          </div>
+          <HqSearchInput
+            value={searchQuery}
+            onChange={(event) => onSearchChange(event.target.value)}
+            onClear={() => onSearchChange('')}
+            placeholder="고객명, 기사명, 차량번호 검색"
+            aria-label="운행일지 검색"
+            containerClassName="flex-1 sm:w-60"
+            className="sm:min-h-10 sm:h-10 rounded-[13px] bg-[#F7F9FC] focus:bg-white shadow-none"
+          />
           <button type="button" onClick={onExportExcel}
             aria-label="필터링된 운행일지 Excel 다운로드" title="화면에 표시된 필터 결과만 다운로드"
             className="flex size-10 shrink-0 items-center justify-center rounded-[13px] bg-[#F7F9FC] transition-colors hover:bg-[#EEF2F8]">

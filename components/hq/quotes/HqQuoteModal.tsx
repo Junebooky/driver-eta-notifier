@@ -29,8 +29,8 @@ import {
   Plus,
   Minus,
   ExternalLink,
-  Search,
 } from 'lucide-react';
+import { HqSearchInput } from '@/components/hq/ui';
 import { HqQuoteItem, QuoteCalculationInput } from '@/types/quoteHq';
 import { OfficialServiceCategory } from '@/types/officialPricingHq';
 import {
@@ -1060,29 +1060,17 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                 </div>
 
                 {/* Vehicle Search Input (White background, Cobalt Blue hover border, Mobile optimized) */}
-                <div className="w-full h-10 sm:h-11 bg-white border border-slate-200 hover:border-[#1E60F3] focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-[#1E60F3]/15 rounded-xl px-3.5 flex items-center gap-2.5 transition-all shadow-2xs">
-                  <Search className="w-4 h-4 text-slate-400 shrink-0 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={vehicleSearchQuery}
-                    onChange={(e) => setVehicleSearchQuery(e.target.value)}
-                    placeholder="차량명, 인승, 등급으로 검색해보세요"
-                    className="w-full bg-transparent text-xs sm:text-sm font-semibold text-slate-900 placeholder:text-xs placeholder:text-slate-400 outline-none"
-                  />
-                  {vehicleSearchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        haptics.lightTap();
-                        setVehicleSearchQuery('');
-                      }}
-                      aria-label="검색어 지우기"
-                      className="p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
+                <HqSearchInput
+                  type="text"
+                  value={vehicleSearchQuery}
+                  onChange={(e) => setVehicleSearchQuery(e.target.value)}
+                  onClear={() => {
+                    haptics.lightTap();
+                    setVehicleSearchQuery('');
+                  }}
+                  placeholder="차량명, 인승, 등급으로 검색해보세요"
+                  className="rounded-xl border border-slate-200 hover:border-[#1E60F3] focus-visible:border-[#1E60F3]"
+                />
 
                 {/* Multi-select helper banner when vehicleCount >= 2 */}
                 {vehicleCount >= 2 && (

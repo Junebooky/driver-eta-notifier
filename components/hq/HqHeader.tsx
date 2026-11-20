@@ -84,8 +84,8 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
   return (
     <header className="sticky top-0 z-40 bg-white px-3.5 shadow-[0_1px_0_rgba(225,231,240,0.5)] sm:px-6">
       <div className="flex items-center justify-between gap-2.5 h-14 sm:h-16">
-        {/* Left: Mobile Menu Button (lg:hidden) */}
-        <div className="flex items-center gap-2">
+        {/* Left: Mobile Menu Button (mobile/tablet only) */}
+        <div className="flex items-center gap-2 lg:hidden">
           {onOpenMobileMenu && (
             <HqIconButton variant="subtle"
               type="button"
@@ -93,7 +93,6 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
                 haptics.lightTap();
                 onOpenMobileMenu();
               }}
-              className="lg:hidden"
               aria-label="전체 메뉴 열기"
             >
               <Menu className="w-4 h-4" />

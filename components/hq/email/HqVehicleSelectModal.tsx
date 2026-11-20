@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, CarFront, Check, Search } from 'lucide-react';
+import { ArrowRight, CarFront, Check } from 'lucide-react';
 import type { AvailableVehicleItem } from '@/utils/availabilityEngine';
 import { VIP_REAL_VEHICLES, getVehicleImage } from '@/utils/vehicleData';
 import { useHqFleetRegistry } from '@/hooks/useHqFleetRegistry';
 import { emailVehicleChoices } from '@/utils/emailWorkflowReview';
-import { HqButton, HqInput, HqSegmentedTabs } from '@/components/hq/ui';
+import { HqButton, HqSearchInput, HqSegmentedTabs } from '@/components/hq/ui';
 import { HqModal } from '@/components/hq/ui/HqModal';
 import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
 
@@ -62,9 +62,13 @@ const VehiclePickerContent: React.FC<HqVehicleSelectModalProps> = ({
   return <HqModal isOpen={isOpen} onClose={close} title="차량 선택" subtitle={`${slotNumber}호차 · 차량관리 등록부`}
     className="max-w-lg" footer={<p className="w-full text-center text-xs text-[#73839D]">등록된 실차만 표시 · 일정 확인 후 배정할 수 있습니다.</p>}>
     <div className="space-y-4">
-      <div className="relative"><Search className="pointer-events-none absolute left-3.5 top-3.5 size-4 text-slate-400"/>
-        <HqInput type="search" value={query} onChange={event => setQuery(event.target.value)} aria-label="차량 검색" placeholder="차종, 차량번호 검색" className="w-full" style={{ paddingLeft: 40 }} />
-      </div>
+      <HqSearchInput
+        value={query}
+        onChange={event => setQuery(event.target.value)}
+        onClear={() => setQuery('')}
+        aria-label="차량 검색"
+        placeholder="차종, 차량번호 검색"
+      />
       <HqSegmentedTabs tabs={FILTERS} value={category} onValueChange={setCategory} aria-label="차종 필터" />
       <div className="flex items-center justify-between gap-3 text-xs text-[#61728A]">
         <label className="flex min-h-10 items-center gap-2"><input type="checkbox" checked={availableOnly} onChange={event => setAvailableOnly(event.target.checked)}/>예약 가능한 차량만</label>

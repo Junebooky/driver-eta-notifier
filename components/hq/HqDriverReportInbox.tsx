@@ -1,6 +1,7 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {Upload,Download,RefreshCw,ChevronRight,Check,Search} from 'lucide-react';
+import {Upload,Download,RefreshCw,ChevronRight,Check} from 'lucide-react';
+import {HqSearchInput} from '@/components/hq/ui';
 import {HqExcelSectionIcon} from './HqExcelSectionIcon';
 import {HqExcelWorkbookView,type ReportExcelFocus} from './HqExcelWorkbookView';
 import type {DriverReportSubmission,ReportChatMessage} from '@/types/driverReportChat';
@@ -145,11 +146,15 @@ export function HqDriverReportInbox() {
        className={'h-8 rounded-lg px-3.5 sm:px-4 text-[13px] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/40 '+(active?'bg-white text-slate-900 font-semibold shadow-xs':'text-slate-500 font-medium hover:text-slate-800')}>{item.label}</button>;
     })}
    </div>
-   <div className="relative w-full sm:w-[280px] lg:w-[320px]">
-    <Search size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"/>
-    <input aria-label="최근 보고 검색" type="search" placeholder="기사명, 차량번호, 고객사 검색" value={search} onChange={e=>setSearch(e.target.value)}
-     className="h-10 w-full min-w-0 rounded-xl border border-slate-200/90 bg-white pl-9 pr-3 text-[13px] text-slate-800 placeholder:text-slate-400 outline-none transition-all hover:border-slate-300 focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/10"/>
-   </div>
+   <HqSearchInput
+    aria-label="최근 보고 검색"
+    placeholder="기사명, 차량번호, 고객사 검색"
+    value={search}
+    onChange={e=>setSearch(e.target.value)}
+    onClear={()=>setSearch('')}
+    containerClassName="w-full sm:w-[280px] lg:w-[320px]"
+    className="sm:h-10 rounded-xl border border-slate-200/90 shadow-none"
+   />
   </div>
   <div className="space-y-2.5">
    {reports.filter(s=>reportMatchesFilter(s.excel_status,filter)&&(!search||[s.parsed.draft.driver,s.parsed.draft.customer,s.parsed.draft.plate,s.parsed.draft.date].some(v=>v.includes(search)))).map(report=>{

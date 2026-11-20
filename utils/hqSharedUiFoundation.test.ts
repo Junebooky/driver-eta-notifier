@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { HqButton, HqIconButton, HqCard, HqInput, HqBadge, HqSegmentedTabs } from '../components/hq/ui/index';
+import { HqButton, HqIconButton, HqCard, HqInput, HqSearchInput, HqBadge, HqSegmentedTabs } from '../components/hq/ui/index';
 
 const r=(path:string)=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 const css=r('app/globals.css');
@@ -23,6 +23,13 @@ test('shared primitives expose centralized HQ style variants without tying to bu
   assert.match(card,/data-tone="muted"/);
   const field=renderToStaticMarkup(React.createElement(HqInput,{type:'text',placeholder:'받는 분'}));
   assert.match(field,/hq-ui-field/);
+  const search=renderToStaticMarkup(React.createElement(HqSearchInput,{value:'김기사',onChange:()=>{},onClear:()=>{},placeholder:'기사명 검색'}));
+  assert.match(search,/hq-ui-search-input/);
+  assert.match(search,/text-\[15px\]/);
+  assert.match(search,/sm:text-\[14px\]/);
+  assert.match(search,/placeholder:text-\[14px\]/);
+  assert.match(search,/sm:placeholder:text-\[14px\]/);
+  assert.match(search,/aria-label="검색어 지우기"/);
   const badge=renderToStaticMarkup(React.createElement(HqBadge,{tone:'warning'},'확인 필요'));
   assert.match(badge,/data-tone="warning"/);
   const tabs=renderToStaticMarkup(React.createElement(HqSegmentedTabs,{'aria-label':'분류',tabs:[{id:'all',label:'전체'},{id:'car',label:'세단'}],value:'car',onValueChange:()=>{}}));
@@ -35,7 +42,7 @@ test('one CSS token controls HQ colors, surfaces, radii and shadows, no global b
   for(const token of ['--hq-accent: #1E60F3','--hq-surface: #FFFFFF','--hq-ink: #17233B','--hq-shadow-card','--hq-shadow-dialog','--hq-radius-control']){
     assert.ok(css.includes(token),token);
   }
-  for(const className of ['.hq-ui-card','.hq-ui-button','.hq-ui-field','.hq-ui-badge','.hq-ui-tabs','.hq-ui-tooltip','.hq-ui-modal-surface']){
+  for(const className of ['.hq-ui-card','.hq-ui-button','.hq-ui-field','.hq-ui-search-input','.hq-ui-badge','.hq-ui-tabs','.hq-ui-tooltip','.hq-ui-modal-surface']){
     assert.ok(css.includes(className),className);
   }
   assert.match(css,/HQ A-plan design tokens & primitives \(not applied to driver Cockpit or Settings\)/);

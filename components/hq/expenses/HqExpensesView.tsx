@@ -4,7 +4,6 @@ import { useReportingRefresh } from '@/hooks/useReportingRefresh';
 import React, { useState, useMemo, useSyncExternalStore } from 'react';
 import {
   Receipt,
-  Search,
   CheckCircle2,
   AlertCircle,
   Clock,
@@ -37,6 +36,7 @@ import { haptics } from '@/utils/haptics';
 import { nextPendingReceiptId } from '@/utils/expenseReview';
 import HqReceiptReviewWorkspace from './HqReceiptReviewWorkspace';
 import { HqBooking } from '@/types/hq';
+import { HqSearchInput } from '@/components/hq/ui';
 
 export interface HqExpensesViewProps {
   initialSearchQuery?: string;
@@ -301,25 +301,14 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
               </div>
             </div>
 
-            <div className="relative w-full sm:w-64">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="기사 · 차량 · 거래처 검색"
-                className="h-11 w-full rounded-[14px] bg-white pl-9 pr-8 text-[13px] font-medium text-[#17233B] placeholder:text-[#95A3B9] shadow-[0_4px_14px_rgba(35,49,78,0.045)] outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
+            <HqSearchInput
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onClear={() => setSearchQuery('')}
+              placeholder="기사 · 차량 · 거래처 검색"
+              containerClassName="w-full sm:w-64"
+            />
 
             <button
               type="button"

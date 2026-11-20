@@ -86,37 +86,58 @@ export const HqFlightInfoHint: React.FC<HqFlightInfoHintProps> = ({
     scheduledArrival,
     scheduledDeparture,
   });
+  const hasDirection = Boolean(direction);
   const queryType: FlightType = direction?.queryType || (role === 'departure' ? 'departure' : 'arrival');
   const [liveHint, setLiveHint] = useState<EmailFlightHintInfo | null>(null);
 
   useEffect(() => {
-    if (!normalizedCode || role === 'connection' || !direction) {
-      setLiveHint(null);
+    const applyLiveHint = (next: EmailFlightHintInfo | null) => {
+      setLiveHint((prev) => {
+        if (prev === next) return prev;
+        if (
+          prev &&
+          next &&
+          prev.summaryText === next.summaryText &&
+          prev.isLiveApi === next.isLiveApi &&
+          prev.source === next.source
+        ) {
+          return prev;
+        }
+        return next;
+      });
+    };
+
+    if (!normalizedCode || role === 'connection' || !hasDirection) {
+      applyLiveHint(null);
       return;
     }
     let active = true;
     const cacheKey = `${queryType}:${normalizedCode}`;
-    const cached = liveFlightCache.get(cacheKey);
-    if (cached) {
+    if (liveFlightCache.has(cacheKey)) {
+      const cached = liveFlightCache.get(cacheKey);
+      if (!cached) {
+        applyLiveHint(null);
+        return;
+      }
       const matched = (date && cached.candidates.find(c => c.flightDate === date)) || cached.flight;
-      setLiveHint(matched ? formatLiveFlightHint(matched) : null);
+      applyLiveHint(matched ? formatLiveFlightHint(matched) : null);
       return;
     }
 
     fetchFlightLookup(normalizedCode, queryType).then((payload) => {
       if (!active) return;
       if (!payload) {
-        setLiveHint(null);
+        applyLiveHint(null);
         return;
       }
       const matched = (date && payload.candidates.find(c => c.flightDate === date)) || payload.flight;
-      setLiveHint(matched ? formatLiveFlightHint(matched) : null);
+      applyLiveHint(matched ? formatLiveFlightHint(matched) : null);
     });
 
     return () => {
       active = false;
     };
-  }, [normalizedCode, queryType, date, role, direction]);
+  }, [normalizedCode, queryType, date, role, hasDirection]);
 
   if (!normalizedCode || role === 'connection') return null;
 

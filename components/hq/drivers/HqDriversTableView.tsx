@@ -3,7 +3,6 @@
 import React, { Fragment, useCallback, useEffect, useState, useMemo } from 'react';
 import {
   Users,
-  Search,
   Plus,
   MapPin,
   ChevronDown,
@@ -23,7 +22,7 @@ import { haptics } from '@/utils/haptics';
 import { formatPhoneNumber } from '@/utils/formatters';
 import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
 import { summarizeDriverCardCoverage } from '@/utils/driverDispatchCardVehicles';
-import { HqButton, HqBadge, HqCard } from '@/components/hq/ui';
+import { HqButton, HqBadge, HqCard, HqSearchInput } from '@/components/hq/ui';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 import { HqDriverCardVehicleGroups } from './HqDriverCardVehicleGroups';
 import { HqDriverCardPickerModal } from './HqDriverCardPickerModal';
@@ -249,15 +248,15 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
-        {/* Quick Add Driver Action */}
-        <button
-          type="button"
-          onClick={onOpenAddDriver}
-          className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[14px] bg-[#1E60F3] px-4 text-[12px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-colors hover:bg-[#1757DC]"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>기사 등록</span>
-        </button>
+          {/* Quick Add Driver Action */}
+          <button
+            type="button"
+            onClick={onOpenAddDriver}
+            className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[14px] bg-[#1E60F3] px-4 text-[12px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-colors hover:bg-[#1757DC]"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>기사 등록</span>
+          </button>
         </div>
       </div>
 
@@ -359,90 +358,92 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
 
         {/* Right: Search */}
         <div className="flex w-full items-center gap-2.5 sm:w-auto">
-          {/* Search Bar */}
-          <div className="relative w-full sm:w-64">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              placeholder="기사명, 차종, 연락처로 검색"
-              className="hq-drivers-search h-10 w-full pl-9 pr-3.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-[11px] sm:placeholder:text-xs placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1E60F3] focus:bg-white transition-all shadow-2xs"
-            />
-          </div>
+          <HqSearchInput
+            type="text"
+            containerClassName="w-full sm:w-64"
+            aria-label="기사명 차종 연락처 검색"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
+            onClear={() => {
+              setSearchQuery('');
+              setCurrentPage(1);
+            }}
+            placeholder="기사명, 차종, 연락처로 검색"
+            className="sm:h-10"
+          />
         </div>
       </div>
 
       {/* Mobile: each driver opens a full detail view; the card action stays separate. */}
       <section className="space-y-3 px-4 pb-5 lg:hidden" aria-label="모바일 기사 목록">
-        <label className="flex min-h-11 items-center gap-2.5 rounded-[13px] bg-[#F6F8FA] px-3.5">
-          <Search aria-hidden="true" className="size-4 shrink-0 text-[#8795A7]"/>
-          <input type="search" aria-label="기사 이름 연락처 검색"
-            value={searchQuery} onChange={event=>{setSearchQuery(event.target.value);setCurrentPage(1);}}
-            placeholder="기사 이름, 연락처 검색"
-            className="min-w-0 flex-1 bg-transparent py-3 text-[13px] text-[#243750] outline-none placeholder:text-[#9AA6B5]"/>
-        </label>
+        <HqSearchInput
+          aria-label="기사 이름 연락처 검색"
+          value={searchQuery}
+          onChange={event => { setSearchQuery(event.target.value); setCurrentPage(1); }}
+          onClear={() => { setSearchQuery(''); setCurrentPage(1); }}
+          placeholder="기사 이름, 연락처 검색"
+        />
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-          {([{key:'all',label:'전체',count:counts.total},{key:'employed',label:'소속',count:counts.employed},
-            {key:'freelance',label:'프리랜서',count:counts.freelance}] as const).map(item=>
-            <button type="button" key={item.key} onClick={()=>{setAffiliationFilter(item.key);setCurrentPage(1);}}
-              aria-pressed={affiliationFilter===item.key}
-              className={'min-h-10 shrink-0 rounded-[12px] px-3.5 text-[12px] font-semibold transition-colors '+
-                (affiliationFilter===item.key?'bg-[#EEF3FF] text-[#1E60F3]':'bg-[#F7F9FC] text-[#6C7C91]')}>
+          {([{ key: 'all', label: '전체', count: counts.total }, { key: 'employed', label: '소속', count: counts.employed },
+          { key: 'freelance', label: '프리랜서', count: counts.freelance }] as const).map(item =>
+            <button type="button" key={item.key} onClick={() => { setAffiliationFilter(item.key); setCurrentPage(1); }}
+              aria-pressed={affiliationFilter === item.key}
+              className={'min-h-10 shrink-0 rounded-[12px] px-3.5 text-[13px] font-semibold transition-colors ' +
+                (affiliationFilter === item.key ? 'bg-[#EEF3FF] text-[#1E60F3]' : 'bg-[#F7F9FC] text-[#6C7C91]')}>
               {item.label} {item.count}
             </button>)}
-          <button type="button" onClick={()=>setGlobalCardSearchOpen(true)}
-            disabled={!drivers.length||!coverage} className="ml-auto min-h-10 shrink-0 rounded-[12px] px-3 text-[12px] font-semibold text-[#526680] disabled:opacity-40">
+          <button type="button" onClick={() => setGlobalCardSearchOpen(true)}
+            disabled={!drivers.length || !coverage} className="ml-auto min-h-10 shrink-0 rounded-[12px] px-3 text-[13px] font-semibold text-[#526680] disabled:opacity-40">
             전체 카드 찾기
           </button>
         </div>
-        {coverageError&&<button type="button" onClick={()=>void refreshCoverage()}
+        {coverageError && <button type="button" onClick={() => void refreshCoverage()}
           className="min-h-10 text-left text-[12px] text-[#A35E59] underline underline-offset-2">
           배차카드 조회 실패 · 다시 시도
         </button>}
-        {isLoading?<p role="status" className="py-12 text-center text-[12px] text-[#8190A4]">기사 목록을 불러오는 중…</p>:
-          error?<div role="alert" className="space-y-2 rounded-[14px] bg-[#FFF7F5] p-4 text-[12px] text-[#9B5F56]">
+        {isLoading ? <p role="status" className="py-12 text-center text-[12px] text-[#8190A4]">기사 목록을 불러오는 중…</p> :
+          error ? <div role="alert" className="space-y-2 rounded-[14px] bg-[#FFF7F5] p-4 text-[12px] text-[#9B5F56]">
             <p>{error}</p><button type="button" onClick={onRetry} className="min-h-10 font-semibold underline">다시 시도</button>
-            {(statusCode===401||statusCode===403)&&<button type="button" onClick={onOpenLogin} className="ml-4 min-h-10 font-semibold underline">관리자 로그인</button>}
-          </div>:
-          !filteredDrivers.length?<p className="py-12 text-center text-[12px] text-[#8190A4]">조건에 맞는 기사가 없습니다.</p>:
-          filteredDrivers.map(driver=>{
-            const opStatus=getDriverStatus(driver);
-            const summary=summarizeDriverCardCoverage(coverageByDriverId.get(driver.id));
-            return <div key={driver.id} className="rounded-[17px] bg-white p-3.5 shadow-[0_3px_15px_rgba(35,49,78,0.065)]">
-              <button type="button" onClick={()=>handleRowClick(driver.id)}
-                className="flex min-h-12 w-full items-center gap-3 text-left" aria-label={driver.name+' 기사 프로필 보기'}>
-                <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#F3F5F8] text-[15px] font-semibold text-[#526680]">
-                  {driver.avatarUrl?<img src={driver.avatarUrl} alt="" className="size-full object-cover"/>:driver.name.slice(0,1)}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-2">
-                    <span className="truncate text-[14px] font-semibold text-[#17233B]">{driver.name}</span>
-                    {driver.affiliationType==='employed'&&<span className="text-[11px] text-[#73839D]">소속</span>}
-                  </span>
-                  <span className="mt-1 block text-[11px] text-[#8190A4]">
-                    {opStatus==='driving'?'운행 중':opStatus==='off'?'휴무':'운행 가능'}
-                  </span>
-                </span>
-                <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-[#9CA9BA]"/>
-              </button>
-              <div className="mt-3 flex items-center justify-between border-t border-[#F1F3F6] pt-2.5">
-                <button type="button" onClick={()=>{if(coverage)setCardPickerDriverId(driver.id);else void refreshCoverage();}}
-                  disabled={!coverage&&coverageLoading}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-[11px] px-2 text-[12px] font-semibold text-[#526680]">
-                  배차카드 <span className="text-[#8D99A9]">{coverageLoading?'조회 중':coverageError?'조회 실패':summary.label}</span>
-                  <ChevronRight className="size-3.5 text-[#9CA9BA]"/>
-                </button>
-                {driver.phone&&<a href={'tel:'+driver.phone} aria-label={driver.name+' 전화 걸기'}
-                  className="inline-flex size-11 items-center justify-center rounded-full bg-[#F6F8FA] text-[#60728B]">
-                  <Phone className="size-[17px]"/>
-                </a>}
-              </div>
-            </div>;
-          })}
+            {(statusCode === 401 || statusCode === 403) && <button type="button" onClick={onOpenLogin} className="ml-4 min-h-10 font-semibold underline">관리자 로그인</button>}
+          </div> :
+            !filteredDrivers.length ? <p className="py-12 text-center text-[12px] text-[#8190A4]">조건에 맞는 기사가 없습니다.</p> :
+              filteredDrivers.map(driver => {
+                const opStatus = getDriverStatus(driver);
+                const summary = summarizeDriverCardCoverage(coverageByDriverId.get(driver.id));
+                return <div key={driver.id} className="rounded-[17px] bg-white p-3.5 shadow-[0_3px_15px_rgba(35,49,78,0.065)]">
+                  <button type="button" onClick={() => handleRowClick(driver.id)}
+                    className="flex min-h-12 w-full items-center gap-3 text-left" aria-label={driver.name + ' 기사 프로필 보기'}>
+                    <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#F3F5F8] text-[15px] font-semibold text-[#526680]">
+                      {driver.avatarUrl ? <img src={driver.avatarUrl} alt="" className="size-full object-cover" /> : driver.name.slice(0, 1)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2">
+                        <span className="truncate text-[14px] font-semibold text-[#17233B]">{driver.name}</span>
+                        {driver.affiliationType === 'employed' && <span className="text-[11px] text-[#73839D]">소속</span>}
+                      </span>
+                      <span className="mt-1 block text-[11px] text-[#8190A4]">
+                        {opStatus === 'driving' ? '운행 중' : opStatus === 'off' ? '휴무' : '운행 가능'}
+                      </span>
+                    </span>
+                    <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-[#9CA9BA]" />
+                  </button>
+                  <div className="mt-3 flex items-center justify-between border-t border-[#F1F3F6] pt-2.5">
+                    <button type="button" onClick={() => { if (coverage) setCardPickerDriverId(driver.id); else void refreshCoverage(); }}
+                      disabled={!coverage && coverageLoading}
+                      className="inline-flex min-h-11 items-center gap-2 rounded-[11px] px-2 text-[12px] font-semibold text-[#526680]">
+                      배차카드 <span className="text-[#8D99A9]">{coverageLoading ? '조회 중' : coverageError ? '조회 실패' : summary.label}</span>
+                      <ChevronRight className="size-3.5 text-[#9CA9BA]" />
+                    </button>
+                    {driver.phone && <a href={'tel:' + driver.phone} aria-label={driver.name + ' 전화 걸기'}
+                      className="inline-flex size-7 items-center justify-center rounded-full bg-[#F6F8FA] text-[#60728B]">
+                      <Phone className="size-[17px]" />
+                    </a>}
+                  </div>
+                </div>;
+              })}
       </section>
 
       {/* 3. Driver Table (desktop) */}
@@ -568,190 +569,190 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
 
                 return (
                   <Fragment key={driver.id}>
-                  <tr
-                    onClick={() => handleRowClick(driver.id)}
-                    className="hover:bg-blue-50/40 transition-colors cursor-pointer group"
-                  >
-                    {/* 1열: 기사 정보 (Avatar + Name) */}
-                    <td className="py-4 px-5 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        {driver.avatarUrl ? (
-                          <img
-                            src={driver.avatarUrl}
-                            alt={driver.name}
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = 'none';
-                            }}
-                            className="w-10 h-10 rounded-full object-cover border border-slate-200/80 shrink-0 shadow-2xs"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-600 border border-slate-200/80 font-bold text-xs flex items-center justify-center shrink-0">
-                            {driver.name.slice(0, 1)}
-                          </div>
-                        )}
-                        <div className="flex items-center gap-1.5 whitespace-nowrap">
-                          <span className="whitespace-nowrap font-bold text-slate-900 group-hover:text-[#1E60F3] transition-colors">
-                            {driver.name}
-                          </span>
-                          {/* 소속 기사만 '소속' 뱃지 표시 (프리랜서는 다수이므로 미표시하여 시각적 소음 제거) */}
-                          {driver.affiliationType === 'employed' && (
-                            <span className="shrink-0 whitespace-nowrap px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#EEF3FF] text-[#31598F] border border-blue-200/80">
-                              소속
-                            </span>
+                    <tr
+                      onClick={() => handleRowClick(driver.id)}
+                      className="hover:bg-blue-50/40 transition-colors cursor-pointer group"
+                    >
+                      {/* 1열: 기사 정보 (Avatar + Name) */}
+                      <td className="py-4 px-5 whitespace-nowrap">
+                        <div className="flex items-center gap-3">
+                          {driver.avatarUrl ? (
+                            <img
+                              src={driver.avatarUrl}
+                              alt={driver.name}
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = 'none';
+                              }}
+                              className="w-10 h-10 rounded-full object-cover border border-slate-200/80 shrink-0 shadow-2xs"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-600 border border-slate-200/80 font-bold text-xs flex items-center justify-center shrink-0">
+                              {driver.name.slice(0, 1)}
+                            </div>
                           )}
-                          {isNew && (
-                            <span className="shrink-0 whitespace-nowrap px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#EEF3FF] text-[#31598F] border border-emerald-200/80">
-                              신규
+                          <div className="flex items-center gap-1.5 whitespace-nowrap">
+                            <span className="whitespace-nowrap font-bold text-slate-900 group-hover:text-[#1E60F3] transition-colors">
+                              {driver.name}
                             </span>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* 2열: 운행 상태 (운행 가능 / 운행 중 / 휴무) */}
-                    <td className="py-4 px-5 whitespace-nowrap">
-                      {opStatus === 'driving' ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#EEF3FF] text-[#31598F] border border-blue-200/60 shadow-2xs">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#1E60F3] animate-pulse" />
-                          운행 중
-                        </span>
-                      ) : opStatus === 'off' ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200/60">
-                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                          휴무
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200/80">
-                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                          운행 가능
-                        </span>
-                      )}
-                    </td>
-
-                    {/* 3열: 배차카드 현황 토글 */}
-                    <td className="py-4 px-5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                      {coverageLoading && !coverage ? (
-                        <HqBadge tone="neutral">확인 중…</HqBadge>
-                      ) : driverCoverage ? (
-                        <button
-                          type="button"
-                          aria-expanded={isCardExpanded}
-                          aria-label={`${driver.name} 배차카드 차량별 현황`}
-                          onClick={() => {
-                            haptics.lightTap();
-                            setExpandedCardDriverIds(prev => ({ ...prev, [driver.id]: !prev[driver.id] }));
-                          }}
-                          className={`inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-[12px] px-2 py-1 transition-colors ${isCardExpanded ? 'bg-[#EEF3FF]' : 'hover:bg-[#F3F6FB]'}`}
-                        >
-                          <HqBadge tone={cardSummary.tone}>{cardSummary.label}</HqBadge>
-                          <ChevronDown className={`size-3.5 text-[#73839D] transition-transform duration-150 ${isCardExpanded ? 'rotate-180 text-[#1E60F3]' : ''}`} />
-                        </button>
-                      ) : (
-                        <HqBadge tone="neutral">{coverageError ? '조회 실패' : '미확인'}</HqBadge>
-                      )}
-                    </td>
-
-                    {/* 4열: 연락처 (전화 걸기 연동) */}
-                    <td className="py-4 px-5 whitespace-nowrap">
-                      {driver.phone ? (
-                        <a
-                          href={`tel:${driver.phone}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="font-mono text-xs font-semibold text-slate-700 hover:text-[#1E60F3] hover:underline transition-colors inline-flex items-center gap-1.5 group/phone"
-                          title="전화 걸기"
-                        >
-                          <Phone className="w-3.5 h-3.5 text-slate-400 group-hover/phone:text-[#1E60F3] transition-colors" />
-                          <span>{formatPhoneNumber(driver.phone)}</span>
-                        </a>
-                      ) : (
-                        <span className="text-slate-300 font-mono text-xs">-</span>
-                      )}
-                    </td>
-
-                    {/* 4열: 지원 언어 (미국 국기 🇺🇸 표기, 비어있으면 하이픈 없이 빈 공간) */}
-                    <td className="py-4 px-5 whitespace-nowrap">
-                      {hasForeignLanguage ? (
-                        <div className="flex items-center gap-1.5">
-                          {foreignLanguages.map((lang) => {
-                            const isEng = lang === '영어' || lang.toLowerCase() === 'english' || lang === 'en';
-                            return (
-                              <span
-                                key={lang}
-                                className={isEng ? 'text-sm select-none' : 'inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200/80'}
-                                title={isEng ? '영어 소통 가능' : lang}
-                              >
-                                {isEng ? '🇺🇸' : lang}
+                            {/* 소속 기사만 '소속' 뱃지 표시 (프리랜서는 다수이므로 미표시하여 시각적 소음 제거) */}
+                            {driver.affiliationType === 'employed' && (
+                              <span className="shrink-0 whitespace-nowrap px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#EEF3FF] text-[#31598F] border border-blue-200/80">
+                                소속
                               </span>
-                            );
-                          })}
-                        </div>
-                      ) : null}
-                    </td>
-
-                  </tr>
-                  {isCardExpanded && driverCoverage && (
-                    <tr className="bg-[#FAFBFD]">
-                      <td colSpan={5} className="px-5 py-3.5">
-                        <HqCard className="space-y-3 p-3.5 sm:p-4">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <span className="text-[12px] font-semibold text-[#17233B]">{driver.name} 배차카드 차량별 현황</span>
-                              <HqBadge tone="selected">완료 {cardSummary.completeVehicles}/{cardSummary.totalVehicles}대</HqBadge>
-                              <HqBadge tone="neutral">미등록 {cardSummary.unregisteredSlots.length}대</HqBadge>
-                              {cardSummary.imageMissingSlots.length>0&&
-                                <HqBadge tone="warning">차량 이미지 미준비 {cardSummary.imageMissingSlots.length}대</HqBadge>}
-                              {!cardSummary.identityReady && (
-                                <HqBadge tone="warning">
-                                  {(cardSummary.missingIdentityLabels.join(' · ') || '기사 정보') + ' 확인 필요'}
-                                </HqBadge>
-                              )}
-                            </div>
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <HqButton
-                                variant="subtle"
-                                size="sm"
-                                onClick={() => {
-                                  haptics.lightTap();
-                                  setCardPreviewTarget({ driverId: driver.id });
-                                }}
-                              >
-                                카드 보기
-                              </HqButton>
-                              <HqButton
-                                variant="primary"
-                                size="sm"
-                                disabled={!driverCoverage.slots.some(slot=>slot.imageReady!==false)}
-                                onClick={() => {
-                                  haptics.lightTap();
-                                  setCardBuilderTarget({
-                                    driver,
-                                    vehicleId: cardSummary.unregisteredSlots.find(slot=>slot.imageReady!==false)?.vehicleId ||
-                                      cardSummary.registeredSlots.find(slot=>slot.imageReady!==false)?.vehicleId,
-                                  });
-                                }}
-                              >
-                                카드 만들기·수정
-                              </HqButton>
-                            </div>
+                            )}
+                            {isNew && (
+                              <span className="shrink-0 whitespace-nowrap px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#EEF3FF] text-[#31598F] border border-emerald-200/80">
+                                신규
+                              </span>
+                            )}
                           </div>
-
-                          <HqDriverCardVehicleGroups
-                             driverName={driver.name}
-                             slots={driverCoverage.slots}
-                             vehicles={coverage?.vehicles || []}
-                             onView={slot=>{
-                               haptics.lightTap();
-                               setCardPreviewTarget({driverId:driver.id,vehiclePlate:slot.plate});
-                             }}
-                             onCreate={slot=>{
-                               haptics.lightTap();
-                               setCardBuilderTarget({driver,vehicleId:slot.vehicleId});
-                             }}
-                           />
-                        </HqCard>
+                        </div>
                       </td>
+
+                      {/* 2열: 운행 상태 (운행 가능 / 운행 중 / 휴무) */}
+                      <td className="py-4 px-5 whitespace-nowrap">
+                        {opStatus === 'driving' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#EEF3FF] text-[#31598F] border border-blue-200/60 shadow-2xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#1E60F3] animate-pulse" />
+                            운행 중
+                          </span>
+                        ) : opStatus === 'off' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200/60">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                            휴무
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200/80">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                            운행 가능
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 3열: 배차카드 현황 토글 */}
+                      <td className="py-4 px-5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        {coverageLoading && !coverage ? (
+                          <HqBadge tone="neutral">확인 중…</HqBadge>
+                        ) : driverCoverage ? (
+                          <button
+                            type="button"
+                            aria-expanded={isCardExpanded}
+                            aria-label={`${driver.name} 배차카드 차량별 현황`}
+                            onClick={() => {
+                              haptics.lightTap();
+                              setExpandedCardDriverIds(prev => ({ ...prev, [driver.id]: !prev[driver.id] }));
+                            }}
+                            className={`inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-[12px] px-2 py-1 transition-colors ${isCardExpanded ? 'bg-[#EEF3FF]' : 'hover:bg-[#F3F6FB]'}`}
+                          >
+                            <HqBadge tone={cardSummary.tone}>{cardSummary.label}</HqBadge>
+                            <ChevronDown className={`size-3.5 text-[#73839D] transition-transform duration-150 ${isCardExpanded ? 'rotate-180 text-[#1E60F3]' : ''}`} />
+                          </button>
+                        ) : (
+                          <HqBadge tone="neutral">{coverageError ? '조회 실패' : '미확인'}</HqBadge>
+                        )}
+                      </td>
+
+                      {/* 4열: 연락처 (전화 걸기 연동) */}
+                      <td className="py-4 px-5 whitespace-nowrap">
+                        {driver.phone ? (
+                          <a
+                            href={`tel:${driver.phone}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="font-mono text-xs font-semibold text-slate-700 hover:text-[#1E60F3] hover:underline transition-colors inline-flex items-center gap-1.5 group/phone"
+                            title="전화 걸기"
+                          >
+                            <Phone className="w-3.5 h-3.5 text-slate-400 group-hover/phone:text-[#1E60F3] transition-colors" />
+                            <span>{formatPhoneNumber(driver.phone)}</span>
+                          </a>
+                        ) : (
+                          <span className="text-slate-300 font-mono text-xs">-</span>
+                        )}
+                      </td>
+
+                      {/* 4열: 지원 언어 (미국 국기 🇺🇸 표기, 비어있으면 하이픈 없이 빈 공간) */}
+                      <td className="py-4 px-5 whitespace-nowrap">
+                        {hasForeignLanguage ? (
+                          <div className="flex items-center gap-1.5">
+                            {foreignLanguages.map((lang) => {
+                              const isEng = lang === '영어' || lang.toLowerCase() === 'english' || lang === 'en';
+                              return (
+                                <span
+                                  key={lang}
+                                  className={isEng ? 'text-sm select-none' : 'inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200/80'}
+                                  title={isEng ? '영어 소통 가능' : lang}
+                                >
+                                  {isEng ? '🇺🇸' : lang}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                      </td>
+
                     </tr>
-                  )}
+                    {isCardExpanded && driverCoverage && (
+                      <tr className="bg-[#FAFBFD]">
+                        <td colSpan={5} className="px-5 py-3.5">
+                          <HqCard className="space-y-3 p-3.5 sm:p-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-[12px] font-semibold text-[#17233B]">{driver.name} 배차카드 차량별 현황</span>
+                                <HqBadge tone="selected">완료 {cardSummary.completeVehicles}/{cardSummary.totalVehicles}대</HqBadge>
+                                <HqBadge tone="neutral">미등록 {cardSummary.unregisteredSlots.length}대</HqBadge>
+                                {cardSummary.imageMissingSlots.length > 0 &&
+                                  <HqBadge tone="warning">차량 이미지 미준비 {cardSummary.imageMissingSlots.length}대</HqBadge>}
+                                {!cardSummary.identityReady && (
+                                  <HqBadge tone="warning">
+                                    {(cardSummary.missingIdentityLabels.join(' · ') || '기사 정보') + ' 확인 필요'}
+                                  </HqBadge>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <HqButton
+                                  variant="subtle"
+                                  size="sm"
+                                  onClick={() => {
+                                    haptics.lightTap();
+                                    setCardPreviewTarget({ driverId: driver.id });
+                                  }}
+                                >
+                                  카드 보기
+                                </HqButton>
+                                <HqButton
+                                  variant="primary"
+                                  size="sm"
+                                  disabled={!driverCoverage.slots.some(slot => slot.imageReady !== false)}
+                                  onClick={() => {
+                                    haptics.lightTap();
+                                    setCardBuilderTarget({
+                                      driver,
+                                      vehicleId: cardSummary.unregisteredSlots.find(slot => slot.imageReady !== false)?.vehicleId ||
+                                        cardSummary.registeredSlots.find(slot => slot.imageReady !== false)?.vehicleId,
+                                    });
+                                  }}
+                                >
+                                  카드 만들기·수정
+                                </HqButton>
+                              </div>
+                            </div>
+
+                            <HqDriverCardVehicleGroups
+                              driverName={driver.name}
+                              slots={driverCoverage.slots}
+                              vehicles={coverage?.vehicles || []}
+                              onView={slot => {
+                                haptics.lightTap();
+                                setCardPreviewTarget({ driverId: driver.id, vehiclePlate: slot.plate });
+                              }}
+                              onCreate={slot => {
+                                haptics.lightTap();
+                                setCardBuilderTarget({ driver, vehicleId: slot.vehicleId });
+                              }}
+                            />
+                          </HqCard>
+                        </td>
+                      </tr>
+                    )}
                   </Fragment>
                 );
               })
@@ -828,14 +829,14 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
       {globalCardSearchOpen && coverage && (
         <HqDispatchCardQuickFindModal
           isOpen coverage={coverage} drivers={drivers}
-          onClose={()=>setGlobalCardSearchOpen(false)}
-          onView={(driverId,plate)=>{
+          onClose={() => setGlobalCardSearchOpen(false)}
+          onView={(driverId, plate) => {
             setGlobalCardSearchOpen(false);
-            setCardPreviewTarget({driverId,vehiclePlate:plate});
+            setCardPreviewTarget({ driverId, vehiclePlate: plate });
           }}
-          onCreate={(driver,vehicleId)=>{
+          onCreate={(driver, vehicleId) => {
             setGlobalCardSearchOpen(false);
-            setCardBuilderTarget({driver,vehicleId});
+            setCardBuilderTarget({ driver, vehicleId });
           }}
         />
       )}
@@ -843,18 +844,18 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
       {cardPickerDriverId && coverage && (
         <HqDriverCardPickerModal
           isOpen
-          driverName={drivers.find(item=>item.id===cardPickerDriverId)?.name||'기사'}
-          slots={coverageByDriverId.get(cardPickerDriverId)?.slots||[]}
+          driverName={drivers.find(item => item.id === cardPickerDriverId)?.name || '기사'}
+          slots={coverageByDriverId.get(cardPickerDriverId)?.slots || []}
           vehicles={coverage.vehicles}
-          onClose={()=>setCardPickerDriverId(null)}
-          onView={slot=>{
+          onClose={() => setCardPickerDriverId(null)}
+          onView={slot => {
             setCardPickerDriverId(null);
-            setCardPreviewTarget({driverId:cardPickerDriverId,vehiclePlate:slot.plate});
+            setCardPreviewTarget({ driverId: cardPickerDriverId, vehiclePlate: slot.plate });
           }}
-          onCreate={slot=>{
-            const driver=drivers.find(item=>item.id===cardPickerDriverId);
+          onCreate={slot => {
+            const driver = drivers.find(item => item.id === cardPickerDriverId);
             setCardPickerDriverId(null);
-            if(driver)setCardBuilderTarget({driver,vehicleId:slot.vehicleId});
+            if (driver) setCardBuilderTarget({ driver, vehicleId: slot.vehicleId });
           }}
         />
       )}

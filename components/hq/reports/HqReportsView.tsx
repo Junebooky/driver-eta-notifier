@@ -18,7 +18,6 @@ import {
   MoreHorizontal,
   Printer,
   Receipt,
-  Search,
   Settings2,
   ShieldAlert,
   ShieldCheck,
@@ -50,6 +49,7 @@ import {
 } from "@/utils/settlementStorage";
 import { formatKRW } from "@/utils/expense";
 import { haptics } from "@/utils/haptics";
+import { HqSearchInput } from "@/components/hq/ui";
 import { HqDateRangePicker } from "@/components/hq/ui/HqDateRangePicker";
 import { HqSearchSelect } from "@/components/hq/ui/HqSearchSelect";
 import { HqServerSettlementPanel } from "@/components/hq/reports/HqServerSettlementPanel";
@@ -577,16 +577,14 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
 
             {/* Search and Status Dropdown */}
             <div className="space-y-2">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="고객사, 행사명, 차량 검색"
-                  className="w-full pl-8.5 pr-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
-                />
-              </div>
+              <HqSearchInput
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onClear={() => setSearchQuery('')}
+                placeholder="고객사, 행사명, 차량 검색"
+                className="sm:h-10 rounded-xl border border-slate-200/80 bg-slate-50 shadow-none focus:bg-white"
+              />
               <HqSearchSelect
                 label="정산 상태 필터"
                 size="sm"

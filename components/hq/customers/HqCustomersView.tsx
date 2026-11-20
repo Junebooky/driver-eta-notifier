@@ -3,7 +3,6 @@
 import React, { useState, useMemo, useEffect, useSyncExternalStore } from 'react';
 import Image from 'next/image';
 import {
-  Search,
   Plus,
   Star,
   LayoutGrid,
@@ -58,6 +57,7 @@ import { HqExpenseRecord, HqExpenseStatus } from '@/types/expenseHq';
 import { formatKRW } from '@/utils/expense';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
+import { HqSearchInput } from '@/components/hq/ui';
 import { HqBadge, HqButton, HqCard, HqIconButton, HqSegmentedTabs } from '@/components/hq/ui';
 import { HqCustomerOverview } from './HqCustomerOverview';
 import { HqCustomerActivityPanels } from './HqCustomerActivityPanels';
@@ -540,19 +540,20 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
 
           {/* Search & Filter Bar */}
           <div className="flex items-center gap-2 px-5 pb-4 sm:px-6">
-            <div className="relative flex-1">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setCurrentPage(1);
-                }}
-                placeholder="고객명 또는 담당자명 검색..."
-                className="h-11 w-full rounded-[14px] bg-white pl-9 pr-3 text-[13px] font-medium text-[#17233B] placeholder:text-[#95A3B9] shadow-[0_4px_14px_rgba(35,49,78,0.045)] outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20"
-              />
-            </div>
+            <HqSearchInput
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              onClear={() => {
+                setSearchQuery('');
+                setCurrentPage(1);
+              }}
+              placeholder="고객명 또는 담당자명 검색..."
+              containerClassName="flex-1"
+            />
 
             <div className="min-w-[148px]">
               <HqSearchSelect

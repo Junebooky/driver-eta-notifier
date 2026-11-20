@@ -572,6 +572,13 @@ dialog::backdrop {
   .hq-drivers-a input.hq-drivers-search::placeholder {
     font-size: 11px;
   }
+  .hq-drivers-a input.hq-drivers-mobile-search {
+    font-size: 15px;
+  }
+  .hq-drivers-a input.hq-drivers-mobile-search:not(:focus):placeholder-shown,
+  .hq-drivers-a input.hq-drivers-mobile-search::placeholder {
+    font-size: 14px;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .hq-drivers-a :is(button,input,select,textarea),
@@ -806,6 +813,73 @@ dialog::backdrop {
 }
 .hq-ui-tab[aria-selected="true"] { background: #fff; color: var(--hq-accent); box-shadow: 0 3px 10px rgba(35,49,78,.065); }
 .hq-ui-tab:not([aria-selected="true"]):hover { color: var(--hq-ink); }
+.hq-ui-underline-tabs {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  border-bottom: 1px solid rgba(225,231,240,.85);
+  padding: 0 2px;
+}
+.hq-ui-underline-tabs::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.hq-ui-underline-tab {
+  position: relative;
+  display: inline-flex;
+  min-height: 40px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: transparent;
+  color: var(--hq-ink-soft);
+  padding: 6px 2px 8px;
+  font-size: 13px;
+  line-height: 1.25;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.hq-ui-underline-tab[aria-selected="true"] {
+  color: var(--hq-accent);
+  border-bottom-color: var(--hq-accent);
+  font-weight: 700;
+}
+.hq-ui-underline-tab:not([aria-selected="true"]):hover {
+  color: var(--hq-ink);
+}
+.hq-ui-underline-tab:focus-visible {
+  outline: 2px solid rgba(30,96,243,.38);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.hq-ui-underline-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--hq-surface-control);
+  color: var(--hq-ink-soft);
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.hq-ui-underline-tab[aria-selected="true"] .hq-ui-underline-tab-count {
+  background: var(--hq-selected-quiet);
+  color: var(--hq-accent);
+}
 .hq-ui-tooltip {
   display: inline-flex;
   white-space: nowrap;
@@ -834,10 +908,71 @@ dialog::backdrop {
   border-radius: var(--hq-radius-dialog);
   background: var(--hq-surface-muted);
   box-shadow: var(--hq-shadow-dialog);
-  overflow: auto;
+  overflow: hidden;
 }
 @media (max-width:767px) {
   .hq-ui-field { font-size: 16px; }
+}
+@media (min-width: 1024px) {
+  .hq-ui-button.lg\:hidden,
+  .hq-ui-icon-button.lg\:hidden { display: none; }
+}
+
+/* Shared HQ mobile-friendly search input across all HQ screens & modals (PC 14px, mobile 15px / placeholder 14px). */
+input.hq-ui-search-input,
+.hq-drivers-a input.hq-ui-search-input,
+.hq-customer-a input.hq-ui-search-input,
+.hq-email-a input.hq-ui-search-input,
+.hq-booking-residual-a input.hq-ui-search-input,
+.hq-quote-modal-a input.hq-ui-search-input,
+.hq-pricing-a input.hq-ui-search-input {
+  background-color: #fff;
+  border: 1px solid rgba(225,231,240,.55);
+  border-radius: 14px;
+  color: var(--hq-ink, #17233B);
+  box-shadow: var(--hq-shadow-control, 0 4px 14px rgba(35,49,78,.045));
+  font-size: 14px;
+}
+input.hq-ui-search-input.hq-ui-search-inline {
+  background-color: #F7F9FC;
+  border: 0;
+  border-radius: 11px;
+  box-shadow: none;
+}
+input.hq-ui-search-input:focus-visible,
+.hq-drivers-a input.hq-ui-search-input:focus-visible,
+.hq-customer-a input.hq-ui-search-input:focus-visible,
+.hq-email-a input.hq-ui-search-input:focus-visible {
+  border-color: rgba(30,96,243,.28);
+  box-shadow: var(--hq-shadow-control, 0 4px 14px rgba(35,49,78,.045)), 0 0 0 2px rgba(30,96,243,.14);
+}
+input.hq-ui-search-input::placeholder,
+.hq-drivers-a input.hq-ui-search-input::placeholder,
+.hq-customer-a input.hq-ui-search-input::placeholder,
+.hq-email-a input.hq-ui-search-input::placeholder {
+  color: #95A3B9;
+  font-size: 14px;
+}
+@media (max-width:767px) {
+  input.hq-ui-search-input,
+  .hq-drivers-a input.hq-ui-search-input,
+  .hq-customer-a input.hq-ui-search-input,
+  .hq-email-a input.hq-ui-search-input,
+  .hq-booking-residual-a input.hq-ui-search-input,
+  .hq-quote-modal-a input.hq-ui-search-input,
+  .hq-pricing-a input.hq-ui-search-input {
+    font-size: 15px;
+  }
+  input.hq-ui-search-input::placeholder,
+  input.hq-ui-search-input:not(:focus):placeholder-shown,
+  .hq-drivers-a input.hq-ui-search-input::placeholder,
+  .hq-drivers-a input.hq-ui-search-input:not(:focus):placeholder-shown,
+  .hq-customer-a input.hq-ui-search-input::placeholder,
+  .hq-customer-a input.hq-ui-search-input:not(:focus):placeholder-shown,
+  .hq-email-a input.hq-ui-search-input::placeholder,
+  .hq-email-a input.hq-ui-search-input:not(:focus):placeholder-shown {
+    font-size: 14px;
+  }
 }
 @media (prefers-reduced-motion:reduce) {
   .hq-ui-button,.hq-ui-field,.hq-ui-tab { transition: none; }
