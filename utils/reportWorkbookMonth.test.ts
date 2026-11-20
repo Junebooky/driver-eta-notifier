@@ -12,7 +12,9 @@ import {reportWorkbookYear} from './reportWorkbookYear';
 
 function octoberLegacy():Uint8Array {
  const members=unzipSync(kakaoWorkbookFixture());
- members['xl/workbook.xml']=strToU8(strFromU8(members['xl/workbook.xml']).replace('name="4월"','name="202610월"'));
+ members['xl/workbook.xml']=strToU8(strFromU8(members['xl/workbook.xml'])
+  .replace('<sheet name="4月" sheetId="1" r:id="rId1"/><sheet name="4월" sheetId="2" r:id="rId2"/>',
+           '<sheet name="202610월" sheetId="2" r:id="rId2"/><sheet name="11월" sheetId="1" r:id="rId1"/>'));
  return zipSync(members);
 }
 test('original October sheet named 202610월 is shown as 10월 without renaming the owner workbook',()=>{
