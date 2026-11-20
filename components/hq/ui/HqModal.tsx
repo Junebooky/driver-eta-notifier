@@ -17,12 +17,14 @@ export interface HqModalProps {
   icon?: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  /** Optional compact actions beside the close control, inside the dialog header. */
+  headerActions?: React.ReactNode;
   onClose: () => void;
   className?: string;
 }
 const FOCUSABLE = 'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
 
-export function HqModal({ isOpen, title, subtitle, icon, children, footer, onClose, className = '' }: HqModalProps) {
+export function HqModal({ isOpen, title, subtitle, icon, children, footer, headerActions, onClose, className = '' }: HqModalProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   // Callers often pass an inline onClose callback which changes while typing.
@@ -83,17 +85,30 @@ export function HqModal({ isOpen, title, subtitle, icon, children, footer, onClo
         className={"hq-ui-modal-surface flex w-full max-w-xl flex-col outline-none " + className}
         onMouseDown={event => event.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between gap-3 bg-white px-5 py-5 sm:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            {icon}
-            <div className="min-w-0">
-              <h2 id={titleId} className="truncate text-[19px] font-bold tracking-[-0.03em] text-[#17233B]">{title}</h2>
-              {subtitle && <p className="mt-1 text-[12px] font-medium text-[#73839D]">{subtitle}</p>}
+        <div className={headerActions
+          ? "shrink-0 bg-white px-4 py-4 sm:px-6 sm:py-5"
+          : "shrink-0 bg-white px-5 py-5 sm:px-6"}>
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              {icon}
+              <div className="min-w-0">
+                <h2 id={titleId} className={
+                  "font-bold tracking-[-0.03em] text-[#17233B] " +
+                  (headerActions ? "text-[16px] leading-tight sm:text-[19px]" : "truncate text-[19px]")
+                }>{title}</h2>
+                {!headerActions && subtitle && <p className="mt-1 text-[12px] font-medium text-[#73839D]">{subtitle}</p>}
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              {headerActions && <div role="group" aria-label="팝업 작업" className="flex items-center gap-1">
+                {headerActions}
+              </div>}
+              <HqIconButton variant="subtle" aria-label="닫기" onClick={onClose}>
+                <X className="size-4" />
+              </HqIconButton>
             </div>
           </div>
-          <HqIconButton variant="subtle" aria-label="닫기" onClick={onClose}>
-            <X className="size-4" />
-          </HqIconButton>
+          {headerActions && subtitle && <p className="mt-1.5 text-[12px] font-medium text-[#73839D]">{subtitle}</p>}
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6">{children}</div>
         {footer && <div className="flex shrink-0 items-center justify-end gap-2 bg-white px-5 py-4 sm:px-6">{footer}</div>}
