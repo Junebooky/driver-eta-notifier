@@ -27,6 +27,7 @@ import { HqButton, HqBadge, HqCard } from '@/components/hq/ui';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 import { HqDriverCardVehicleGroups } from './HqDriverCardVehicleGroups';
 import { HqDriverCardPickerModal } from './HqDriverCardPickerModal';
+import { HqDispatchCardQuickFindModal } from './HqDispatchCardQuickFindModal';
 import { HqDriverAssetManagerModal } from './HqDriverAssetManagerModal';
 import { HqDispatchCardBuilderModal } from './HqDispatchCardBuilderModal';
 
@@ -83,6 +84,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
   const [coverageError, setCoverageError] = useState('');
   const [expandedCardDriverIds, setExpandedCardDriverIds] = useState<Record<string, boolean>>({});
   const [cardPickerDriverId, setCardPickerDriverId] = useState<string | null>(null);
+  const [globalCardSearchOpen, setGlobalCardSearchOpen] = useState(false);
   const [cardPreviewTarget, setCardPreviewTarget] = useState<{ driverId: string; vehiclePlate?: string } | null>(null);
   const [cardBuilderTarget, setCardBuilderTarget] = useState<{ driver: HqDriverSummary; vehicleId?: string } | null>(null);
   const pageSize = 10;
@@ -391,7 +393,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                 (affiliationFilter===item.key?'bg-[#EEF3FF] text-[#1E60F3]':'bg-[#F7F9FC] text-[#6C7C91]')}>
               {item.label} {item.count}
             </button>)}
-          <button type="button" onClick={()=>setCardPreviewTarget({driverId:drivers[0]?.id||''})}
+          <button type="button" onClick={()=>setGlobalCardSearchOpen(true)}
             disabled={!drivers.length} className="ml-auto min-h-10 shrink-0 rounded-[12px] px-3 text-[12px] font-semibold text-[#526680] disabled:opacity-40">
             전체 카드 찾기
           </button>
@@ -819,7 +821,22 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
         </div>
       </div>
 
-      {cardPickerDriverId && coverage && ( 
+      {globalCardSearchOpen && coverage && (
+        <HqDispatchCardQuickFindModal
+          isOpen coverage={coverage} drivers={drivers}
+          onClose={()=>setGlobalCardSearchOpen(false)}
+          onView={(driverId,plate)=>{
+            setGlobalCardSearchOpen(false);
+            setCardPreviewTarget({driverId,vehiclePlate:plate});
+          }}
+          onCreate={(driver,vehicleId)=>{
+            setGlobalCardSearchOpen(false);
+            setCardBuilderTarget({driver,vehicleId});
+          }}
+        />
+      )}
+
+      {cardPickerDriverId && coverage && (
         <HqDriverCardPickerModal
           isOpen
           driverName={drivers.find(item=>item.id===cardPickerDriverId)?.name||'기사'}
