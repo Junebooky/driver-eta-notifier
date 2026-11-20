@@ -7,7 +7,9 @@ import {
   LogOut,
   Pin,
   PinOff,
+  ContactRound,
 } from 'lucide-react';
+import {HqButton} from '@/components/hq/ui';
 import { haptics } from '@/utils/haptics';
 import { logoutClientSession } from '@/utils/cockpitClientAuth';
 
@@ -16,6 +18,7 @@ export interface HqSidebarProps {
   onSelectTab: (tab: string) => void;
   isOpenMobile?: boolean;
   onCloseMobile?: () => void;
+  onOpenDispatchCard?: () => void;
   dispatchActionBadgeCount?: number;
 }
 
@@ -24,6 +27,7 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
   onSelectTab,
   isOpenMobile = false,
   onCloseMobile,
+  onOpenDispatchCard,
   dispatchActionBadgeCount = 0,
 }) => {
   // 1. Sidebar Pin State with LocalStorage Persistence
@@ -251,6 +255,23 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
           </button>
         )}
       </div>
+
+      {/* Mobile drawer: one discoverable global card shortcut, without adding a sixth bottom tab. */}
+      {isMobileDrawer&&onOpenDispatchCard&&(
+        <div className="px-3 pt-3">
+          <HqButton variant="secondary" size="md"
+            className="flex min-h-11 w-full items-center justify-start gap-2.5 px-3"
+            aria-label="배차카드 빠른 검색"
+            onClick={()=>{
+              haptics.lightTap();
+              onCloseMobile?.();
+              onOpenDispatchCard();
+            }}>
+            <ContactRound className="size-4 shrink-0 text-[#526680]" aria-hidden="true"/>
+            <span className="text-[13px] font-semibold">배차카드 빠른 검색</span>
+          </HqButton>
+        </div>
+      )}
 
       {/* Navigation List */}
       <nav className="flex-1 space-y-1 overflow-x-hidden overflow-y-auto px-2.5 pb-3 pt-3">

@@ -86,7 +86,8 @@ test('asset manager uses one pair action, requires both current cards, removes n
   assert.match(source,/PC·모바일 두 장 생성 후 공유/);
   assert.match(source,/PC·모바일 함께 공유/);
   assert.match(source,/PC·모바일 ZIP 저장/);
-  assert.equal((source.match(/<HqIconButton/g)||[]).length,3);
+  assert.equal((source.match(/<HqIconButton/g)||[]).length,2);
+  assert.doesNotMatch(source,/aria-label="배차카드 새로고침"/);
   assert.match(source,/headerActions=\{<>/);
   assert.match(source,/<Pencil className="size-4"/);
   assert.match(source,/<Share2 className="size-4"/);
