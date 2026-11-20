@@ -57,6 +57,46 @@ test('new reports use the first safe blank row, not the last formatted worksheet
  assert.equal(sheet.cells.B3.v,1336);
 });
 
+test('Web Excel keeps report numbers consecutive without rewriting original physical rows',()=>{
+ const {bytes,members}=spacedWorkbook();
+ const page=readWorkbookGrid(bytes,'11월');
+ assert.deepEqual(page.rows.filter(row=>row.displayRow!==null).map(row=>[row.row,row.displayRow]),
+  [[2,2],[202,3],[203,4]]);
+ // The 113 footer is still visible, but follows the actual report entries
+ // and is NOT counted as another chauffeur report.
+ const footer=page.rows.find(row=>row.row===113);
+ assert.ok(footer?.locked.includes('L'));
+ assert.equal(footer?.displayRow,null);
+ assert.ok(page.rows.findIndex(row=>row.row===203)<page.rows.findIndex(row=>row.row===113));
+ const filtered=readWorkbookGrid(bytes,'11월',300,0,undefined,{customer:'관리 보고 A'});
+ assert.deepEqual(filtered.rows.map(row=>[row.row,row.displayRow]),[[202,3]],
+  'filters must preserve the stable full-month serial, never start back at 2');
+ const sorted=readWorkbookGrid(bytes,'11월',300,0,undefined,{sortBy:'D',sortDirection:'desc'});
+ assert.equal(sorted.rows.find(row=>row.row===202)?.displayRow,3,
+  'table sorting must not change the report serial or actual Excel row');
+ assert.equal(readWorkbookGrid(bytes,'11월',1,0,202).rows[0].displayRow,3,
+  'source navigation still targets the unchanged physical row 202');
+ assert.deepEqual(unzipSync(bytes)[path],members[path],'the stored original never changes');
+});
+
+test('a 61 to 200 physical gap displays new chauffeur report as number 62',()=>{
+ const {bytes}=spacedWorkbook();
+ const entries=unzipSync(bytes);
+ let xml=strFromU8(entries[path]);
+ const template=rowFragment(xml,2);
+ const extra=Array.from({length:59},(_,index)=>relocate(template,2,index+3)).join('');
+ // Replace the two old vacant placeholders with real dated records, making
+ // physical rows 2 through 61 populated before the historical row 202.
+ xml=xml.replace(/<row r="3" s="1"\/>/,'').replace(/<row r="4" s="1"\/>/,'');
+ const footer=rowFragment(xml,113);
+ xml=xml.replace(footer,extra+footer);
+ entries[path]=strToU8(xml);
+ const view=readWorkbookGrid(zipSync(entries),'11월');
+ assert.equal(view.rows.find(row=>row.row===61)?.displayRow,61);
+ assert.equal(view.rows.find(row=>row.row===202)?.displayRow,62);
+ assert.equal(view.rows.find(row=>row.row===203)?.displayRow,63);
+});
+
 test('historical 202/203 reports compact to 3/4, preserving formula/footer, metadata and UUID moves',()=>{
  const {bytes,members}=spacedWorkbook();
  const before=readWorkbookGrid(bytes,'11월');
