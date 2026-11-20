@@ -43,9 +43,9 @@ test('driver form and table filters share A-plan search select', () => {
   assert.match(table, /<HqDispatchCardQuickFindModal/);
   assert.doesNotMatch(table, /setMenuOpenDriverId|setDriverToRemove/);
   assert.match(detail, /<HqModal/);
-  assert.match(detail, /deleteDriver\\(activeDriver\\.id\\)/);
-  assert.match(detail, /setRemoveError\\(/);
-  assert.doesNotMatch(table, /window\\.confirm\\(|alert\\('등록 해제에 실패/);
+  assert.match(detail, /deleteDriver\(activeDriver\.id\)/);
+  assert.match(detail, /setRemoveError\(/);
+  assert.doesNotMatch(table, /window\.confirm\(|alert\('등록 해제에 실패/);
 });
 
 test('driver image manager uses registered fleet, shared builder and no legacy upload or delete UI', () => {
