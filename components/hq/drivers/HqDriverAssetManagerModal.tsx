@@ -1,7 +1,7 @@
 'use client';
 
 import React, {useEffect,useMemo,useState} from 'react';
-import {AlertTriangle,ExternalLink,ImageIcon,Loader2,RefreshCw,Share2,Download} from 'lucide-react';
+import {AlertTriangle,ExternalLink,Pencil,Loader2,RefreshCw,Share2} from 'lucide-react';
 import type {HqDriverSummary} from '@/types/driverHq';
 import type {DriverVehicleAssetBundle} from '@/types/driverVehicleAsset';
 import {resolveDispatchCardPhotos} from '@/lib/dispatchCards/dispatchCardAssets';
@@ -12,7 +12,7 @@ import {
   partitionDispatchCardVehicles,
   pickDefaultDispatchCardVehicle,
 } from '@/utils/driverDispatchCardVehicles';
-import {HqButton,HqBadge,HqCard} from '@/components/hq/ui';
+import {HqButton,HqIconButton,HqBadge,HqCard} from '@/components/hq/ui';
 import {HqModal} from '@/components/hq/ui/HqModal';
 import {HqSearchSelect} from '@/components/hq/ui/HqSearchSelect';
 import {HqDispatchCardBuilderModal} from './HqDispatchCardBuilderModal';
@@ -238,9 +238,35 @@ export function HqDriverAssetManagerModal({
 
   return <>
     <HqModal isOpen={isOpen&&!builderOpen} onClose={onClose}
-      title="기사 배차카드" subtitle="기사와 차량을 선택해 최신 배차카드를 확인하고 수정해요."
+      title="기사 배차카드" subtitle="기사·차량을 선택해 배차카드를 확인하세요."
       className="max-w-[920px]"
-      footer={<HqButton variant="secondary" onClick={onClose}>닫기</HqButton>}>
+      headerActions={<>
+        <HqIconButton variant="subtle" size="sm"
+          aria-label="배차카드 새로고침" title="새로고침"
+          disabled={loading||summaryLoading||sharing}
+          onClick={()=>setRevision(value=>value+1)}>
+          {loading||summaryLoading?<Loader2 className="size-4 animate-spin" aria-hidden="true"/>:
+            <RefreshCw className="size-4" aria-hidden="true"/>}
+        </HqIconButton>
+        <HqIconButton variant="subtle" size="sm"
+          aria-label="배차카드 만들기 또는 수정" title="카드 만들기·수정"
+          disabled={!driver||!selectedVehicle||!selectedVehiclePhotoReady||fleet.loading||sharing}
+          onClick={()=>setBuilderOpen(true)}>
+          <Pencil className="size-4" aria-hidden="true"/>
+        </HqIconButton>
+        <HqIconButton variant="primary" size="sm"
+          aria-label={sharing?'배차카드 공유 중':
+            preparing.pc||preparing.mobile?'PC·모바일 PNG 두 장 준비 중':
+            !bothFilesPrepared?'PC·모바일 카드 두 장을 생성한 뒤 공유할 수 있습니다':
+            canNativeShare?'PC·모바일 PNG 두 장 함께 공유':'PC·모바일 PNG 두 장 ZIP으로 저장'}
+          title={bothFilesPrepared?(canNativeShare?'PC·모바일 함께 공유':'PC·모바일 ZIP 저장'):'PC·모바일 두 장 생성 후 공유'}
+          disabled={!bothFilesPrepared||preparing.pc||preparing.mobile||sharing||loading}
+          onClick={()=>{void handleShareBoth();}}>
+          {sharing||preparing.pc||preparing.mobile?
+            <Loader2 className="size-4 animate-spin" aria-hidden="true"/>:
+            <Share2 className="size-4" aria-hidden="true"/>}
+        </HqIconButton>
+      </>}>
       <div className="space-y-4">
         <div className="grid gap-3 rounded-[16px] bg-[#F7F9FC]/70 p-3 sm:grid-cols-2 sm:gap-0 sm:divide-x sm:divide-[#EDF1F6]">
           <div className="sm:pr-3.5">
@@ -266,33 +292,10 @@ export function HqDriverAssetManagerModal({
         </div>
         {fleet.error&&<p role="alert" className="text-[12px] text-[#B05B57]">{fleet.error}</p>}
         {error&&<p role="alert" className="text-[12px] text-[#B05B57]">{error}</p>}
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <HqButton variant="subtle" size="sm"
-            onClick={()=>setRevision(v=>v+1)} disabled={loading||summaryLoading}>
-            <RefreshCw className="size-4"/> 새로고침
-          </HqButton>
-          <HqButton variant="primary" size="sm"
-            disabled={!driver||!selectedVehicle||!selectedVehiclePhotoReady||fleet.loading}
-            onClick={()=>setBuilderOpen(true)}>
-            <ImageIcon className="size-4"/> 카드 만들기·수정
-          </HqButton>
-        </div>
         {selectedVehicle&&!selectedVehiclePhotoReady&&<p role="status" className="text-[11px] text-[#A17C55]">
           이 차량은 배차카드용 외관·실내 이미지가 아직 준비되지 않았어요. 차량 이미지를 등록한 뒤 카드를 만들 수 있습니다.
         </p>}
         {shareFeedback&&<p role="status" className="text-[11px] text-[#60728C]">{shareFeedback}</p>}
-        <div className="flex flex-wrap items-center justify-stretch gap-2 sm:justify-end">
-          <HqButton variant="primary" size="md" className="w-full sm:w-auto"
-            disabled={!bothFilesPrepared||preparing.pc||preparing.mobile||sharing||loading}
-            aria-label="PC·모바일 배차카드 PNG 두 장 한 번에 공유"
-            onClick={()=>{void handleShareBoth();}}>
-            {sharing||preparing.pc||preparing.mobile?<Loader2 className="size-4 animate-spin"/>:
-              canNativeShare?<Share2 className="size-4"/>:<Download className="size-4"/>}
-            {sharing?'파일 공유 중…':preparing.pc||preparing.mobile?'PNG 2장 준비 중…':
-              !bothCardsReady?'두 카드 생성 후 공유':
-              canNativeShare?'PC·모바일 함께 공유':'PC·모바일 ZIP 저장'}
-          </HqButton>
-        </div>
         <div className="flex gap-1 rounded-[12px] bg-[#F6F8FA] p-1 sm:hidden" aria-label="배차카드 미리보기 형식">
           {(['pc','mobile'] as const).map(variant=><button key={variant} type="button"
             aria-pressed={previewVariant===variant} onClick={()=>setPreviewVariant(variant)}
