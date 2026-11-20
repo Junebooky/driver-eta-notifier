@@ -107,7 +107,7 @@ test('driver dispatch card manager prioritizes registered vehicles, separates un
 
   const manager=source('components/hq/drivers/HqDriverAssetManagerModal.tsx');
   for(const phrase of [
-    '기사와 차량을 선택해 최신 배차카드를 확인하고 수정해요.',
+    '기사·차량을 선택해 배차카드를 확인하세요.',
     '카드 만들기·수정',
     '원본 보기',
     '등록된 차량',
