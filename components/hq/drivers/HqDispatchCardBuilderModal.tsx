@@ -610,7 +610,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
             <div className="space-y-3">
               {([
                 { label: '한국어 성명', value: name, onChange: updateKoreanName, placeholder: '윤태준', id: 'dispatch-card-korean-name' },
-                { label: '영문 성명', value: englishName, onChange: setEnglishName, placeholder: suggestedEnglishName || 'Tae-jun Yoon', id: 'dispatch-card-english-name' },
+                { label: '영문 성명', value: englishName, onChange: setEnglishName, placeholder: suggestedEnglishName || 'Tae-jun Yun', id: 'dispatch-card-english-name' },
                 { label: '전화번호', value: phone, onChange: setPhone, placeholder: '+82-10-1234-5678', id: 'dispatch-card-phone' },
               ] as const).map(field => (
                 <div key={field.id} className="space-y-1.5">

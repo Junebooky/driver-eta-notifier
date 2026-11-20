@@ -11,14 +11,14 @@ const builder = readFileSync(
 );
 
 test('Korean chauffeur names produce one deterministic placeholder value', () => {
-  assert.equal(formatKoreanEnglishName('윤태준'), 'Tae-jun Yoon');
+  assert.equal(formatKoreanEnglishName('윤태준'), 'Tae-jun Yun');
   assert.equal(formatKoreanEnglishName('김민혁'), 'Min-hyeok Kim');
   assert.equal(formatKoreanEnglishName('QA 테스트'), '');
   assert.equal(resolveDispatchCardEnglishName('윤태준', 'Taejun Yoon'), 'Taejun Yoon');
 });
 
 test('English-name placeholder can be filled with one tap or apply button', () => {
-  assert.match(builder, /placeholder: suggestedEnglishName \|\| 'Tae-jun Yoon'/);
+  assert.match(builder, /placeholder: suggestedEnglishName \|\| 'Tae-jun Yun'/);
   assert.match(builder, /onFocus=\{field\.label === '영문 성명' \? applySuggestedEnglishName : undefined\}/);
   assert.match(builder, /onClick=\{field\.label === '영문 성명' \? applySuggestedEnglishName : undefined\}/);
   assert.match(builder, /onClick=\{\(\) => setEnglishName\(suggestedEnglishName\)\}/);

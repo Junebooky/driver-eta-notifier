@@ -1,6 +1,6 @@
 /**
  * Single, consistent VIP LIMOUSINE KOREA card format: Given-name Syllables-Hyphenated Surname.
- * Example: 윤태준 -> Tae-jun Yoon.
+ * Example: 윤태준 -> Tae-jun Yun.
  * This is name romanization, not translation or legal/passport identity verification.
  * Already saved English names are preserved by the calling profile workflow.
  */
@@ -9,7 +9,7 @@ const VOWEL = ['a','ae','ya','yae','eo','e','yeo','ye','o','wa','wae','oe','yo',
 const FINAL = ['','k','k','ks','n','nj','nh','t','l','lk','lm','lb','ls','lt','lp','lh','m','p','ps','t','t','ng','t','t','k','t','p','t'];
 const FAMILY_NAMES: Record<string,string> = {
   '김':'Kim','이':'Lee','박':'Park','최':'Choi','정':'Jung','강':'Kang',
-  '조':'Cho','윤':'Yoon','장':'Jang','임':'Lim','한':'Han','오':'Oh',
+  '조':'Cho','윤':'Yun','장':'Jang','임':'Lim','한':'Han','오':'Oh',
   '서':'Seo','신':'Shin','권':'Kwon','황':'Hwang','안':'Ahn','송':'Song',
   '홍':'Hong','유':'Yoo','전':'Jeon','배':'Bae','백':'Baek','손':'Son',
   '남':'Nam','문':'Moon','하':'Ha','허':'Heo','고':'Ko','양':'Yang',
