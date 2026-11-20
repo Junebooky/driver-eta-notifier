@@ -37,10 +37,14 @@ test('driver profile details, schedule and table actions remain hooked up',()=>{
   assert.match(table,/setAffiliationFilter/);
   assert.match(table,/setResidenceFilter/);
   assert.match(table,/setStatusFilter/);
-  assert.match(table,/setEditingDriver\(driver\)/);
-  assert.match(table,/deleteDriver\(driverToRemove\.id\)/);
-  assert.match(table,/<HqModal/);
-  assert.match(table,/setDriverToRemove\(driver\)/);
+  // Actions formerly hidden in ··· now live in the profile or vehicle picker.
+  assert.match(table,/setCardPickerDriverId/);
+  assert.match(table,/<HqDriverCardPickerModal/);
+  assert.match(table,/<HqDispatchCardQuickFindModal/);
+  assert.doesNotMatch(table,/setMenuOpenDriverId|setDriverToRemove/);
+  assert.match(detail,/deleteDriver\(activeDriver\.id\)/);
+  assert.match(detail,/setShowRemoveConfirm\(true\)/);
+  assert.match(detail,/<HqModal/);
   assert.match(detail,/onSelectDriver\(driver\.id\)/);
   assert.match(detail,/onBackToTable/);
   assert.match(detail,/activeDriver\.name/);

@@ -17,6 +17,7 @@ import {
   Calendar,
   Image as ImageIcon,
   Pencil,
+  Trash2,
 } from 'lucide-react';
 import { HqDriverSummary, DriverScheduleItem } from '@/types/driverHq';
 import { useHqDrivers } from '@/utils/useHqDrivers';
@@ -29,6 +30,7 @@ import { HqDriverEditModal } from './HqDriverEditModal';
 import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
 import { HqTextarea } from '@/components/hq/ui';
 import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
+import { HqModal } from '@/components/hq/ui/HqModal';
 
 interface HqDriverDetailSplitViewProps {
   selectedDriverId: string;
@@ -43,6 +45,7 @@ interface HqDriverDetailSplitViewProps {
   };
   isLoading?: boolean;
   onUpdateDriver?: (id: string, updates: Record<string, any>) => Promise<boolean>;
+  onDeleteDriver?: (id: string) => Promise<boolean>;
   onRefreshDrivers?: () => Promise<void> | void;
 }
 
@@ -54,6 +57,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
   counts: propCounts,
   isLoading: propIsLoading,
   onUpdateDriver: propOnUpdateDriver,
+  onDeleteDriver: propOnDeleteDriver,
   onRefreshDrivers,
 }) => {
   const hookState = useHqDrivers();
@@ -61,6 +65,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
   const counts = propCounts ?? hookState.counts;
   const isLoading = propIsLoading ?? hookState.isLoading;
   const updateDriver = propOnUpdateDriver ?? hookState.updateDriver;
+  const deleteDriver = propOnDeleteDriver ?? hookState.deleteDriver;
 
   const [filterAffiliation, setFilterAffiliation] = useState<'all' | 'employed' | 'freelance'>('all');
   const [isEditingMemo, setIsEditingMemo] = useState(false);
@@ -72,6 +77,9 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isUpdatingAffiliation, setIsUpdatingAffiliation] = useState(false);
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const [removingDriver, setRemovingDriver] = useState(false);
+  const [removeError, setRemoveError] = useState('');
   const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
 
@@ -253,7 +261,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
           className="group inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-[14px] bg-white px-4 text-[12px] font-semibold text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.05)] transition-colors hover:bg-[#F5F8FF]"
         >
           <ArrowLeft className="w-3.5 h-3.5 text-slate-500 group-hover:-translate-x-0.5 transition-transform" />
-          <span>표 목록으로 보기</span>
+          <span>기사 목록</span>
         </button>
       </div>
 
@@ -265,7 +273,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
         {/* ========================================================= */}
         {/* Column 1 (Left): Compact Driver List (w-[250px])           */}
         {/* ========================================================= */}
-        <div className="flex h-[750px] w-full shrink-0 flex-col rounded-[23px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] lg:w-[250px]">
+        <div className="hidden h-[750px] w-full shrink-0 flex-col rounded-[23px] lg:flex bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] lg:w-[250px]">
           {/* Header */}
           <div className="flex items-center gap-2 rounded-t-[23px] bg-white px-4 py-4">
             <div className="relative group/drivers inline-flex items-center gap-2 cursor-pointer">
@@ -394,7 +402,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
         {/* Column 2 (Middle): 기본 정보 (Basic Info) (w-[320px])      */}
         {/* [Swapped position: placed in middle as requested]          */}
         {/* ========================================================= */}
-        <div className="h-[750px] w-full shrink-0 space-y-4 overflow-y-auto overscroll-contain rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] lg:w-[320px]">
+        <div className="h-auto w-full min-w-0 shrink-0 space-y-4 rounded-[23px] lg:h-[750px] lg:overflow-y-auto lg:overscroll-contain bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] lg:w-[320px]">
           {/* Section Header */}
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <h3 className="text-[15px] font-bold tracking-[-0.02em] text-[#17233B]">기본 정보</h3>
@@ -561,7 +569,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                   type="button"
                   disabled={isUpdatingAffiliation}
                   onClick={async () => {
-                    if (activeDriver.affiliationType !== 'employed') {
+                    if (activeDriver.affiliationType !== 'employed' && window.confirm(activeDriver.name+' 기사님의 소속 형태를 변경할까요?')) {
                       haptics.selection();
                       setIsUpdatingAffiliation(true);
                       try {
@@ -585,7 +593,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                   type="button"
                   disabled={isUpdatingAffiliation}
                   onClick={async () => {
-                    if (activeDriver.affiliationType !== 'freelance') {
+                    if (activeDriver.affiliationType !== 'freelance' && window.confirm(activeDriver.name+' 기사님의 소속 형태를 변경할까요?')) {
                       haptics.selection();
                       setIsUpdatingAffiliation(true);
                       try {
@@ -746,13 +754,19 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
               </button>
             )}
           </div>
+          <div className="border-t border-[#EEF1F5] pt-3">
+            <button type="button" onClick={()=>{setRemoveError('');setShowRemoveConfirm(true);}}
+              className="inline-flex min-h-11 items-center gap-2 rounded-[12px] px-2 text-[12px] font-medium text-[#A35E59] hover:bg-[#FFF7F5]">
+              <Trash2 className="size-4"/> 기사 등록 해제
+            </button>
+          </div>
         </div>
 
         {/* ========================================================= */}
         {/* Column 3 (Right): 주간 스케줄 달력표 (Weekly Timetable)     */}
         {/* [Swapped position: placed on right as requested]          */}
         {/* ========================================================= */}
-        <div className="flex-1 min-w-0 w-full rounded-[23px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] p-5 space-y-4 h-[750px] flex flex-col">
+        <div className="flex min-w-0 w-full flex-1 flex-col space-y-4 rounded-[23px] bg-white p-3.5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-5 h-[640px] lg:h-[750px]">
           {/* Header Bar: Title + Week Navigator */}
           <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100 shrink-0">
             <h3 className="text-[15px] font-bold tracking-[-0.02em] text-[#17233B]">
@@ -795,9 +809,9 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
           </div>
 
           {/* Timetable Grid Container */}
-          <div className="flex-1 border border-slate-200 rounded-xl overflow-hidden flex flex-col min-h-0 bg-white select-none">
+          <div className="flex-1 border border-slate-200 rounded-xl overflow-x-auto flex flex-col min-h-0 bg-white select-none">
             {/* Top Days Header Row */}
-            <div className="grid grid-cols-8 border-b border-slate-200 bg-slate-50 text-center text-xs font-black divide-x divide-slate-200 shrink-0">
+            <div className="grid min-w-[760px] grid-cols-8 border-b border-slate-200 bg-slate-50 text-center text-xs font-black divide-x divide-slate-200 shrink-0 lg:min-w-0">
               {/* Top-left corner cell */}
               <div className="py-2.5 px-1 text-[11px] text-slate-400 font-semibold flex items-center justify-center">
                 시간
@@ -822,7 +836,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
 
             {/* Timetable Rows Body */}
             <div className="flex-1 overflow-y-auto relative">
-              <div className="grid grid-cols-8 relative min-h-[496px]">
+              <div className="grid min-w-[760px] grid-cols-8 relative min-h-[496px] lg:min-w-0">
                 {/* Left Hours Column */}
                 <div className="divide-y divide-slate-100 border-r border-slate-100 bg-slate-50/40">
                   {timeHours.map((hour) => (
@@ -941,6 +955,37 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
           }}
         />
       )}
+
+      <HqModal
+        isOpen={showRemoveConfirm}
+        title="기사 등록 해제"
+        subtitle={activeDriver.name+' 기사님의 등록을 해제하시겠습니까?'}
+        onClose={()=>{if(!removingDriver){setShowRemoveConfirm(false);setRemoveError('');}}}
+        footer={<>
+          <button type="button" disabled={removingDriver} onClick={()=>setShowRemoveConfirm(false)}
+            className="min-h-11 rounded-[12px] bg-[#F6F8FA] px-4 text-[12px] font-semibold text-[#60728B] disabled:opacity-50">취소</button>
+          <button type="button" disabled={removingDriver} onClick={async()=>{
+            if(removingDriver)return;
+            setRemovingDriver(true);setRemoveError('');
+            try{
+              const ok=await deleteDriver(activeDriver.id);
+              if(!ok){setRemoveError('등록 해제에 실패했습니다. 서버 연결과 배차 상태를 확인해 주세요.');return;}
+              setShowRemoveConfirm(false);
+              onBackToTable();
+              onRefreshDrivers?.();
+            }catch(error){
+              setRemoveError(error instanceof Error?error.message:'등록 해제에 실패했습니다.');
+            }finally{setRemovingDriver(false);}
+          }} className="min-h-11 rounded-[12px] bg-[#A85C54] px-4 text-[12px] font-semibold text-white disabled:opacity-50">
+            {removingDriver?'등록 해제 중…':'등록 해제'}
+          </button>
+        </>}>
+        <p className="text-[13px] leading-relaxed text-[#60728B]">
+          등록 해제 후에는 새 배차에 지정할 수 없습니다. 기존 운행 기록은 유지되며,
+          진행 중인 배차가 있으면 서버의 안전 규칙에 따라 처리됩니다.
+        </p>
+        {removeError&&<p role="alert" className="mt-3 text-[12px] text-[#A45B54]">{removeError}</p>}
+      </HqModal>
 
       {/* Driver Profile Edit Modal */}
       {isEditModalOpen && activeDriver && (

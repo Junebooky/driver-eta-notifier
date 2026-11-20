@@ -38,10 +38,13 @@ test('driver form and table filters share A-plan search select', () => {
   assert.match(table, /setStatusFilter\(next as typeof statusFilter\)/);
   assert.match(table, /setCurrentPage\(1\)/);
   assert.doesNotMatch(table, /<select\b/);
-  assert.match(table, /<HqModal/);
-  assert.match(table, /setDriverToRemove\(driver\)/);
-  assert.match(table, /deleteDriver\(driverToRemove\.id\)/);
-  assert.match(table, /setRemoveError\(/);
+  const detail = source('components/hq/drivers/HqDriverDetailSplitView.tsx');
+  assert.match(table, /<HqDriverCardPickerModal/);
+  assert.match(table, /<HqDispatchCardQuickFindModal/);
+  assert.doesNotMatch(table, /setMenuOpenDriverId|setDriverToRemove/);
+  assert.match(detail, /<HqModal/);
+  assert.match(detail, /deleteDriver\(activeDriver\.id\)/);
+  assert.match(detail, /setRemoveError\(/);
   assert.doesNotMatch(table, /window\.confirm\(|alert\('등록 해제에 실패/);
 });
 
