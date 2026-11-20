@@ -113,6 +113,14 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
     setViewMode('detail');
   };
 
+  // In the HQ mobile shell the roster may be scrolled far down. Start every
+  // selected profile at its top instead of preserving the previous list offset.
+  useEffect(() => {
+    if (viewMode !== 'detail' || typeof window === 'undefined' ||
+        !window.matchMedia('(max-width: 1023px)').matches) return;
+    window.scrollTo({top: 0, behavior: 'instant'});
+  }, [viewMode, selectedDriverId]);
+
   const handleBackToTable = () => {
     haptics.lightTap();
     setViewMode('table');
@@ -229,6 +237,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
           counts={counts}
           isLoading={isLoading}
           onUpdateDriver={updateDriver}
+          onDeleteDriver={deleteDriver}
           onRefreshDrivers={refetch}
         />
       )}
