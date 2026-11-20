@@ -103,12 +103,20 @@ test('customer card names use official Mercedes-Benz Sprinter and the verified s
   const sprinters = VIP_REAL_VEHICLES.filter(vehicle => vehicle.category === 'sprinter');
   assert.equal(sprinters.length, Object.keys(seating).length);
   for (const vehicle of sprinters) {
-    const expectedModel = vehicle.plateShort === '8040' ? '319' : '519';
+    const expectedModel = vehicle.plateShort === '9982' ? '319' : '519';
     assert.equal(
       dispatchCardVehicleLabel(vehicle),
       `Mercedes-Benz Sprinter ${expectedModel} CDI · ${seating[vehicle.plateShort]} Seats`,
       vehicle.plate,
     );
+  }
+
+  // Stale DB labels must not change the model-specific photo lookup.
+  for (const plate of ['9982', '8040']) {
+    const car = sprinters.find(vehicle => vehicle.plateShort === plate);
+    assert.ok(car);
+    const staleModel = plate === '9982' ? '벤츠 스프린터 519 CDI' : '벤츠 스프린터 319 CDI';
+    assert.equal(dispatchCardModelFolder({ ...car, model: staleModel }), plate === '9982' ? 'sprinter_319' : 'sprinter_519');
   }
 
   // A stale DB row must never change the customer-visible model or seat count.

@@ -19,8 +19,8 @@ A `.gitkeep` is just a Git folder placeholder, **not** an image.
 
 | Folder | Vehicle plate suffixes | Photo policy |
 | --- | --- | --- |
-| `mercedes-benz/sprinter-319-cdi/8040/` | 8040 | vehicle-specific |
-| `mercedes-benz/sprinter-519-cdi/{plate}/` | 9982, 1458, 2658, 3864, 3338, 2553, 3285, 1058 | vehicle-specific; interiors are not interchangeable |
+| `mercedes-benz/sprinter-319-cdi/9982/` | 9982 | vehicle-specific |
+| `mercedes-benz/sprinter-519-cdi/{plate}/` | 8040, 1458, 2658, 3864, 3338, 2553, 3285, 1058 | vehicle-specific; interiors are not interchangeable |
 | `mercedes-benz/s560/3343/` | 3343 | vehicle-specific |
 | `hyundai/staria-limousine/` | **7665, 9037, 8407, 1514** | **one shared photo set for all four vehicles** |
 | `kia/carnival-hi-limousine/` | **5336, 7681** | **one shared photo set for both vehicles** |

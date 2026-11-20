@@ -16,6 +16,11 @@ export function dispatchCardModelFolder(vehicle: Car): string {
   const model = vehicle.model.toLowerCase();
   if (vehicle.category === 'staria') return 'staria';
   if (vehicle.category === 'sprinter') {
+    // Plate-verified physical model overrides any stale DB label.
+    const canonical = findVipVehicle(vehicle.plate);
+    if (canonical?.category === 'sprinter') {
+      return canonical.model.includes('319') ? 'sprinter_319' : 'sprinter_519';
+    }
     if (model.includes('519')) return 'sprinter_519';
     if (model.includes('319')) return 'sprinter_319';
   }
