@@ -7,7 +7,6 @@ import {
   LogOut,
   Pin,
   PinOff,
-  ContactRound,
 } from 'lucide-react';
 import {HqButton} from '@/components/hq/ui';
 import { haptics } from '@/utils/haptics';
@@ -267,7 +266,7 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
               onCloseMobile?.();
               onOpenDispatchCard();
             }}>
-            <ContactRound className="size-4 shrink-0 text-[#526680]" aria-hidden="true"/>
+            <img src="/images/icons/drivers/icon_driver.png" alt="" aria-hidden="true" className="size-5 shrink-0 object-contain"/>
             <span className="text-[13px] font-semibold">배차카드 빠른 검색</span>
           </HqButton>
         </div>

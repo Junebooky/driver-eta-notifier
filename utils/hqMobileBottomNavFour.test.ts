@@ -19,7 +19,9 @@ test('mobile bottom navigation has exactly four meaningful actions in the approv
  assert.doesNotMatch(nav,/grid-cols-5|id:'vehicles'/);
  assert.match(nav,/onQuickBooking/);
  assert.match(nav,/onMenu/);
- assert.match(nav,/bg-\[#1E60F3\]/);
+ assert.match(nav,/<Icon className="size-5" aria-hidden="true"\/>/);
+ assert.doesNotMatch(nav,/id==='quick'\s*\?\s*<span|rounded-full bg-\[#1E60F3\] text-white shadow-/);
+ assert.match(nav,/active\?'bg-\[#F3F7FF\] text-\[#1E60F3\]'/);
  assert.match(nav,/actionCount>99\?'99\+'/);
 });
 
