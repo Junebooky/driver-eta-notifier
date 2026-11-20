@@ -23,6 +23,7 @@ import {
 import { FieldKnowledgeItem, FieldKnowledgeCategory } from '@/types/fieldKnowledge';
 import { useSharedFieldKnowledge } from '@/hooks/useSharedFieldKnowledge';
 import { haptics } from '@/utils/haptics';
+import {fieldKnowledgeGuideRows} from '@/utils/fieldKnowledgeGuideDisplay';
 
 export interface DriverFieldKnowledgeModalProps {
   isOpen: boolean;
@@ -252,55 +253,18 @@ export const DriverFieldKnowledgeModal: React.FC<DriverFieldKnowledgeModalProps>
             {/* Tab 1: Info Content */}
             {activeTab === 'info' && (
               <div className="p-4 sm:p-5 space-y-4">
-                {/* 6 Quick Action Grid Buttons */}
-                <div className="grid grid-cols-3 gap-2.5">
-                  {/* 1. 무료회차 */}
-                  <div className="p-3 rounded-2xl bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] flex flex-col items-center justify-center text-center">
-                    <div className="w-8 h-8 rounded-full bg-[#EBF3FF] text-[#0055FF] flex items-center justify-center mb-1.5">
-                      <CircleParking className="w-4 h-4" />
+                {/* Data-driven quick facts: only display registered operational facts. */}
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+                  {fieldKnowledgeGuideRows(activeItem).slice(0,6).map(row=>(
+                    <div key={row.key} className="min-w-0 rounded-[16px] bg-white p-3 shadow-[0_3px_12px_rgba(15,23,42,0.035)]">
+                      <p className="text-[11px] font-semibold text-[#8190A5]">{row.label}</p>
+                      <p className="mt-1 line-clamp-2 break-words text-[12px] font-medium text-[#243750]">{row.value}</p>
                     </div>
-                    <span className="text-[12px] font-bold text-slate-700">무료회차</span>
-                  </div>
-
-                  {/* 2. 스프린터 대기 */}
-                  <div className="p-3 rounded-2xl bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] flex flex-col items-center justify-center text-center">
-                    <div className="w-8 h-8 rounded-full bg-[#EBF3FF] text-[#0055FF] flex items-center justify-center mb-1.5">
-                      <Truck className="w-4 h-4" />
-                    </div>
-                    <span className="text-[12px] font-bold text-slate-700">스프린터 대기</span>
-                  </div>
-
-                  {/* 3. 화장실 */}
-                  <div className="p-3 rounded-2xl bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] flex flex-col items-center justify-center text-center">
-                    <div className="w-8 h-8 rounded-full bg-[#EBF3FF] text-[#0055FF] flex items-center justify-center mb-1.5">
-                      <Users2 className="w-4 h-4" />
-                    </div>
-                    <span className="text-[12px] font-bold text-slate-700">화장실</span>
-                  </div>
-
-                  {/* 4. 픽업 위치 */}
-                  <div className="p-3 rounded-2xl bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] flex flex-col items-center justify-center text-center">
-                    <div className="w-8 h-8 rounded-full bg-[#EBF3FF] text-[#0055FF] flex items-center justify-center mb-1.5">
-                      <MapPin className="w-4 h-4" />
-                    </div>
-                    <span className="text-[12px] font-bold text-slate-700">픽업 위치</span>
-                  </div>
-
-                  {/* 5. 차량 대기 */}
-                  <div className="p-3 rounded-2xl bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] flex flex-col items-center justify-center text-center">
-                    <div className="w-8 h-8 rounded-full bg-[#EBF3FF] text-[#0055FF] flex items-center justify-center mb-1.5">
-                      <Car className="w-4 h-4" />
-                    </div>
-                    <span className="text-[12px] font-bold text-slate-700">차량 대기</span>
-                  </div>
-
-                  {/* 6. 주정차 주의 */}
-                  <div className="p-3 rounded-2xl bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] flex flex-col items-center justify-center text-center">
-                    <div className="w-8 h-8 rounded-full bg-[#EBF3FF] text-[#0055FF] flex items-center justify-center mb-1.5">
-                      <AlertTriangle className="w-4 h-4 text-slate-600" />
-                    </div>
-                    <span className="text-[12px] font-bold text-slate-700">주정차 주의</span>
-                  </div>
+                  ))}
+                  {!fieldKnowledgeGuideRows(activeItem).length&&
+                    <p className="col-span-full py-4 text-center text-[12px] text-[#94A3B8]">
+                      등록된 현장 정보가 없습니다.
+                    </p>}
                 </div>
 
                 {/* Detailed Accordion Section List */}
@@ -360,83 +324,16 @@ export const DriverFieldKnowledgeModal: React.FC<DriverFieldKnowledgeModalProps>
                     </div>
                   )}
 
-                  {/* 무료회차 */}
-                  {activeItem.freeParkingNotice && (
-                    <div className="p-4 flex items-start gap-3">
-                      <CircleParking className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-[11px] font-bold text-slate-400">무료회차</p>
-                        <p className="text-[13px] font-medium text-slate-800 mt-0.5">
-                          {activeItem.freeParkingNotice}
-                        </p>
+                  {/* Server-validated standard guide, with old notes as fallback. */}
+                  {fieldKnowledgeGuideRows(activeItem).map(row=>(
+                    <div key={row.key} className="flex items-start gap-3 p-4">
+                      <Info className="mt-0.5 size-4 shrink-0 text-[#8C99AC]"/>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-semibold text-[#8390A3]">{row.label}</p>
+                        <p className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-[#293B52]">{row.value}</p>
                       </div>
                     </div>
-                  )}
-
-                  {/* 스프린터 대기 가능 */}
-                  {activeItem.sprinterWaiting && (
-                    <div className="p-4 flex items-start gap-3">
-                      <Truck className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-[11px] font-bold text-slate-400">스프린터 대기 가능</p>
-                        <p className="text-[13px] font-medium text-slate-800 mt-0.5">
-                          {activeItem.sprinterWaiting}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 화장실 위치 */}
-                  {activeItem.restroomLocation && (
-                    <div className="p-4 flex items-start gap-3">
-                      <Users2 className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-[11px] font-bold text-slate-400">화장실 위치</p>
-                        <p className="text-[13px] font-medium text-slate-800 mt-0.5">
-                          {activeItem.restroomLocation}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 차량 대기 위치 */}
-                  {activeItem.vehicleWaitingNotes && (
-                    <div className="p-4 flex items-start gap-3">
-                      <Car className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-[11px] font-bold text-slate-400">차량 대기 위치</p>
-                        <p className="text-[13px] font-medium text-slate-800 mt-0.5">
-                          {activeItem.vehicleWaitingNotes}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 주정차 주의사항 */}
-                  {activeItem.cautionNotes && (
-                    <div className="p-4 flex items-start gap-3">
-                      <AlertTriangle className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-[11px] font-bold text-slate-400">주정차 주의사항</p>
-                        <p className="text-[13px] font-medium text-slate-800 mt-0.5">
-                          {activeItem.cautionNotes}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 추가 정보 */}
-                  {activeItem.additionalNotes && (
-                    <div className="p-4 flex items-start gap-3">
-                      <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-[11px] font-bold text-slate-400">추가 정보</p>
-                        <p className="text-[13px] font-medium text-slate-800 mt-0.5">
-                          {activeItem.additionalNotes}
-                        </p>
-                      </div>
-                    </div>
-                  )}
+                  ))}
                 </div>
               </div>
             )}

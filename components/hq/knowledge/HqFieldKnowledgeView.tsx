@@ -33,6 +33,10 @@ import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 import { HqModal } from '@/components/hq/ui/HqModal';
 import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
 import { isValidFieldKnowledgeImageUrl } from '@/utils/hqKnowledgeImageUrl';
+import {HqButton,HqCard,HqBadge,HqInput,HqSegmentedTabs} from '@/components/hq/ui';
+import {HqFieldKnowledgeEditor} from './HqFieldKnowledgeEditor';
+import {emptyFieldKnowledgeGuide,validateFieldKnowledgeGuide} from '@/utils/fieldKnowledgeGuide';
+import {uploadKnowledgePhoto,cleanupUncommittedKnowledgePhotos,type UploadedKnowledgeImage} from '@/utils/fieldKnowledgeImageUpload';
 
 export interface HqFieldKnowledgeViewProps {
   initialSearchQuery?: string;
@@ -65,15 +69,11 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
   // View state: 'list' | 'edit'
   const [currentView, setCurrentView] = useState<'list' | 'edit'>('list');
   const [editingItem, setEditingItem] = useState<FieldKnowledgeItem | null>(null);
-  const [editTab, setEditTab] = useState<'details' | 'photos'>('details');
 
   // Toast feedback state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [feedbackTone, setFeedbackTone] = useState<'info' | 'error'>('info');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [photoDialogMode, setPhotoDialogMode] = useState<'cover' | 'photo' | null>(null);
-  const [photoUrlDraft, setPhotoUrlDraft] = useState('');
-  const [photoInputError, setPhotoInputError] = useState<string | null>(null);
 
   const showToast = (msg: string, tone: 'info' | 'error' = 'info') => {
     setFeedbackTone(tone);
@@ -110,7 +110,6 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
     haptics.lightTap();
     setEditingItem({ ...item });
     setToastMessage(null);
-    setEditTab('details');
     setCurrentView('edit');
   };
 
@@ -126,6 +125,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
       description: '',
       imageUrl: '/images/icons/knowledge/icon_knowledge.png',
       photos: [],
+      guide: emptyFieldKnowledgeGuide(),
       address: '',
       phone: '',
       website: '',
@@ -141,39 +141,57 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
     };
     setEditingItem(newItem);
     setToastMessage(null);
-    setEditTab('details');
     setCurrentView('edit');
   };
 
-  // Mutations require confirmed DB writes and the version opened by HQ.
-  const handleSaveItem = async () => {
-    if (!editingItem || isMutating) return;
-    if (!editingItem.title.trim()) {
-      showToast('장소명을 입력해 주세요.', 'error');
-      return;
-    }
-    if (!isValidFieldKnowledgeImageUrl(editingItem.imageUrl) ||
-      (editingItem.photos || []).some(url => !isValidFieldKnowledgeImageUrl(url))) {
-      showToast('이미지 주소는 유효한 HTTPS 또는 앱 이미지 경로여야 합니다.', 'error');
-      return;
+  // Uploaded files stay local until Save. Never persist blob/object URLs.
+  // If the DB write fails, clean up just files from this save attempt.
+  const handleSaveItem=async(coverFile:File|null=null,galleryFiles:File[]=[])=>{
+    if(!editingItem||isMutating)return;
+    if(!editingItem.title.trim()){showToast('장소명을 입력해 주세요.','error');return;}
+    const validated=validateFieldKnowledgeGuide(editingItem.guide||emptyFieldKnowledgeGuide());
+    if(!validated.ok){showToast(validated.error,'error');return;}
+    if((editingItem.photos?.length||0)+galleryFiles.length>25){
+      showToast('사진 갤러리는 최대 25장까지 등록할 수 있습니다.','error');return;
     }
     setIsMutating(true);
-    try {
-      const existing = Number.isSafeInteger(editingItem.version) && Number(editingItem.version) > 0;
-      const response = await mutateSharedFieldKnowledge(existing ? 'PUT' : 'POST', {
-        item: editingItem, ...(existing ? { expectedVersion: editingItem.version } : {}),
-      });
-      if (!response.ok) {
-        haptics.errorAlert();
-        showToast(response.error || '현장 지식을 서버에 저장하지 못했습니다.', 'error');
-        return;
+    const uploaded:UploadedKnowledgeImage[]=[];
+    let committed=false;
+    try{
+      let coverUrl=editingItem.imageUrl;
+      if(coverFile){
+        const saved=await uploadKnowledgePhoto(editingItem.id,coverFile);
+        uploaded.push(saved);
+        coverUrl=saved.url;
       }
+      const photos=[...(editingItem.photos||[])];
+      for(const file of galleryFiles){
+        const saved=await uploadKnowledgePhoto(editingItem.id,file);
+        uploaded.push(saved);
+        photos.push(saved.url);
+      }
+      const next:FieldKnowledgeItem={
+        ...editingItem,imageUrl:coverUrl,photos,guide:validated.guide,
+      };
+      if(!isValidFieldKnowledgeImageUrl(next.imageUrl)||
+        photos.some(url=>!isValidFieldKnowledgeImageUrl(url)))
+        throw new Error('이미지 URL이 올바르지 않습니다.');
+      const existing=Number.isSafeInteger(editingItem.version)&&Number(editingItem.version)>0;
+      const result=await mutateSharedFieldKnowledge(existing?'PUT':'POST',{
+        item:next,...(existing?{expectedVersion:editingItem.version}:{}),
+      });
+      if(!result.ok)throw new Error(result.error||'현장 지식 저장에 실패했습니다.');
+      committed=true;
       haptics.success();
-      showToast(`'${editingItem.title}' 현장 지식이 회사 공용 DB에 저장되었습니다.`);
+      showToast("'"+editingItem.title+"' 현장 지식과 표준 양식이 저장되었습니다.");
       setCurrentView('list');
       setEditingItem(null);
       await refreshKnowledge();
-    } finally {
+    }catch(e){
+      if(!committed)await cleanupUncommittedKnowledgePhotos(uploaded);
+      haptics.errorAlert();
+      showToast(e instanceof Error?e.message:'이미지를 저장하지 못했습니다.','error');
+    }finally{
       setIsMutating(false);
     }
   };
@@ -236,458 +254,25 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
     }
   };
 
-  const openPhotoDialog = (mode: 'cover' | 'photo') => {
-    if (!editingItem) return;
-    setPhotoDialogMode(mode);
-    setPhotoUrlDraft(mode === 'cover' ? editingItem.imageUrl : '');
-    setPhotoInputError(null);
-  };
-
-  const savePhotoUrl = () => {
-    if (!editingItem || !photoDialogMode) return;
-    if (!isValidFieldKnowledgeImageUrl(photoUrlDraft)) {
-      setPhotoInputError('유효한 HTTPS 이미지 주소 또는 /images/로 시작하는 경로를 입력해 주세요.');
-      return;
-    }
-    const url = photoUrlDraft.trim();
-    setEditingItem(previous => previous ? photoDialogMode === 'cover'
-      ? { ...previous, imageUrl: url }
-      : { ...previous, photos: [...(previous.photos || []), url] }
-      : previous);
-    setPhotoDialogMode(null);
-    setPhotoInputError(null);
-    showToast('이미지를 수정했습니다. 변경사항을 저장하려면 아래 저장 버튼을 눌러 주세요.');
-  };
-
-  // =========================================================================
-  // VIEW: EDIT SCREEN (Reference 2 Screen C)
-  // =========================================================================
-  if (currentView === 'edit' && editingItem) {
-    const descLength = editingItem.description?.length || 0;
-
-    return (
-      <div className="space-y-4 max-w-5xl mx-auto">
-        {/* Top Header Bar */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-[#1E60F3]">
-              <BookOpen className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-slate-900 tracking-tight">현장 지식 수정</h2>
-              <p className="text-xs text-slate-500 font-medium">
-                관리자 등록 내용은 회사 공용 DB에 저장되며 기사 앱에서 자동 갱신됩니다.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* STRICT REQUIREMENT: Clean Neutral Gray Delete Button (NOT RED!) */}
-            <button
-              type="button"
-              disabled={!editingItem.version || isMutating}
-              onClick={handleDeleteItem}
-              className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-100/80 active:scale-95 text-slate-700 text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
-              title="현장 지식 삭제"
-            >
-              <Trash2 className="w-3.5 h-3.5 text-slate-500" />
-              <span>삭제</span>
-            </button>
-
-            {/* Back to List Button */}
-            <button
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                setCurrentView('list');
-                setEditingItem(null);
-              }}
-              className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 text-slate-700 text-xs font-bold flex items-center gap-1 shadow-2xs transition-all cursor-pointer"
-            >
-              <ChevronLeft className="w-3.5 h-3.5 text-slate-500" />
-              <span>목록으로</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Toast Feedback */}
-        <HqInlineFeedback
-          message={toastMessage}
-          tone={feedbackTone}
-          onDismiss={() => setToastMessage(null)}
-        />
-
-        {/* Main Header Edit Card: Image + Title/Category/Description */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
-            {/* Left: Representative Image with change button */}
-            <div className="md:col-span-4 flex flex-col items-center">
-              <div className="relative w-full h-48 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 group">
-                <img
-                  src={editingItem.imageUrl}
-                  alt={editingItem.title || '대표 이미지'}
-                  className="w-full h-full object-cover"
-                />
-                <button
-                  type="button"
-                  onClick={() => openPhotoDialog('cover')}
-                  className="absolute bottom-2.5 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-white/95 hover:bg-white text-[#374B66] text-[11px] font-bold flex items-center gap-1.5 backdrop-blur-xs transition-all cursor-pointer"
-                >
-                  <Camera className="w-3.5 h-3.5" />
-                  <span>대표 이미지 변경</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Right: Meta Fields */}
-            <div className="md:col-span-8 space-y-3.5">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="sm:col-span-2 space-y-1">
-                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                    <span>장소명</span>
-                    <span className="text-[#1E60F3]">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={editingItem.title}
-                    onChange={(e) => setEditingItem({ ...editingItem, title: e.target.value })}
-                    placeholder="예: 조선팰리스 강남, 인천공항 T2"
-                    className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:bg-white focus:outline-hidden focus:border-[#1E60F3]"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                    <span>카테고리</span>
-                    <span className="text-[#1E60F3]">*</span>
-                  </label>
-                  <HqSearchSelect
-                    label="현장 지식 카테고리"
-                    size="sm"
-                    value={editingItem.category}
-                    onChange={next => setEditingItem(previous => previous ? {
-                      ...previous, category: next as FieldKnowledgeItem['category'], categoryBadge: next,
-                    } : previous)}
-                    placeholder="카테고리 선택"
-                    options={CATEGORIES.filter(category => category !== '전체').map(category => ({ value: category, label: category }))}
-                  />
-                </div>
-              </div>
-
-              {/* 한 줄 설명 */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-700">한 줄 설명</label>
-                  <span className="text-[11px] text-slate-400 font-semibold">{descLength}/100</span>
-                </div>
-                <input
-                  type="text"
-                  maxLength={100}
-                  value={editingItem.description}
-                  onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
-                  placeholder="장소의 성격과 핵심 특징을 한 줄로 요약해 주세요"
-                  className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:outline-hidden focus:border-[#1E60F3]"
-                />
-              </div>
-
-              {/* 서브 카피 / 배지 문구 */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">서브 안내 문구</label>
-                <input
-                  type="text"
-                  value={editingItem.subtitle || ''}
-                  onChange={(e) => setEditingItem({ ...editingItem, subtitle: e.target.value })}
-                  placeholder="예: 차량 진입 안내, 미팅포인트 안내, 주차 및 발렛"
-                  className="w-full px-3.5 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:outline-hidden focus:border-[#1E60F3]"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Sub-tabs: 기본정보 | 사진 */}
-        <div className="flex items-center gap-6 border-b border-slate-200 px-2 pt-1">
-          <button
-            type="button"
-            onClick={() => {
-              haptics.selection();
-              setEditTab('details');
-            }}
-            className={`pb-2.5 text-xs font-bold transition-all relative cursor-pointer ${editTab === 'details'
-              ? 'text-[#1E60F3] font-black'
-              : 'text-slate-400 hover:text-slate-700'
-              }`}
-          >
-            <span>기본정보</span>
-            {editTab === 'details' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1E60F3] rounded-full" />
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              haptics.selection();
-              setEditTab('photos');
-            }}
-            className={`pb-2.5 text-xs font-bold transition-all relative cursor-pointer ${editTab === 'photos'
-              ? 'text-[#1E60F3] font-black'
-              : 'text-slate-400 hover:text-slate-700'
-              }`}
-          >
-            <span>사진 갤러리</span>
-            {editTab === 'photos' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1E60F3] rounded-full" />
-            )}
-          </button>
-        </div>
-
-        {/* Tab 1: 기본정보 Form Fields */}
-        {editTab === 'details' && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-4">
-            {/* 1. 주소 */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                <span>주소</span>
-              </label>
-              <input
-                type="text"
-                value={editingItem.address}
-                onChange={(e) => setEditingItem({ ...editingItem, address: e.target.value })}
-                placeholder="서울시 강남구 테헤란로 231..."
-                className="w-full px-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:outline-hidden focus:border-[#1E60F3]"
-              />
-            </div>
-
-            {/* 2. 대표전화 & 공식 웹사이트 */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <Phone className="w-3.5 h-3.5 text-slate-400" />
-                  <span>대표전화</span>
-                </label>
-                <input
-                  type="tel"
-                  value={editingItem.phone || ''}
-                  onChange={(e) => setEditingItem({ ...editingItem, phone: formatPhoneNumber(e.target.value) })}
-                  placeholder="예: 02-727-7200 또는 010-1234-5678"
-                  maxLength={13}
-                  className="w-full px-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:outline-hidden focus:border-[#1E60F3]"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <Globe className="w-3.5 h-3.5 text-slate-400" />
-                  <span>공식 웹사이트</span>
-                </label>
-                <input
-                  type="text"
-                  value={editingItem.website || ''}
-                  onChange={(e) => setEditingItem({ ...editingItem, website: e.target.value })}
-                  placeholder="https://..."
-                  className="w-full px-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:outline-hidden focus:border-[#1E60F3]"
-                />
-              </div>
-            </div>
-
-            {/* 3. 무료회차 안내 */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                <CircleParking className="w-3.5 h-3.5 text-slate-400" />
-                <span>무료회차</span>
-              </label>
-              <input
-                type="text"
-                value={editingItem.freeParkingNotice || ''}
-                onChange={(e) =>
-                  setEditingItem({ ...editingItem, freeParkingNotice: e.target.value })
-                }
-                placeholder="예: 30분 (호텔 등록 시 무료, 이후 유료)"
-                className="w-full px-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:outline-hidden focus:border-[#1E60F3]"
-              />
-            </div>
-
-            {/* 4. 스프린터 대기 가능 구역 */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                <Truck className="w-3.5 h-3.5 text-slate-400" />
-                <span>스프린터 대기 가능 구역</span>
-              </label>
-              <input
-                type="text"
-                value={editingItem.sprinterWaiting || ''}
-                onChange={(e) => setEditingItem({ ...editingItem, sprinterWaiting: e.target.value })}
-                placeholder="예: 로비 앞, B2, B3 (상황에 따라 변동 가능)"
-                className="w-full px-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:outline-hidden focus:border-[#1E60F3]"
-              />
-            </div>
-
-            {/* 5. 화장실 위치 */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                <Users2 className="w-3.5 h-3.5 text-slate-400" />
-                <span>화장실 위치</span>
-              </label>
-              <input
-                type="text"
-                value={editingItem.restroomLocation || ''}
-                onChange={(e) =>
-                  setEditingItem({ ...editingItem, restroomLocation: e.target.value })
-                }
-                placeholder="예: 로비층, B2층 (직원 전용 화장실 별도)"
-                className="w-full px-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:outline-hidden focus:border-[#1E60F3]"
-              />
-            </div>
-
-            {/* 6. 차량 대기 위치 */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                <Car className="w-3.5 h-3.5 text-slate-400" />
-                <span>차량 대기 위치</span>
-              </label>
-              <input
-                type="text"
-                value={editingItem.vehicleWaitingNotes || ''}
-                onChange={(e) =>
-                  setEditingItem({ ...editingItem, vehicleWaitingNotes: e.target.value })
-                }
-                placeholder="예: 지하 주차장 대기 구역 (직원 안내 필요)"
-                className="w-full px-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:outline-hidden focus:border-[#1E60F3]"
-              />
-            </div>
-
-            {/* 7. 추가 정보 (공사, 행사 기간, 주차 제한 등) */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                <Info className="w-3.5 h-3.5 text-slate-400" />
-                <span>추가 정보</span>
-              </label>
-              <textarea
-                rows={3}
-                value={editingItem.additionalNotes || ''}
-                onChange={(e) => setEditingItem({ ...editingItem, additionalNotes: e.target.value })}
-                placeholder="추가로 알아야 할 정보가 있다면 입력하세요. (예: 공사, 행사 기간, 주차 제한, VIP 전용 동선 등)"
-                className="w-full px-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:outline-hidden focus:border-[#1E60F3]"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Tab 2: 사진 갤러리 */}
-        {editTab === 'photos' && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-slate-700">현장 참조 사진 목록</h3>
-              <button
-                type="button"
-                onClick={() => openPhotoDialog('photo')}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>사진 추가</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {(editingItem.photos || []).map((p, idx) => (
-                <div
-                  key={idx}
-                  className="relative h-28 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 group"
-                >
-                  <img src={p} alt={`사진 ${idx + 1}`} className="w-full h-full object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingItem({
-                        ...editingItem,
-                        photos: (editingItem.photos || []).filter((_, i) => i !== idx),
-                      });
-                    }}
-                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-white/95 text-[#52647A] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
-              {(editingItem.photos || []).length === 0 && (
-                <div className="col-span-full py-8 text-center text-xs text-slate-400">
-                  등록된 추가 현장 사진이 없습니다.
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Bottom Action Buttons: [취소] [저장] */}
-        <div className="flex items-center justify-end gap-2.5 pt-2">
-          <button
-            type="button"
-            onClick={() => {
-              haptics.lightTap();
-              setCurrentView('list');
-              setEditingItem(null);
-            }}
-            className="px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-2xs"
-          >
-            취소
-          </button>
-
-          <button
-            type="button"
-            disabled={isMutating}
-            onClick={() => void handleSaveItem()}
-            className="px-6 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 text-white text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-[0_4px_14px_rgba(30,96,243,0.25)] flex items-center gap-1.5"
-          >
-            <CheckCircle2 className="w-4 h-4" />
-            <span>{isMutating ? '서버 저장 중…' : '저장'}</span>
-          </button>
-        </div>
-        <HqModal
-          isOpen={deleteDialogOpen}
-          title="현장 지식 삭제"
-          subtitle={editingItem.title}
-          onClose={() => setDeleteDialogOpen(false)}
-          footer={
-            <>
-              <button type="button" onClick={() => setDeleteDialogOpen(false)}
-                className="min-h-10 rounded-[12px] bg-[#F5F7FB] px-4 text-[12px] font-semibold text-[#60728A]">취소</button>
-              <button type="button" disabled={isMutating} onClick={() => void confirmDeleteItem()}
-                className="min-h-10 rounded-[12px] bg-[#60728A] px-4 text-[12px] font-semibold text-white">삭제</button>
-            </>
-          }
-        >
-          <p className="text-[12px] leading-relaxed text-[#65758B]">
-            모든 기사와 관리자 화면에서 해당 항목을 보관 처리합니다. 삭제 전에 확인해 주세요.
-          </p>
-        </HqModal>
-        <HqModal
-          isOpen={photoDialogMode !== null}
-          title={photoDialogMode === 'cover' ? '대표 이미지 변경' : '현장 사진 추가'}
-          subtitle="HTTPS 이미지 주소 또는 앱 이미지 경로를 입력해 주세요."
-          onClose={() => setPhotoDialogMode(null)}
-          footer={
-            <>
-              <button type="button" onClick={() => setPhotoDialogMode(null)}
-                className="min-h-10 rounded-[12px] bg-[#F5F7FB] px-4 text-[12px] font-semibold text-[#60728A]">취소</button>
-              <button type="button" onClick={savePhotoUrl}
-                className="min-h-10 rounded-[12px] bg-[#1E60F3] px-4 text-[12px] font-semibold text-white">적용</button>
-            </>
-          }
-        >
-          <label className="block space-y-1.5 text-[12px] font-semibold text-[#52647A]">
-            <span>이미지 URL</span>
-            <input type="text" value={photoUrlDraft} onChange={event => {
-              setPhotoUrlDraft(event.target.value);
-              setPhotoInputError(null);
-            }} placeholder="https://example.com/photo.jpg"
-              className="w-full rounded-[13px] bg-[#F7F9FC] px-3.5 py-3 text-[12px] text-[#26374E] outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20" />
-          </label>
-          <HqInlineFeedback message={photoInputError} className="mt-2" />
-        </HqModal>
-      </div>
-    );
+  if(currentView==='edit'&&editingItem){
+    return <>
+      <HqFieldKnowledgeEditor item={editingItem} onChange={setEditingItem}
+        onSave={(cover,gallery)=>{void handleSaveItem(cover,gallery);}}
+        onCancel={()=>{if(isMutating)return;setEditingItem(null);setCurrentView('list');}}
+        onDelete={handleDeleteItem} saving={isMutating}/>
+      <HqModal isOpen={deleteDialogOpen}
+        title="현장 지식 삭제" subtitle={editingItem.title}
+        onClose={()=>setDeleteDialogOpen(false)}
+        footer={<>
+          <HqButton variant="secondary" onClick={()=>setDeleteDialogOpen(false)}>취소</HqButton>
+          <HqButton variant="danger" disabled={isMutating}
+            onClick={()=>void confirmDeleteItem()}>삭제하기</HqButton>
+        </>}>
+        <p className="text-[12px] leading-relaxed text-[#65758B]">
+          해당 현장 지식은 관리자와 기사 화면에서 보관 처리됩니다.
+        </p>
+      </HqModal>
+    </>;
   }
 
   // =========================================================================
@@ -696,7 +281,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
   return (
     <div className="space-y-4 max-w-6xl mx-auto">
       {/* Top Header & Search Bar (Reference 1) */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <HqCard className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center sm:p-5">
         <div className="flex items-center gap-3">
           <div className="relative group/knowledge inline-flex items-center justify-center cursor-pointer shrink-0">
             <img
@@ -717,9 +302,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
           <div>
             <h1 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
               <span>현장 지식</span>
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-50 text-[#1E60F3] border border-blue-100">
-                {items.length}개 거점
-              </span>
+              <HqBadge>{items.length}개 거점</HqBadge>
             </h1>
             <p className="text-xs text-slate-500 font-medium">
               회사 공용 현장 지식 · 기사 Cockpit 자동 동기화 (최대 약 30초)
@@ -731,13 +314,9 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <div className="relative flex-1 sm:w-72">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="검색어를 입력하세요..."
-              className="w-full pl-10 pr-4 py-2 bg-slate-50/80 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-hidden focus:border-[#1E60F3] transition-all"
-            />
+            <HqInput type="search" aria-label="현장 지식 검색" value={searchQuery}
+              onChange={event=>setSearchQuery(event.target.value)}
+              placeholder="현장명, 주소, 안내사항 검색" className="w-full pl-10 pr-9"/>
             {searchQuery && (
               <button
                 type="button"
@@ -749,48 +328,22 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={openLegacyDialog}
-            className="min-h-10 shrink-0 rounded-[12px] bg-[#F4F6FA] px-3 text-[12px] font-semibold text-[#556A85] transition-colors hover:bg-[#EDF1F6]"
-            title="이 브라우저에 저장된 기존 현장 지식 검토 및 수동 이전"
-          >
+          <HqButton variant="secondary" size="sm" onClick={openLegacyDialog}
+            title="기존 브라우저 지식을 검토한 뒤 수동 이전">
             기존 데이터 가져오기
-          </button>
-
-          <button
-            type="button"
-            disabled={knowledgeLoading || Boolean(knowledgeError)}
-            onClick={handleOpenAddNew}
-            className="px-3.5 py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 shadow-[0_4px_12px_rgba(30,96,243,0.2)] transition-all cursor-pointer shrink-0"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">새 지식 등록</span>
-          </button>
+          </HqButton>
+          <HqButton variant="primary" size="sm"
+            disabled={knowledgeLoading||Boolean(knowledgeError)} onClick={handleOpenAddNew}>
+            <Plus className="size-4"/> 새 지식 등록
+          </HqButton>
         </div>
-      </div>
+      </HqCard>
 
-      {/* Category Filter Pills (Reference 1: 전체, 공항, 호텔, 식당, 쇼핑, 교통, 긴급, 기타) */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-        {CATEGORIES.map((cat) => {
-          const isSelected = selectedCategory === cat;
-          return (
-            <button
-              key={cat}
-              type="button"
-              onClick={() => {
-                haptics.selection();
-                setSelectedCategory(cat);
-              }}
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${isSelected
-                ? 'bg-white text-[#1E60F3] border-2 border-[#1E60F3] shadow-2xs'
-                : 'bg-white/80 hover:bg-slate-50 text-slate-600 border border-slate-200'
-                }`}
-            >
-              {cat}
-            </button>
-          );
-        })}
+      <div className="overflow-x-auto pb-1">
+        <HqSegmentedTabs aria-label="현장 지식 카테고리"
+          value={selectedCategory}
+          onValueChange={value=>{haptics.selection();setSelectedCategory(value as FieldKnowledgeCategory);}}
+          tabs={CATEGORIES.map(category=>({id:category,label:category}))}/>
       </div>
 
       {/* Toast Feedback */}
@@ -820,7 +373,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
           const isEmergency = item.category === '긴급';
 
           return (
-            <div
+            <HqCard
               key={item.id}
               role="button"
               tabIndex={0}
@@ -831,7 +384,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
                   handleOpenEdit(item);
                 }
               }}
-              className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs hover:shadow-md hover:border-[#1E60F3]/40 transition-all cursor-pointer group flex flex-col"
+              className="group flex cursor-pointer flex-col overflow-hidden p-0 transition-shadow hover:shadow-md"
             >
               {/* Card Image Thumbnail */}
               <div className="relative w-full h-44 bg-slate-100 overflow-hidden">
@@ -876,18 +429,18 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
                   </span>
                 </div>
               </div>
-            </div>
+            </HqCard>
           );
         })}
 
         {filteredItems.length === 0 && (
-          <div className="col-span-full py-16 text-center bg-white rounded-2xl border border-slate-200 p-8">
+          <HqCard className="col-span-full p-8 py-16 text-center">
             <BookOpen className="w-10 h-10 text-slate-300 mx-auto mb-2" />
             <p className="text-sm font-bold text-slate-700">검색된 현장 지식이 없습니다.</p>
             <p className="text-xs text-slate-400 mt-1">
               다른 검색어를 입력하시거나 카테고리 필터를 변경해 보세요.
             </p>
-          </div>
+          </HqCard>
         )}
       </div>
       <HqModal
