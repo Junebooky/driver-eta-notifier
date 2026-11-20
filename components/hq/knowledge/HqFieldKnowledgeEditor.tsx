@@ -104,7 +104,7 @@ export function HqFieldKnowledgeEditor({item,onChange,onSave,onCancel,onDelete,s
           </label>
           <div className="min-w-0">
             <p className={inputLabel}>카테고리 *</p>
-            <HqSearchSelect label="현장 지식 카테고리" value={item.category} size="md"
+            <HqSearchSelect label="현장 지식 카테고리" placeholder="카테고리 선택" value={item.category} size="md"
               onChange={value=>onChange({...item,category:value as FieldKnowledgeItem['category'],categoryBadge:value})}
               options={CATEGORIES.map(value=>({value,label:value}))}/>
           </div>
