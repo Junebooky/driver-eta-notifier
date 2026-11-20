@@ -395,10 +395,14 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
               {item.label} {item.count}
             </button>)}
           <button type="button" onClick={()=>setGlobalCardSearchOpen(true)}
-            disabled={!drivers.length} className="ml-auto min-h-10 shrink-0 rounded-[12px] px-3 text-[12px] font-semibold text-[#526680] disabled:opacity-40">
+            disabled={!drivers.length||!coverage} className="ml-auto min-h-10 shrink-0 rounded-[12px] px-3 text-[12px] font-semibold text-[#526680] disabled:opacity-40">
             전체 카드 찾기
           </button>
         </div>
+        {coverageError&&<button type="button" onClick={()=>void refreshCoverage()}
+          className="min-h-10 text-left text-[12px] text-[#A35E59] underline underline-offset-2">
+          배차카드 조회 실패 · 다시 시도
+        </button>}
         {isLoading?<p role="status" className="py-12 text-center text-[12px] text-[#8190A4]">기사 목록을 불러오는 중…</p>:
           error?<div role="alert" className="space-y-2 rounded-[14px] bg-[#FFF7F5] p-4 text-[12px] text-[#9B5F56]">
             <p>{error}</p><button type="button" onClick={onRetry} className="min-h-10 font-semibold underline">다시 시도</button>
@@ -426,9 +430,10 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                 <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-[#9CA9BA]"/>
               </button>
               <div className="mt-3 flex items-center justify-between border-t border-[#F1F3F6] pt-2.5">
-                <button type="button" onClick={()=>setCardPickerDriverId(driver.id)}
+                <button type="button" onClick={()=>{if(coverage)setCardPickerDriverId(driver.id);else void refreshCoverage();}}
+                  disabled={!coverage&&coverageLoading}
                   className="inline-flex min-h-11 items-center gap-2 rounded-[11px] px-2 text-[12px] font-semibold text-[#526680]">
-                  배차카드 <span className="text-[#8D99A9]">{coverageLoading?'조회 중':summary.label}</span>
+                  배차카드 <span className="text-[#8D99A9]">{coverageLoading?'조회 중':coverageError?'조회 실패':summary.label}</span>
                   <ChevronRight className="size-3.5 text-[#9CA9BA]"/>
                 </button>
                 {driver.phone&&<a href={'tel:'+driver.phone} aria-label={driver.name+' 전화 걸기'}
