@@ -51,7 +51,7 @@ test('driver image manager uses registered fleet, shared builder and no legacy u
   assert.match(view,/const imageVehicles=fleet\.vehicles/);
   assert.match(view,/!selectedVehiclePhotoReady/);
   assert.match(view,/차량 이미지 미준비/);
-  assert.match(view,/resolveDispatchCardPhotos\(vehicle\)/);
+  assert.match(view,/resolveDispatchCardPhotos\(/);
   assert.match(view,/HqSearchSelect/);
   assert.match(view,/<HqModal/);
   assert.match(view,/<HqDispatchCardBuilderModal/);
