@@ -6,7 +6,7 @@
  * [현대 스타리아 리무진] 4대: 125호 7665, 125호 9037, 142호 8407, 116허 1514
  * [기아 카니발 하이리무진] 2대: 101호 7681, 193호 5336
  * [제네시스 GV80] 1대: 203호 5947
- * [제네시스 G90 리무진] 1대: 102부 4280
+ * [제네시스 G90 리무진] 1대: 107부 4280
  * [제네시스 G90L] 1대: 116호 1336
  * [제네시스 G90] 1대: 125호 8839
  * [벤츠 S560] 1대: 01호 3343
@@ -415,7 +415,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
   {
     id: 'veh-gn-4280',
     uuid: 'e0f7c22a-0001-4c12-8800-000000004280',
-    plate: '102부 4280',
+    plate: '107부 4280',
     plateShort: '4280',
     model: '제네시스 G90 리무진',
     modelShort: 'G90 리무진',
@@ -520,7 +520,7 @@ export const VIP_VEHICLE_FLEET_CATEGORIES = [
     activeCount: 3,
     availableCount: 1,
     details: 'GV80 1대 · G90 리무진 1대 · G90L 1대 · G90 1대',
-    plates: ['203호 5947', '102부 4280', '116호 1336', '125호 8839'],
+    plates: ['203호 5947', '107부 4280', '116호 1336', '125호 8839'],
   },
   {
     id: 's_class',
@@ -749,7 +749,7 @@ export function getVehicleImage(
     return '/images/vehicles/gv80.webp';
   }
 
-  // 6. Genesis G90 Black (2 vehicles: 102부 4280, 125호 8839)
+  // 6. Genesis G90 Black (2 vehicles: 107부 4280, 125호 8839)
   if (
     plateShort === '4280' ||
     plateShort === '8839'

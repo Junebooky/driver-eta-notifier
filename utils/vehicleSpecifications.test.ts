@@ -18,6 +18,8 @@ test('20 registered vehicles retain immutable identity and unique plates', () =>
   assert.equal(VIP_REAL_VEHICLES.length, 20);
   assert.equal(new Set(VIP_REAL_VEHICLES.map((v) => v.uuid)).size, 20);
   assert.equal(new Set(VIP_REAL_VEHICLES.map((v) => v.plate)).size, 20);
+  assert.equal(registered('4280').plate, '107부 4280');
+  assert.equal(registered('4280').uuid, 'e0f7c22a-0001-4c12-8800-000000004280');
 });
 
 test('owner-verified sprinter seating and models (only 9982 is 319 CDI)', () => {
