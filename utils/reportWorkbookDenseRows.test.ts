@@ -88,8 +88,8 @@ test('a 61 to 200 physical gap displays new chauffeur report as number 62',()=>{
  // Replace the two old vacant placeholders with real dated records, making
  // physical rows 2 through 61 populated before the historical row 202.
  xml=xml.replace(/<row r="3" s="1"\/>/,'').replace(/<row r="4" s="1"\/>/,'');
- const farRow=rowFragment(xml,202);
- xml=xml.replace(farRow,extra+farRow);
+ const footer=rowFragment(xml,113);
+ xml=xml.replace(footer,extra+footer);
  entries[path]=strToU8(xml);
  const view=readWorkbookGrid(zipSync(entries),'11월');
  assert.equal(view.rows.find(row=>row.row===61)?.displayRow,61);
