@@ -466,7 +466,7 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
           '보고 순번 '+row.displayRow+' · 실제 Excel '+row.row+'행'}
          aria-label={row.displayRow===null?'실제 Excel '+row.row+'행':
           '보고 순번 '+row.displayRow+(row.displayRow!==row.row?' · Excel 실제 '+row.row+'행':'')}>
-          {row.displayRow??'—'}
+          {row.displayRow??row.row}
         </span>
         {grid.linkedRows?.includes(row.row)&&
          <button type="button" onClick={()=>openSource(row.row)} title="클릭해서 기사 운행보고 원문 보기"
