@@ -53,6 +53,7 @@ export function HqDispatchCardQuickFindModal({isOpen,coverage,drivers,onClose,on
 
   return <HqModal isOpen={isOpen} onClose={onClose}
     title="배차카드 빠른 검색" subtitle="차량번호로 찾고, 해당 기사 카드를 공유하세요."
+    icon={<img src="/images/icons/drivers/icon_driver.png" alt="" aria-hidden="true" className="size-9 shrink-0 object-contain"/>}
     className="max-w-[620px]" footer={<HqButton variant="subtle" onClick={onClose}>닫기</HqButton>}>
     <div className="space-y-4">
       {vehicle&&<button type="button" onClick={()=>{setVehicleId(null);setDriverQuery('');setShowUnregistered(false);}}
