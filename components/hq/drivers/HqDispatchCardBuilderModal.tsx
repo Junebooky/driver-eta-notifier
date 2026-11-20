@@ -23,15 +23,14 @@ import {
 import { zipSync } from 'fflate';
 import {
   DEFAULT_DISPATCH_PORTRAIT_PLACEMENT,
-  PORTRAIT_CROP_LIMITS,
   normalizePortraitPlacement,
-  calculatePortraitCrop,
 } from '@/lib/dispatchCards/portraitCrop';
 import { HqButton, HqCard, HqInput, HqSegmentedTabs } from '@/components/hq/ui';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 import { HqModal } from '@/components/hq/ui/HqModal';
 import { HqDispatchCardCompareModal } from './HqDispatchCardCompareModal';
 import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
+import { HqDispatchCardLiveEditor, type DispatchCardEditMode } from './HqDispatchCardLiveEditor';
 import { CHAUFFEUR_POSITION_OPTIONS, formatBilingualChauffeurName, getEnglishPosition, validateDispatchCardProfile, type ChauffeurPositionCode } from '@/lib/dispatchCards/chauffeurIdentity';
 import { formatKoreanMobileInternationalInput, KOREA_MOBILE_PREFIX } from '@/utils/koreanInternationalPhone';
 import { formatKoreanEnglishName } from '@/utils/koreanNameRomanization';
@@ -108,7 +107,6 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   const [portraitSavedPlacement, setPortraitSavedPlacement] = useState<CardPlacement>({ ...DEFAULT_DISPATCH_PORTRAIT_PLACEMENT });
   const [portraitSettingsLoaded, setPortraitSettingsLoaded] = useState(false);
   const [portraitSaving, setPortraitSaving] = useState(false);
-  const [portraitImageDimensions, setPortraitImageDimensions] = useState({ width: 800, height: 800 });
   const [dbReady, setDbReady] = useState(true);
   const [savedCards, setSavedCards] = useState<CardSummary>({});
   const [summaryLoaded, setSummaryLoaded] = useState(false);
@@ -125,6 +123,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     mobile: DispatchCardRenderInput;
   } | null>(null);
   const [photoKind, setPhotoKind] = useState<CardPhotoKind>('exterior');
+  const [editMode, setEditMode] = useState<DispatchCardEditMode>('portrait');
   const [perVehiclePlacements, setPerVehiclePlacements] = useState<Record<string, CardPhotoPlacements>>({});
   const [previewUrl, setPreviewUrl] = useState('');
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -135,6 +134,11 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   const fileRef = useRef<HTMLInputElement>(null);
   const currentRequest = useRef(0);
   const portraitRequest = useRef(0);
+  // Keep the displayed canvas URL alive while a new slider render is in flight.
+  const previewObjectUrlRef = useRef('');
+  useEffect(() => () => {
+    if (previewObjectUrlRef.current) URL.revokeObjectURL(previewObjectUrlRef.current);
+  }, []);
   // Keep the shared HQ modal's focus trap stable while form values change.
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -167,11 +171,6 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   const currentCardStatus = vehicle ? savedCards[vehicle.uuid] : undefined;
   const placements = vehicle ? (perVehiclePlacements[vehicle.uuid] || {}) : {};
   const currentPlacement = placements[photoKind] || DEFAULT_PLACEMENT;
-  const smallPortraitFrame = { x: 0, y: 0, w: 150, h: 187.5 };
-  const smallPortraitCrop = calculatePortraitCrop(
-    portraitImageDimensions.width, portraitImageDimensions.height,
-    smallPortraitFrame, portraitPlacement,
-  );
   const portraitDirty = portraitPlacement.zoom !== portraitSavedPlacement.zoom ||
     portraitPlacement.x !== portraitSavedPlacement.x || portraitPlacement.y !== portraitSavedPlacement.y;
   const cardProfile = { koreanName: name.trim(), englishName: englishName.trim(), positionCode, phone: phone.trim() };
@@ -410,14 +409,18 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
 
   useEffect(() => {
     if (!isOpen || compareOpen || !isComplete || !vehicle) {
+      const previous = previewObjectUrlRef.current;
+      previewObjectUrlRef.current = '';
+      if (previous) URL.revokeObjectURL(previous);
       setPreviewUrl('');
       setPreviewLoading(false);
       return;
     }
     let cancelled = false;
-    let currentObjectUrl = '';
+    // Never blank out the last successful full-card preview on slider input.
+    // The near-slider crop updates synchronously; the full canvas refreshes
+    // after a short debounce without jumping the layout.
     setPreviewLoading(true);
-    setError('');
     const job = window.setTimeout(async () => {
       try {
         const canvas = await renderDispatchCard(buildInput(vehicle, orientation));
@@ -425,21 +428,24 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
           canvas.toBlob(result => result ? resolve(result) : reject(new Error('미리보기 실패')), 'image/webp', 0.82),
         );
         if (cancelled) return;
-        currentObjectUrl = URL.createObjectURL(blob);
-        setPreviewUrl(currentObjectUrl);
+        const nextUrl = URL.createObjectURL(blob);
+        const previous = previewObjectUrlRef.current;
+        previewObjectUrlRef.current = nextUrl;
+        setPreviewUrl(nextUrl);
+        // Let the browser paint the newly generated card before releasing the
+        // previous URL, preventing flashes when dragging a range slider.
+        if (previous) window.setTimeout(() => URL.revokeObjectURL(previous), 1500);
       } catch (err) {
         if (!cancelled) {
-          setPreviewUrl('');
           setError(err instanceof Error ? err.message : '배차카드를 생성하지 못했습니다.');
         }
       } finally {
         if (!cancelled) setPreviewLoading(false);
       }
-    }, 220);
+    }, 140);
     return () => {
       cancelled = true;
       window.clearTimeout(job);
-      if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
     };
     // Only values used by rendering, including position adjustments, trigger preview updates.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -707,11 +713,39 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
                 )}
               </div>
             </div>
-            <div className="flex min-h-[280px] items-center justify-center rounded-b-[18px] bg-[#F5F7FA] p-4 sm:min-h-[430px] sm:p-6">
-              {previewLoading && <div role="status" className="flex items-center gap-2 text-[12px] text-[#66778B]">
-                <Loader2 className="size-4 animate-spin" /> 카드 생성 중…
-              </div>}
-              {!previewLoading && previewUrl && isComplete && (
+            <div className="border-t border-[#EEF1F5] px-3 pb-3 pt-3 sm:px-5">
+              <HqDispatchCardLiveEditor
+                mode={editMode}
+                onModeChange={setEditMode}
+                portraitPhotoUrl={photoUrl}
+                portraitPlacement={portraitPlacement}
+                onPortraitChange={setPortraitPlacement}
+                portraitDisabled={!portraitSettingsLoaded || busy || portraitSaving}
+                portraitDirty={portraitDirty}
+                vehiclePhotoSrc={photos?.[photoKind] || ''}
+                vehiclePlacement={currentPlacement}
+                vehicleKind={photoKind}
+                onVehicleKindChange={setPhotoKind}
+                onVehicleChange={updatePlacement}
+                onVehicleReset={() => {
+                  if (!vehicle) return;
+                  setPerVehiclePlacements(previous => ({
+                    ...previous,
+                    [vehicle.uuid]: { ...previous[vehicle.uuid], [photoKind]: DEFAULT_PLACEMENT },
+                  }));
+                }}
+                vehicleDisabled={!vehicle || busy}
+                orientation={orientation}
+              />
+            </div>
+            <div className="relative flex min-h-[280px] items-center justify-center rounded-b-[18px] bg-[#F5F7FA] p-4 sm:min-h-[370px] sm:p-6">
+              {previewLoading && (
+                <div role="status" aria-live="polite"
+                  className={previewUrl ? 'absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-[11px] bg-white/95 px-3 py-2 text-[11px] font-medium text-[#60728C] shadow-sm' : 'flex items-center gap-2 text-[12px] text-[#66778B]'}>
+                  <Loader2 className="size-4 animate-spin" /> {previewUrl ? '미리보기 갱신 중…' : '카드 생성 중…'}
+                </div>
+              )}
+              {previewUrl && isComplete && (
                 <img src={previewUrl} alt={vehicle?.plate + ' 배차카드 ' + orientation + ' 미리보기'}
                   className="max-h-[55vh] max-w-full object-contain shadow-[0_12px_32px_rgba(15,25,45,.14)]" />
               )}
@@ -865,107 +899,6 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
             </p>
           </HqCard>
 
-          <HqCard className="p-4 sm:p-5">
-            <h3 className="mb-1 text-[14px] font-semibold text-[#21344D]">기사 사진 구도</h3>
-            <p className="mb-4 text-[11px] leading-relaxed text-[#8492A4]">
-              미리보기를 보며 얼굴 크기와 위치를 맞춰주세요.
-            </p>
-            {photoUrl && (
-              <div className="mb-4 flex items-center gap-4 rounded-[14px] bg-[#F7F9FC] p-3">
-                <div className="relative shrink-0 overflow-hidden bg-white" style={{ width: 150, height: 187.5 }}>
-                  <img src={photoUrl} alt="조정 중인 기사 사진의 실시간 크롭 미리보기"
-                    onLoad={event => setPortraitImageDimensions({
-                      width: event.currentTarget.naturalWidth,
-                      height: event.currentTarget.naturalHeight,
-                    })}
-                    style={{
-                      position: 'absolute', left: smallPortraitCrop.x, top: smallPortraitCrop.y,
-                      width: smallPortraitCrop.w, height: smallPortraitCrop.h,
-                      maxWidth: 'none', maxHeight: 'none',
-                    }} />
-                </div>
-                <p className="min-w-0 text-[11px] leading-relaxed text-[#73839A]">
-                  기사 얼굴을 확인하면서 확대하고 위치를 옮겨보세요. 실제 배차카드와 같은 비율로 표시합니다.
-                </p>
-              </div>
-            )}
-            <div className="space-y-4">
-              {([
-                ['zoom', '얼굴 확대', PORTRAIT_CROP_LIMITS.zoom.min, PORTRAIT_CROP_LIMITS.zoom.max, '%'],
-                ['x', '좌우 위치', PORTRAIT_CROP_LIMITS.x.min, PORTRAIT_CROP_LIMITS.x.max, '%'],
-                ['y', '상하 위치', PORTRAIT_CROP_LIMITS.y.min, PORTRAIT_CROP_LIMITS.y.max, '%'],
-              ] as const).map(([key, label, min, max, suffix]) => (
-                <label key={key} className="block">
-                  <span className="mb-1.5 flex justify-between text-[12px] text-[#62738A]">
-                    <span>{label}</span><strong className="font-semibold">{portraitPlacement[key]}{suffix}</strong>
-                  </span>
-                  <input type="range" min={min} max={max} step={1}
-                    aria-label={'기사 사진 ' + label} value={portraitPlacement[key]}
-                    disabled={!portraitSettingsLoaded || busy || portraitSaving}
-                    onChange={event => setPortraitPlacement(current => ({
-                      ...current, [key]: Number(event.target.value),
-                    }))}
-                    className="w-full accent-[#1E60F3]" />
-                </label>
-              ))}
-            </div>
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-              <HqButton variant="ghost" size="sm" disabled={!portraitSettingsLoaded || busy || portraitSaving}
-                onClick={() => setPortraitPlacement({ ...DEFAULT_DISPATCH_PORTRAIT_PLACEMENT })}>
-                기본 구도 복원
-              </HqButton>
-              <HqButton variant={cardSettingsDirty ? 'primary' : 'secondary'} size="sm"
-                disabled={!isComplete || !dbReady || !summaryLoaded || !needsCardRefresh || busy || portraitSaving || photoUploading}
-                loading={busy || portraitSaving}
-                onClick={() => { void saveAllToAssetLibrary(changedSharedInputs ? 'all' : 'missing'); }}>
-                정보 저장 · 전체 카드 갱신
-              </HqButton>
-            </div>
-            <p className="mt-3 text-[11px] leading-relaxed text-[#8492A4]">
-              {!portraitSettingsLoaded ? '기사 정보 불러오는 중…' :
-                needsCardRefresh
-                  ? '변경된 기사 정보·사진은 이 기사의 모든 차량별 PC·모바일 카드에 새 버전으로 반영됩니다.'
-                  : '기사 정보 저장됨 · 기존 등록 카드가 최신 상태예요.'}
-            </p>
-          </HqCard>
-
-          <HqCard className="p-4 sm:p-5">
-            <h3 className="mb-3 text-[14px] font-semibold text-[#21344D]">이미지 위치 조정</h3>
-            <HqSegmentedTabs aria-label="조정할 차량 이미지" value={photoKind}
-              onValueChange={value => setPhotoKind(value as CardPhotoKind)}
-              tabs={[
-                { id: 'exterior', label: '외관' },
-                { id: 'interiorOne', label: '실내 1' },
-                { id: 'interiorTwo', label: '실내 2' },
-              ]} />
-            <div className="mt-4 space-y-3">
-              {([
-                ['zoom', '크기', 80, 150, '%'],
-                ['x', '좌우', -20, 20, '%'],
-                ['y', '상하', -20, 20, '%'],
-              ] as const).map(([key, label, min, max, suffix]) => (
-                <label key={key} className="block">
-                  <span className="mb-1 flex justify-between text-[12px] text-[#62738A]">
-                    <span>{label}</span><strong className="font-semibold">{currentPlacement[key]}{suffix}</strong>
-                  </span>
-                  <input type="range" min={min} max={max} value={currentPlacement[key]}
-                    disabled={!vehicle || busy} onChange={event => updatePlacement(key, Number(event.target.value))}
-                    className="w-full accent-[#1E60F3]" />
-                </label>
-              ))}
-            </div>
-            <HqButton variant="ghost" size="sm" className="mt-2" disabled={!vehicle || busy}
-              onClick={() => {
-                if (!vehicle) return;
-                setPerVehiclePlacements(previous => ({
-                  ...previous,
-                  [vehicle.uuid]: { ...previous[vehicle.uuid], [photoKind]: DEFAULT_PLACEMENT },
-                }));
-              }}>
-              선택 이미지 초기화
-            </HqButton>
-            <p className="mt-2 text-[11px] text-[#8492A4]">현재 작업에만 임시 적용돼요.</p>
-          </HqCard>
         </div>
 
       </div>
