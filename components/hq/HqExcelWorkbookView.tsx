@@ -5,7 +5,7 @@ import {HqSearchSelect} from './ui/HqSearchSelect';
 import {HqButton,HqIconButton} from '@/components/hq/ui';
 import {workbookMonthLabel} from '@/utils/reportWorkbookMonth';
 export type ReportExcelFocus={year:number;sheet:string;row:number;requestId:number};
-type Row={row:number;cells:string[];locked:string[]};
+type Row={row:number;displayRow:number|null;cells:string[];locked:string[]};
 type Grid={version:string;year:number;filename:string;month:string;months:string[];total:number;unfilteredTotal:number;filterOptions:{plate:string[];driver:string[];customer:string[]};offset:number;limit:number;rows:Row[];columns:string[];headers:string[];linkedRows:number[];manualRows:number[];rowGap:{after:number;before:number;gap:number}|null};
 type DeleteTarget={action:'delete_row';row:number}|{action:'delete_column';column:string;label:string};
 type FilterKey='plate'|'driver'|'customer';
@@ -331,8 +331,8 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
    </div>
    {grid?.rowGap&&<div role="status" className="flex flex-wrap items-center gap-2 rounded-xl bg-[#F7F9FC] px-3 py-2.5">
     <span className="min-w-0 flex-1 text-[12px] leading-5 text-[#63768E]">
-     실제 Excel 행 번호가 <strong className="text-[#3E5574]">{grid.rowGap.after} → {grid.rowGap.before}</strong>으로 건너뛰었어.
-     기존 수식·원본은 유지하면서 기록과 연결 번호를 함께 정리할 수 있어.
+     원본 Excel의 실제 행이 <strong className="text-[#3E5574]">{grid.rowGap.after} → {grid.rowGap.before}</strong>으로 건너뛰었습니다.
+     웹에서는 운행보고 순번을 연속으로 표시하고, 실제 행 이동은 수식·메모가 안전할 때만 정리합니다.
     </span>
     <button type="button" disabled={busy} onClick={()=>void sortMonth()}
      className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-xl bg-white px-3 text-[12px] font-semibold text-[#1E60F3] shadow-[0_2px_10px_rgba(26,47,85,.06)] hover:bg-[#EEF3FC] disabled:opacity-40">
@@ -423,7 +423,8 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
    {grid&&<div ref={scrollRef} onScroll={syncScroll} className={'hq-excel-scroll min-w-0 max-w-full overflow-auto overscroll-contain rounded-xl border border-[#E2E9F2] '+(zoom?'min-h-0 flex-1':'max-h-[500px]')}>
     <table className="table-fixed border-collapse text-[11px] text-[#465775]" style={{width:renderedTotal,...(zoom&&tableScale!==100?{zoom:tableScale/100}:{})}}><colgroup><col style={{width:52}}/>{renderedWidths.map((width,index)=><col key={index} style={{width}}/>)}</colgroup>
      <thead className="sticky top-0 z-10 bg-[#EDF2F8]"><tr>
-      <th className="sticky left-0 z-20 border-b border-r border-[#DCE5F1] bg-[#EDF2F8] px-2 py-2">행</th>
+      <th className="sticky left-0 z-20 border-b border-r border-[#DCE5F1] bg-[#EDF2F8] px-2 py-2"
+       title="보고 순번은 연속으로 표시합니다. 셀 편집과 원문 연결은 실제 Excel 행으로 처리합니다.">순번</th>
       {grid.headers.map((h,index)=>{
         const col=grid.columns[index] as SortKey,active=sortBy===col;
         return <th key={h} aria-sort={active?(sortDirection==='asc'?'ascending':'descending'):'none'}
@@ -458,7 +459,14 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
       className={(highlightedRow===row.row?'hq-excel-target-row':'hover:bg-[#F8FAFD]')+' group/row'}>
       <td className="sticky left-0 z-[1] border-b border-r border-[#E8EDF3] bg-[#F7F9FC] px-1 py-0.5 text-center font-medium text-[#8B9BB1]">
        <div className="relative flex min-h-9 items-center justify-start px-1">
-        <span className={grid.linkedRows?.includes(row.row)?'font-semibold text-[#1E60F3]':''}>{row.row}</span>
+        <span className={grid.linkedRows?.includes(row.row)?'font-semibold text-[#1E60F3]':''}
+         title={row.displayRow===null?'기타 메모·계산 행 · 실제 Excel '+row.row+'행':
+          row.displayRow===row.row?'보고 순번 '+row.displayRow:
+          '보고 순번 '+row.displayRow+' · 실제 Excel '+row.row+'행'}
+         aria-label={row.displayRow===null?'실제 Excel '+row.row+'행':
+          '보고 순번 '+row.displayRow+(row.displayRow!==row.row?' · Excel 실제 '+row.row+'행':'')}>
+          {row.displayRow??row.row}
+        </span>
         {grid.linkedRows?.includes(row.row)&&
          <button type="button" onClick={()=>openSource(row.row)} title="클릭해서 기사 운행보고 원문 보기"
           aria-label={row.row+'행 기사 원문 보기'}

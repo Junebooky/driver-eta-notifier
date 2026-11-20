@@ -24,6 +24,7 @@ import { HqQuickDispatch } from '@/components/hq/HqQuickDispatch';
 import { HqBookingDetailModal } from '@/components/hq/HqBookingDetailModal';
 import { HqDriverVehicleInfoModal } from '@/components/hq/bookings/HqDriverVehicleInfoModal';
 import { HqBookingCardManagerLauncher } from '@/components/hq/bookings/HqBookingCardManagerLauncher';
+import {HqDispatchCardGlobalLauncher} from '@/components/hq/drivers/HqDispatchCardGlobalLauncher';
 import { HqDrivingLogsView } from '@/components/hq/driving-logs/HqDrivingLogsView';
 import { HqExpensesView } from '@/components/hq/expenses/HqExpensesView';
 import { HqEmailInboxView } from '@/components/hq/email/HqEmailInboxView';
@@ -36,7 +37,6 @@ import { HqFieldKnowledgeView } from '@/components/hq/knowledge/HqFieldKnowledge
 import { HqOperationsBoard } from '@/components/hq/operations/HqOperationsBoard';
 import { HqQuoteModal } from '@/components/hq/quotes/HqQuoteModal';
 import { HqOfficialPricingView } from '@/components/hq/quotes/HqOfficialPricingView';
-import { VipChauffeurCardModal } from '@/components/cards/VipChauffeurCardModal';
 import HqDispatchAlertDrawer from '@/components/hq/dispatch/HqDispatchAlertDrawer';
 import HqCustomerMessageModal from '@/components/hq/messages/HqCustomerMessageModal';
 import { HqAdminLoginModal } from '@/components/hq/auth/HqAdminLoginModal';
@@ -145,7 +145,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
   const [isAdminLoginOpen, setIsAdminLoginOpen] = useState(false);
   const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(() => searchParams.get('quoteModal') === 'true');
   const [selectedQuoteVehicleCode, setSelectedQuoteVehicleCode] = useState<string | undefined>();
-  const [isChauffeurCardOpen, setIsChauffeurCardOpen] = useState(false);
+  const [isGlobalCardSearchOpen, setIsGlobalCardSearchOpen] = useState(false);
   const [missingCardTarget, setMissingCardTarget] = useState<{driverId:string;vehiclePlate:string}|null>(null);
   const [isAlertDrawerOpen, setIsAlertDrawerOpen] = useState(false);
   const [customerMsgTarget, setCustomerMsgTarget] = useState<{
@@ -485,13 +485,14 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
   };
 
   return (
-    <div className="hq-app min-h-dvh bg-[#F8FAFC] flex font-sans antialiased text-slate-800 pb-[calc(88px+env(safe-area-inset-bottom))] lg:pb-0">
+    <div className="hq-app min-h-dvh bg-[#F8FAFC] flex font-sans antialiased text-slate-800 pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-0">
       {/* 1. Desktop Sidebar + Mobile Slide-over Drawer */}
       <HqSidebar
         activeTab={activeSidebarTab}
         onSelectTab={navigateWorkspace}
         isOpenMobile={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
+        onOpenDispatchCard={() => setIsGlobalCardSearchOpen(true)}
         dispatchActionBadgeCount={operationalCounts.totalActionNeeded}
       />
 
@@ -504,13 +505,12 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
             operationalCounts.totalActionNeeded,
             escalationSummary.alerts.length
           )}
-          onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
           onRefresh={() => fetchSharedBookings(false)}
           isRefreshing={isRefreshing}
           lastSyncedLabel={lastSyncedLabel}
           onOpenQuickPhoneBooking={handleOpenQuickPhoneBookingModal}
           onOpenQuoteModal={() => setIsQuoteModalOpen(true)}
-          onOpenChauffeurCard={() => setIsChauffeurCardOpen(true)}
+          onOpenChauffeurCard={() => setIsGlobalCardSearchOpen(true)}
           onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
           onOpenNotifications={() => setIsAlertDrawerOpen(true)}
           searchPlaceholder={
@@ -562,7 +562,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
                 if (code) setSelectedQuoteVehicleCode(code);
                 setIsQuoteModalOpen(true);
               }}
-              onOpenChauffeurCard={() => setIsChauffeurCardOpen(true)}
+              onOpenChauffeurCard={() => setIsGlobalCardSearchOpen(true)}
             />
           ) : activeSidebarTab === 'field_knowledge' ? (
             <HqFieldKnowledgeView initialSearchQuery={searchQuery} />
@@ -616,6 +616,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
                         setActiveDispatchTab(tab);
                       }}
                       onOpenNewBooking={handleOpenQuickPhoneBookingModal}
+                      onOpenDispatchCard={() => setIsGlobalCardSearchOpen(true)}
                       onAssignDriver={(booking) => {
                         setQuickDispatchBooking(booking);
                         setIsQuickDispatchModalOpen(true);
@@ -642,8 +643,10 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
         </main>
       </div>
 
-      <HqMobileNav activeTab={activeSidebarTab} formOpen={isQuickDispatchModalOpen} actionCount={operationalCounts.totalActionNeeded}
-        onNavigate={navigateWorkspace} onQuickBooking={handleOpenQuickPhoneBookingModal} onMenu={() => setIsMobileSidebarOpen(true)} />
+      <HqMobileNav activeTab={activeSidebarTab} formOpen={isQuickDispatchModalOpen}
+        menuOpen={isMobileSidebarOpen} actionCount={operationalCounts.totalActionNeeded}
+        onNavigate={navigateWorkspace} onQuickBooking={handleOpenQuickPhoneBookingModal}
+        onMenu={() => setIsMobileSidebarOpen(true)} />
 
       {/* 4-A. Fast Booking & Quick Dispatch Modal (New Booking or Row-Click Edit / Assignment) */}
       {isQuickDispatchModalOpen && (
@@ -669,7 +672,18 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
             });
           }}
           onOpenDriverVehicleInfo={(booking) => {
-            setInfoModalBooking(booking);
+            const plate=(booking.vehiclePlate||'').trim();
+            // When the booking has a real assigned pair, go directly to the
+            // same card manager and two-file share used in 기사관리.
+            if(booking.driverId&&plate&&plate!=='미배정'&&plate!=='-'){
+              setIsQuickDispatchModalOpen(false);
+              setQuickDispatchBooking(null);
+              setMissingCardTarget({driverId:booking.driverId,vehiclePlate:plate});
+            }else{
+              // Keep the existing unassigned-booking explanation; never
+              // attempt to look up or share a card with an empty driver ID.
+              setInfoModalBooking(booking);
+            }
           }}
         />
       )}
@@ -770,11 +784,12 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
         }}
       />
 
-      {/* 6. VIP Chauffeur & Vehicle Introduction Card Modal */}
-      <VipChauffeurCardModal
-        isOpen={isChauffeurCardOpen}
-        onClose={() => setIsChauffeurCardOpen(false)}
-      />
+      {/* HQ-wide, vehicle-first entrypoint. Mounted only while requested. */}
+      {isGlobalCardSearchOpen&&(
+        <HqDispatchCardGlobalLauncher
+          onClose={()=>setIsGlobalCardSearchOpen(false)}
+        />
+      )}
 
       {/* 7. HQ Admin Login Modal (for Preview and Production Auth) */}
       <HqAdminLoginModal

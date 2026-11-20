@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   Calendar,
+  ContactRound,
   LayoutList,
   Plus,
   Search,
@@ -32,6 +33,7 @@ import { getCustomerDotColor } from '@/utils/customerDotColor';
 import { getDriverProfileImage } from './HqQuickDispatch';
 import { HqBooking } from '@/types/hq';
 import { haptics } from '@/utils/haptics';
+import {HqButton} from '@/components/hq/ui';
 import { stripManufacturerName } from '@/utils/vehicleData';
 import type { FleetRegistryRecord } from '@/utils/fleetVehicleRegistry';
 import { isBookingInPast, cleanVehicleIdentity } from '@/utils/dispatchConflictDetector';
@@ -52,6 +54,7 @@ export interface HqDispatchTableProps {
   activeTab: HqDispatchTabKey;
   onSelectTab: (tab: HqDispatchTabKey) => void;
   onOpenNewBooking: () => void;
+  onOpenDispatchCard?: () => void;
   onViewBooking: (booking: HqBooking) => void;
   onAssignDriver?: (booking: HqBooking) => void;
   onResendBrochure?: (booking: HqBooking) => void;
@@ -72,6 +75,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
   activeTab,
   onSelectTab,
   onOpenNewBooking,
+  onOpenDispatchCard,
   onViewBooking,
   onAssignDriver,
   onOpenCustomerMessage,
@@ -484,20 +488,30 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            haptics.lightTap();
-            setOpenDropdown(null);
-            setDropdownSearch('');
-            onOpenNewBooking();
-          }}
-          aria-label="예약 추가"
-          className="flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-[14px] bg-[#1E60F3] px-3 text-[12px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-colors hover:bg-[#1757DC] sm:px-4"
-        >
-          <Plus className="w-5 h-5 sm:hidden stroke-[2.5]" />
-          <span className="hidden sm:inline">+ 예약 추가</span>
-        </button>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {onOpenDispatchCard&&(
+            <HqButton variant="subtle" size="sm" onClick={onOpenDispatchCard}
+              className="flex min-h-10 items-center gap-1.5 px-2.5 sm:px-3"
+              aria-label="배차카드 빠른 검색" title="기사 배차카드 찾기">
+              <ContactRound className="size-4 shrink-0" aria-hidden="true"/>
+              <span className="text-[12px]">배차카드</span>
+            </HqButton>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              haptics.lightTap();
+              setOpenDropdown(null);
+              setDropdownSearch('');
+              onOpenNewBooking();
+            }}
+            aria-label="예약 추가"
+            className="flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-[14px] bg-[#1E60F3] px-3 text-[12px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-colors hover:bg-[#1757DC] sm:px-4"
+          >
+            <Plus className="w-5 h-5 sm:hidden stroke-[2.5]" />
+            <span className="hidden sm:inline">+ 예약 추가</span>
+          </button>
+        </div>
       </div>
 
       {/* 2. Operational Tabs (Horizontal Scroll Chip Rail on Mobile / Split End on Desktop) */}

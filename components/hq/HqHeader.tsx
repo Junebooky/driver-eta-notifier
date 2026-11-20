@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, X, ChevronDown, Menu } from 'lucide-react';
+import { Search, X, ChevronDown } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import { DevAuthSwitcher } from '@/components/DevAuthSwitcher';
 import { HqIconButton } from '@/components/hq/ui';
@@ -11,7 +11,6 @@ export interface HqHeaderProps {
   onSearchChange: (query: string) => void;
   unreadAlertsCount?: number;
   onOpenNotifications?: () => void;
-  onOpenMobileMenu?: () => void;
   onRefresh?: () => void;
   isRefreshing?: boolean;
   onOpenQuickPhoneBooking?: () => void;
@@ -31,7 +30,6 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
   onSearchChange,
   unreadAlertsCount = 0,
   onOpenNotifications,
-  onOpenMobileMenu,
   onRefresh,
   isRefreshing = false,
   onOpenQuickPhoneBooking,
@@ -84,22 +82,6 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
   return (
     <header className="sticky top-0 z-40 bg-white px-3.5 shadow-[0_1px_0_rgba(225,231,240,0.5)] sm:px-6">
       <div className="flex items-center justify-between gap-2.5 h-14 sm:h-16">
-        {/* Left: Mobile Menu Button (mobile/tablet only) */}
-        <div className="flex items-center gap-2 lg:hidden">
-          {onOpenMobileMenu && (
-            <HqIconButton variant="subtle"
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                onOpenMobileMenu();
-              }}
-              aria-label="전체 메뉴 열기"
-            >
-              <Menu className="w-4 h-4" />
-            </HqIconButton>
-          )}
-        </div>
-
         {/* Right Actions: Quick Calculator + Bell + Sync + Dev Switcher + Profile */}
         <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-auto">
 
