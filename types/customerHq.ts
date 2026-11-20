@@ -11,6 +11,8 @@ export interface CustomerContact {
   department?: string;
   language?: string;
   isPrimary?: boolean;
+  /** Internal note for this specific contact; separate from company-wide notes. */
+  memo?: string;
 }
 
 export interface CustomerRequestItem {
