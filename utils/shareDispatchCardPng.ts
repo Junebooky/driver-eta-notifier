@@ -1,11 +1,10 @@
 import {zipSync} from 'fflate';
 
 // The share-sheet copy is customer-facing; filenames stay vehicle/driver-specific.
-export const DISPATCH_CARD_SHARE_TITLE = '기사 인포카드 보내드립니다 :)';
 export const DISPATCH_CARD_PAIR_SHARE_TEXT =
-  '안녕하세요 :) 요청하신 기사 인포카드 전달드립니다. 보기 편하시도록 PC용과 모바일용 함께 보내드려요.';
+  '안녕하세요 VIP리무진코리아입니다. 기사 인포카드 전달드립니다. 보기 편하시도록 PC용과 모바일용 함께 보내드려요.';
 export const DISPATCH_CARD_SINGLE_SHARE_TEXT =
-  '안녕하세요 :) 요청하신 기사 인포카드 전달드립니다.';
+  '안녕하세요 VIP리무진코리아입니다. 기사 인포카드 전달드립니다.';
 
 /**
  * Convert a saved, server-authenticated card to an actual PNG attachment.
@@ -62,7 +61,7 @@ export async function shareDispatchCardPng(file:File):Promise<'shared'|'download
     return 'downloaded';
   }
   try{
-    await navigator.share({files:[file],title:DISPATCH_CARD_SHARE_TITLE,text:DISPATCH_CARD_SINGLE_SHARE_TEXT});
+    await navigator.share({files:[file],text:DISPATCH_CARD_SINGLE_SHARE_TEXT});
     return 'shared';
   }catch(error){
     if(error instanceof Error&&error.name==='AbortError')return 'cancelled';
@@ -122,7 +121,6 @@ export async function shareDispatchCardPngPair(
     try{
       await navigator.share({
         files:[...files],
-        title:DISPATCH_CARD_SHARE_TITLE,
         text:DISPATCH_CARD_PAIR_SHARE_TEXT,
       });
       return 'shared';
