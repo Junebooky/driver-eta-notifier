@@ -4,12 +4,15 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { HqDriversTableView } from './HqDriversTableView';
 import { HqDriverDetailSplitView } from './HqDriverDetailSplitView';
-import { Plus, X, User, Phone, MapPin, Check, Loader2, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { X, Check, ImagePlus, Trash2, Loader2, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { useHqDrivers } from '@/utils/useHqDrivers';
 import { HqAdminLoginModal } from '@/components/hq/auth/HqAdminLoginModal';
 import { haptics } from '@/utils/haptics';
 import { formatKoreanMobileInternationalInput, KOREA_MOBILE_PREFIX, normalizeKoreanMobileNumber } from '@/utils/koreanInternationalPhone';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
+import { HqButton } from '@/components/hq/ui';
+import { uploadNewDriverProfilePhoto, validateNewDriverPhotoFile } from '@/utils/driverProfileRegistrationUpload';
+import type { HqDriverSummary } from '@/types/driverHq';
 
 export interface HqDriversViewProps {
   initialSearchQuery?: string;
@@ -70,6 +73,40 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
   const [newAffiliation, setNewAffiliation] = useState<'employed' | 'freelance'>('employed');
   const [newResidence, setNewResidence] = useState('서울 (강남)');
   const [isEnglish, setIsEnglish] = useState(false);
+  const [newProfileFile, setNewProfileFile] = useState<File | null>(null);
+  const [newProfilePreview, setNewProfilePreview] = useState('');
+  const [photoSaving, setPhotoSaving] = useState(false);
+  // A durable newly-created UUID prevents a duplicate driver if photo upload fails.
+  const [createdDriver, setCreatedDriver] = useState<HqDriverSummary | null>(null);
+  const profileFileRef = React.useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    return () => { if (newProfilePreview) URL.revokeObjectURL(newProfilePreview); };
+  }, [newProfilePreview]);
+  const setRegistrationPhoto = (file: File | null) => {
+    if (file) {
+      const failure = validateNewDriverPhotoFile(file);
+      if (failure) { setCreateError({ message: failure }); return; }
+    }
+    setNewProfileFile(file);
+    setNewProfilePreview(file ? URL.createObjectURL(file) : '');
+    setCreateError(null);
+  };
+  const finishDriverRegistration = (driver: HqDriverSummary) => {
+    setIsAddModalOpen(false);
+    setNewName('');
+    setNewPhone(KOREA_MOBILE_PREFIX);
+    setNewResidence('서울 (강남)');
+    setNewAffiliation('employed');
+    setIsEnglish(false);
+    setNewProfileFile(null);
+    setNewProfilePreview('');
+    setCreatedDriver(null);
+    setDuplicateInfo(null);
+    setCreateError(null);
+    setSelectedDriverId(driver.id);
+    setViewMode('detail');
+    void refetch();
+  };
 
   const handleSelectDriver = (driverId: string) => {
     setSelectedDriverId(driverId);
@@ -84,70 +121,82 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
   const handleOpenAddModal = () => {
     setCreateError(null);
     setDuplicateInfo(null);
+    setCreatedDriver(null);
     setIsAddModalOpen(true);
   };
 
   const handleCloseAddModal = () => {
+    if (isSubmitting) return;
+    if (createdDriver) {
+      if (newProfileFile && !window.confirm('기사 등록은 완료됐지만 사진이 저장되지 않았어요. 사진 없이 등록을 마칠까요?')) return;
+      finishDriverRegistration(createdDriver);
+      return;
+    }
     setIsAddModalOpen(false);
+    setNewProfileFile(null);
+    setNewProfilePreview('');
     setCreateError(null);
     setDuplicateInfo(null);
   };
 
   const handleCreateDriver = async (e?: React.FormEvent, allowDuplicate = false) => {
     if (e) e.preventDefault();
-    if (!newName.trim()) return;
+    if (isSubmitting) return;
+    if (!createdDriver && !newName.trim()) return;
     const cleanPhone = normalizeKoreanMobileNumber(newPhone);
-    if (!cleanPhone) {
+    if (!createdDriver && !cleanPhone) {
       setCreateError({ message: '휴대폰 번호를 입력해 주세요. 예: 01063488726 → +82-10-6348-8726' });
       return;
     }
 
     setIsSubmitting(true);
     setCreateError(null);
-    if (!allowDuplicate) {
-      setDuplicateInfo(null);
-    }
+    if (!allowDuplicate) setDuplicateInfo(null);
 
     try {
-      const res = await createDriver(
-        {
+      let target = createdDriver;
+      if (!target) {
+        const result = await createDriver({
           name: newName.trim(),
           phone: cleanPhone,
           affiliationType: newAffiliation,
           residence: newResidence.trim(),
           englishAvailable: isEnglish,
-        },
-        allowDuplicate
-      );
-
-      if (res.ok && res.driver) {
-        haptics.success();
-        setIsAddModalOpen(false);
-        setNewName('');
-        setNewPhone(KOREA_MOBILE_PREFIX);
-        setIsEnglish(false);
-        setDuplicateInfo(null);
-        setCreateError(null);
-        setSelectedDriverId(res.driver.id);
-        setViewMode('detail');
-        return;
+        }, allowDuplicate);
+        if (!result.ok || !result.driver) {
+          if (result.isDuplicate && result.existingDrivers) {
+            haptics.warningPulse();
+            setDuplicateInfo({
+              count: result.duplicateCount || result.existingDrivers.length,
+              existing: result.existingDrivers,
+            });
+            return;
+          }
+          haptics.errorAlert();
+          setCreateError({ message: result.error || '기사 등록 중 오류가 발생했습니다.', statusCode: result.statusCode });
+          return;
+        }
+        target = result.driver;
+        // Do not re-create this driver if the optional photo upload fails.
+        setCreatedDriver(target);
       }
 
-      if (res.isDuplicate && res.existingDrivers) {
-        haptics.warningPulse();
-        setDuplicateInfo({
-          count: res.duplicateCount || res.existingDrivers.length,
-          existing: res.existingDrivers,
-        });
-        return;
+      if (newProfileFile) {
+        setPhotoSaving(true);
+        try {
+          await uploadNewDriverProfilePhoto({ id: target.id, name: target.name }, newProfileFile);
+        } catch (error) {
+          haptics.errorAlert();
+          setCreateError({ message: '기사는 등록됐지만 사진을 저장하지 못했어요. ' +
+            (error instanceof Error ? error.message : '사진 업로드 실패') +
+            ' 사진을 다시 선택하거나 저장을 재시도해 주세요.' });
+          return;
+        } finally {
+          setPhotoSaving(false);
+        }
       }
-
-      // Other errors
-      haptics.errorAlert();
-      setCreateError({
-        message: res.error || '기사 등록 중 오류가 발생했습니다.',
-        statusCode: res.statusCode,
-      });
+      haptics.success();
+      finishDriverRegistration(target);
     } finally {
       setIsSubmitting(false);
     }
@@ -187,18 +236,23 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
       {/* Quick Add Driver Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#17233B]/30 p-3 backdrop-blur-[2px] sm:p-6 animate-in fade-in duration-150">
-          <div className="hq-driver-form-a w-full max-w-md overflow-hidden rounded-[25px] bg-[#FAFBFD] shadow-[0_24px_64px_rgba(27,45,77,0.16),0_4px_14px_rgba(27,45,77,0.04)] animate-in zoom-in-95 duration-150">
+          <div className="hq-driver-form-a flex max-h-[94dvh] w-full max-w-md flex-col overflow-hidden rounded-[25px] bg-[#FAFBFD] shadow-[0_24px_64px_rgba(27,45,77,0.16),0_4px_14px_rgba(27,45,77,0.04)] animate-in zoom-in-95 duration-150">
             {/* Header */}
-            <div className="flex items-center justify-between bg-white px-5 py-5">
+            <div className="flex shrink-0 items-center justify-between bg-white px-5 py-5">
               <div className="flex items-center gap-2">
-                <div className="flex size-11 items-center justify-center rounded-[15px] bg-[#EEF3FF] text-[#1E60F3]">
-                  <User className="w-4 h-4" />
-                </div>
+                <img
+                  src="/images/icons/drivers/icon_driver.png"
+                  alt=""
+                  aria-hidden="true"
+                  className="size-11 shrink-0 select-none object-contain"
+                  draggable={false}
+                />
                 <h3 className="text-[18px] font-bold tracking-[-0.03em] text-[#17233B]">신규 기사 등록</h3>
               </div>
               <button
                 type="button"
                 onClick={handleCloseAddModal}
+                disabled={isSubmitting}
                 className="flex size-10 cursor-pointer items-center justify-center rounded-full bg-[#F7F9FC] text-[#73839D] transition-colors hover:bg-[#EDF1F6]"
               >
                 <X className="w-4 h-4" />
@@ -206,7 +260,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
             </div>
 
             {/* Form */}
-            <form onSubmit={(e) => handleCreateDriver(e, false)} className="space-y-5 p-5 text-[12px] font-medium text-[#4D607C]">
+            <form onSubmit={(e) => handleCreateDriver(e, false)} className="min-h-0 space-y-5 overflow-y-auto overscroll-contain p-5 text-[12px] font-medium text-[#4D607C]">
               {/* Duplicate Driver Warning Card */}
               {duplicateInfo && (
                 <div className="rounded-[17px] bg-[#FFF9F1] p-4 text-[#8E633F] space-y-2.5 animate-in fade-in duration-150">
@@ -298,6 +352,49 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
                 </div>
               )}
 
+              {/* Same stored driver profile asset as the dispatch-card builder. */}
+              <div className="rounded-[16px] bg-white p-4 shadow-[0_4px_14px_rgba(35,49,78,0.045)]">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-[12px] font-semibold text-[#243750]">기사 프로필 사진</p>
+                    <p className="mt-1 text-[11px] font-normal text-[#8190A5]">선택사항 · 배차카드에도 자동 연결</p>
+                  </div>
+                  {newProfileFile && <HqButton variant="subtle" size="sm"
+                    disabled={isSubmitting} onClick={() => setRegistrationPhoto(null)}>
+                    <Trash2 className="size-4" /> 제거
+                  </HqButton>}
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex size-[92px] shrink-0 items-center justify-center overflow-hidden rounded-[15px] bg-[#F5F7FA]">
+                    <img
+                      src={newProfilePreview || '/images/icons/drivers/icon_driver.png'}
+                      alt={newProfileFile ? '등록할 기사 프로필 사진 미리보기' : '기사 목록 아이콘'}
+                      className={newProfileFile ? 'size-full object-contain' : 'size-12 object-contain'}
+                      draggable={false}
+                    />
+                  </div>
+                  <div className="min-w-0 space-y-2">
+                    <input ref={profileFileRef} type="file" className="hidden"
+                      accept="image/png,image/jpeg,image/webp"
+                      aria-label="기사 프로필 사진 선택"
+                      onChange={event => {
+                        const file = event.target.files?.[0];
+                        if (file) setRegistrationPhoto(file);
+                        event.target.value = '';
+                      }}
+                    />
+                    <HqButton variant="secondary" size="sm" disabled={isSubmitting}
+                      onClick={() => profileFileRef.current?.click()}>
+                      <ImagePlus className="size-4" />{newProfileFile ? '사진 변경' : '사진 추가'}
+                    </HqButton>
+                    <p className="break-words text-[11px] font-normal leading-relaxed text-[#8190A5]">
+                      PNG·JPG·WebP, 최대 10MB. 정면 상반신·투명 배경 권장, 최소 400×400px.
+                    </p>
+                    {newProfileFile && <p className="truncate text-[11px] text-[#60728C]">{newProfileFile.name}</p>}
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-slate-500 mb-1">기사명 *</label>
                 <input
@@ -373,7 +470,11 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
                 </button>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3">
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-3">
+                {createdDriver && newProfileFile && <HqButton variant="secondary" size="sm"
+                  disabled={isSubmitting} onClick={() => finishDriverRegistration(createdDriver)}>
+                  사진 없이 완료
+                </HqButton>}
                 <button
                   type="button"
                   onClick={handleCloseAddModal}
@@ -391,7 +492,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
                   ) : (
                     <Check className="w-3.5 h-3.5" />
                   )}
-                  <span>{isSubmitting ? '등록 중...' : '기사 등록 완료'}</span>
+                  <span>{isSubmitting ? (photoSaving ? '사진 저장 중…' : '등록 중…') : createdDriver ? '사진 업로드 다시 시도' : '기사 등록 완료'}</span>
                 </button>
               </div>
             </form>
