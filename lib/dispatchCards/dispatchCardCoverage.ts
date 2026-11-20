@@ -1,11 +1,12 @@
 import { resolveDispatchCardPhotos } from './dispatchCardAssets';
 import { validateDispatchCardProfile } from './chauffeurIdentity';
 import { resolveDispatchCardEnglishName } from '@/utils/koreanNameRomanization';
+import { isDispatchCardAssetStale } from './cardRevision';
 import type { VipRealVehicle } from '@/utils/vehicleData';
 
 type DbDriver = { id: string; driver_name: string | null; phone: string | null; driver_meta: unknown };
-type ExistingCard = { driver_id: string; vehicle_id: string; variant: string };
-type DriverPortrait = { driver_id: string };
+type ExistingCard = { driver_id: string; vehicle_id: string; variant: string; created_at?: string | null };
+type DriverPortrait = { driver_id: string; created_at?: string | null };
 
 export interface DispatchCardCoverageSlot {
   vehicleId: string;
@@ -53,8 +54,15 @@ export function buildDispatchCardCoverage(
     return true;
   });
   const photoDrivers = new Set(portraits.map(p => p.driver_id));
+  const portraitsByDriver = new Map(portraits.map(p => [p.driver_id, p.created_at]));
+  const revisions = new Map(drivers.map(driver => [
+    driver.id,
+    record(driver.driver_meta).dispatch_card_revision_at,
+  ]));
   const saved = new Set(cards
-    .filter(card => card.variant === 'pc' || card.variant === 'mobile')
+    .filter(card => (card.variant === 'pc' || card.variant === 'mobile') &&
+      !isDispatchCardAssetStale(revisions.get(card.driver_id), card.created_at) &&
+      !isDispatchCardAssetStale(portraitsByDriver.get(card.driver_id), card.created_at))
     .map(card => [card.driver_id,card.vehicle_id,card.variant].join(':')));
   const coverage = drivers.map(driver => {
     const meta = record(driver.driver_meta), cardIdentity = record(meta.dispatch_card_identity);

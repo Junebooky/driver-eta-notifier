@@ -17,8 +17,8 @@ export async function GET(request:NextRequest) {
     const [fleet,driverResponse,portraitResponse,cardResponse]=await Promise.all([
       readFleetRegistry(),
       supabaseAdmin.from('drivers').select('id,driver_name,phone,driver_meta').order('driver_name'),
-      supabaseAdmin.from('driver_profile_assets').select('driver_id').eq('organization_id',org).eq('status','active'),
-      supabaseAdmin.from('driver_vehicle_info_assets').select('driver_id,vehicle_id,variant').eq('organization_id',org).eq('status','active'),
+      supabaseAdmin.from('driver_profile_assets').select('driver_id,created_at').eq('organization_id',org).eq('status','active'),
+      supabaseAdmin.from('driver_vehicle_info_assets').select('driver_id,vehicle_id,variant,created_at').eq('organization_id',org).eq('status','active'),
     ]);
     if(driverResponse.error || portraitResponse.error || cardResponse.error)
       throw new Error('기사·프로필·배차카드 현황을 불러올 수 없습니다.');

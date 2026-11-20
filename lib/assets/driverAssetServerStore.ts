@@ -9,6 +9,7 @@ import {
   DriverVehicleInfoAsset,
 } from '@/types/driverVehicleAsset';
 import { resolveVehicleEntity } from '@/utils/vehicleData';
+import { isDispatchCardAssetStale } from '@/lib/dispatchCards/cardRevision';
 
 export const BUCKET_NAME = 'cockpit-assets';
 export const DEFAULT_ORG = 'vip_limousine_korea';
@@ -625,11 +626,25 @@ export async function getDriverVehicleBundle(
   registeredVehicle?: ReturnType<typeof resolveVehicleEntity>,
 ): Promise<DriverVehicleAssetBundle> {
   const veh = registeredVehicle || resolveVehicleEntity(vehiclePlateOrId, fallbackModel);
-  const [profile, pcInfo, mobileInfo] = await Promise.all([
+  const [profile, pcInfo, mobileInfo, driverRecord] = await Promise.all([
     getDriverProfileAsset(driverId, org),
     getDriverVehicleInfoAsset(driverId, veh.uuid, 'pc', org),
     getDriverVehicleInfoAsset(driverId, veh.uuid, 'mobile', org),
+    isAssetTestRuntime() && !process.env.SUPABASE_SERVICE_ROLE_KEY
+      ? Promise.resolve({ data: null, error: null })
+      : supabaseAdmin.from('drivers').select('driver_meta').eq('id', driverId).maybeSingle(),
   ]);
+  if (driverRecord.error) throw driverRecord.error;
+  const meta = driverRecord.data?.driver_meta && typeof driverRecord.data.driver_meta === 'object'
+    ? driverRecord.data.driver_meta as Record<string, unknown> : {};
+  // Never offer an old static brochure after this driver's role, name, phone,
+  // or portrait changed. Previous versions remain in archived history.
+  const currentPc = pcInfo &&
+    !isDispatchCardAssetStale(meta.dispatch_card_revision_at, pcInfo.createdAt) &&
+    !isDispatchCardAssetStale(profile?.createdAt, pcInfo.createdAt) ? pcInfo : null;
+  const currentMobile = mobileInfo &&
+    !isDispatchCardAssetStale(meta.dispatch_card_revision_at, mobileInfo.createdAt) &&
+    !isDispatchCardAssetStale(profile?.createdAt, mobileInfo.createdAt) ? mobileInfo : null;
 
   return {
     driverId,
@@ -638,10 +653,10 @@ export async function getDriverVehicleBundle(
     vehiclePlate: veh.plate,
     vehicleModel: veh.model,
     profile,
-    pcInfo,
-    mobileInfo,
-    isReadyForCustomerDispatch: Boolean(pcInfo || mobileInfo),
-    isFullyComplete: Boolean(pcInfo && mobileInfo),
+    pcInfo: currentPc,
+    mobileInfo: currentMobile,
+    isReadyForCustomerDispatch: Boolean(currentPc || currentMobile),
+    isFullyComplete: Boolean(currentPc && currentMobile),
   };
 }
 
@@ -651,8 +666,8 @@ export async function getDriverVehicleBundle(
 export async function getDriverVehicleAssetSummary(
   driverId: string,
   org: string = DEFAULT_ORG
-): Promise<Record<string, { pc: boolean; mobile: boolean }>> {
-  const summary: Record<string, { pc: boolean; mobile: boolean }> = {};
+): Promise<Record<string, { pc: boolean; mobile: boolean; stalePc?: boolean; staleMobile?: boolean }>> {
+  const summary: Record<string, { pc: boolean; mobile: boolean; stalePc?: boolean; staleMobile?: boolean }> = {};
   const isTestEnv = isAssetTestRuntime();
 
   if (isTestEnv && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -670,24 +685,34 @@ export async function getDriverVehicleAssetSummary(
   }
 
   try {
-    const { data } = await supabaseAdmin
-      .from('driver_vehicle_info_assets')
-      .select('vehicle_id, variant')
-      .eq('organization_id', org)
-      .eq('driver_id', driverId)
-      .eq('status', 'active');
-
-    if (data) {
-      for (const row of data) {
-        if (!summary[row.vehicle_id]) {
-          summary[row.vehicle_id] = { pc: false, mobile: false };
-        }
-        if (row.variant === 'pc') summary[row.vehicle_id].pc = true;
-        if (row.variant === 'mobile') summary[row.vehicle_id].mobile = true;
+    const [assets, driver, photo] = await Promise.all([
+      supabaseAdmin.from('driver_vehicle_info_assets')
+        .select('vehicle_id, variant, created_at')
+        .eq('organization_id', org).eq('driver_id', driverId).eq('status', 'active'),
+      supabaseAdmin.from('drivers').select('driver_meta').eq('id', driverId).maybeSingle(),
+      supabaseAdmin.from('driver_profile_assets')
+        .select('created_at').eq('organization_id',org).eq('driver_id',driverId)
+        .eq('status','active').order('version',{ascending:false}).limit(1).maybeSingle(),
+    ]);
+    if (assets.error || driver.error || photo.error) throw assets.error || driver.error || photo.error;
+    const meta = driver.data?.driver_meta && typeof driver.data.driver_meta === 'object'
+      ? driver.data.driver_meta as Record<string, unknown> : {};
+    for (const row of assets.data || []) {
+      if (!summary[row.vehicle_id]) summary[row.vehicle_id] = { pc: false, mobile: false };
+      const isStale = isDispatchCardAssetStale(meta.dispatch_card_revision_at, row.created_at) ||
+        isDispatchCardAssetStale(photo.data?.created_at, row.created_at);
+      if (row.variant === 'pc') {
+        summary[row.vehicle_id].pc = !isStale;
+        summary[row.vehicle_id].stalePc = isStale;
+      }
+      if (row.variant === 'mobile') {
+        summary[row.vehicle_id].mobile = !isStale;
+        summary[row.vehicle_id].staleMobile = isStale;
       }
     }
-  } catch {
-    // Return graceful fallback
+  } catch (error) {
+    // Fail closed: never claim a card is current when metadata cannot be read.
+    throw error;
   }
 
   return summary;

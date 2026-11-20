@@ -35,6 +35,7 @@ import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
 import { CHAUFFEUR_POSITION_OPTIONS, formatBilingualChauffeurName, getEnglishPosition, validateDispatchCardProfile, type ChauffeurPositionCode } from '@/lib/dispatchCards/chauffeurIdentity';
 import { formatKoreanMobileInternationalInput, KOREA_MOBILE_PREFIX } from '@/utils/koreanInternationalPhone';
 import { formatKoreanEnglishName } from '@/utils/koreanNameRomanization';
+import { shouldRebuildDriverCards } from '@/lib/dispatchCards/cardRevision';
 
 interface Props {
   isOpen: boolean;
@@ -48,7 +49,7 @@ interface Props {
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const DEFAULT_PLACEMENT: CardPlacement = { zoom: 100, x: 0, y: 0 };
-type CardSummary = Record<string, { pc: boolean; mobile: boolean }>;
+type CardSummary = Record<string, { pc: boolean; mobile: boolean; stalePc?: boolean; staleMobile?: boolean }>;
 type GenerationMode = 'missing' | 'selected' | 'all';
 
 function cleanFilename(value: string) {
@@ -101,6 +102,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   const [phone, setPhone] = useState(formatKoreanMobileInternationalInput(driver.phone || KOREA_MOBILE_PREFIX));
   const [photoUrl, setPhotoUrl] = useState('');
   const [photoStored, setPhotoStored] = useState(false);
+  const [profilePhotoChanged, setProfilePhotoChanged] = useState(false);
   const [portraitPlacement, setPortraitPlacement] = useState<CardPlacement>({ ...DEFAULT_DISPATCH_PORTRAIT_PLACEMENT });
   const [portraitSavedPlacement, setPortraitSavedPlacement] = useState<CardPlacement>({ ...DEFAULT_DISPATCH_PORTRAIT_PLACEMENT });
   const [portraitSettingsLoaded, setPortraitSettingsLoaded] = useState(false);
@@ -135,7 +137,15 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   // Keep the shared HQ modal's focus trap stable while form values change.
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
-  const closeModal = React.useCallback(() => onCloseRef.current(), []);
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+  const closeModal = React.useCallback(() => {
+    if (busyRef.current) {
+      setMessage('배차카드 전체 갱신 중입니다. 완료 결과를 확인한 후 닫아 주세요.');
+      return;
+    }
+    onCloseRef.current();
+  }, []);
   const closeComparison = React.useCallback(() => {
     setCompareOpen(false);
     setCompareInputs(null);
@@ -167,6 +177,10 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   const validCardProfile = validateDispatchCardProfile(cardProfile);
   const identityDirty = Boolean(validCardProfile && JSON.stringify(validCardProfile) !== savedIdentity);
   const cardSettingsDirty = portraitDirty || identityDirty;
+  const changedSharedInputs = shouldRebuildDriverCards(cardSettingsDirty, profilePhotoChanged);
+  const staleCardCount = Object.values(savedCards).reduce((count, entry) =>
+    count + Number(Boolean(entry.stalePc)) + Number(Boolean(entry.staleMobile)), 0);
+  const needsCardRefresh = changedSharedInputs || staleCardCount > 0;
   const isComplete = Boolean(
     portraitSettingsLoaded && validCardProfile && photoStored && photoUrl && vehicle && photos,
   );
@@ -188,6 +202,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     setPhone(formatKoreanMobileInternationalInput(driver.phone || KOREA_MOBILE_PREFIX));
     setPhotoUrl('');
     setPhotoStored(false);
+    setProfilePhotoChanged(false);
     setPhotoLoading(true);
     setError('');
     setMessage('');
@@ -347,6 +362,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
       if (currentRequest.current !== id) return;
       setPhotoUrl(getPhotoPreviewUrl(data.storagePath));
       setPhotoStored(true);
+      setProfilePhotoChanged(true);
       setMessage('기사 사진을 비공개 저장소에 저장했습니다. 카드를 미리 볼 수 있습니다.');
       onProfileUpdated?.();
     } catch (err) {
@@ -442,6 +458,10 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
 
   const downloadSingle = async () => {
     if (!isComplete || !vehicle || busy) return;
+    if (needsCardRefresh) {
+      setError('기사 정보나 사진을 먼저 저장하고 전체 카드를 갱신한 뒤 다운로드해 주세요.');
+      return;
+    }
     setBusy(true);
     setError('');
     try {
@@ -459,6 +479,10 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
 
   const downloadAll = async () => {
     if (!isComplete || busy) return;
+    if (needsCardRefresh) {
+      setError('기사 정보나 사진을 먼저 저장하고 전체 카드를 갱신한 뒤 다운로드해 주세요.');
+      return;
+    }
     setBusy(true);
     setError('');
     setMessage('');
@@ -497,13 +521,15 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     }
   };
 
-  // Stored cards are never changed by the default 'missing' mode. Explicit
-  // selected/all modes are the only way to intentionally create new versions.
-  const saveAllToAssetLibrary = async () => {
+  // Changed shared identity/portrait updates all vehicle card variants.
+  // A later retry only rebuilds stale/missing versions, preserving successes.
+  const saveAllToAssetLibrary = async (modeOverride?: GenerationMode) => {
     if (!isComplete || !dbReady || busy || !summaryLoaded) return;
     setBusy(true);
     setError('');
     setMessage('');
+    const effectiveMode: GenerationMode = modeOverride ||
+      (changedSharedInputs ? 'all' : staleCardCount ? 'missing' : generationMode);
     let generatedCount = 0;
     let skippedCount = 0;
     const failures: string[] = [];
@@ -513,9 +539,9 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
       // writes to an existing slot when skipIfExists=true.
       const latest = await loadSavedCards();
       setSavedCards(latest);
-      const targets = generationMode === 'selected'
+      const targets = effectiveMode === 'selected'
         ? (vehicle ? [vehicle] : [])
-        : generationMode === 'missing'
+        : effectiveMode === 'missing'
           ? availableVehicles.filter(item => !latest[item.uuid]?.pc || !latest[item.uuid]?.mobile)
           : availableVehicles;
       if (targets.length === 0) {
@@ -526,7 +552,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
         const item = targets[i];
         setProgress((i + 1) + ' / ' + targets.length + '대 등록 중 · ' + item.plate);
         for (const variant of ['pc', 'mobile'] as const) {
-          if (generationMode === 'missing' && latest[item.uuid]?.[variant]) {
+          if (effectiveMode === 'missing' && latest[item.uuid]?.[variant]) {
             skippedCount++;
             continue;
           }
@@ -545,7 +571,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
             form.set('variant', variant);
             form.set('width', String(canvas.width));
             form.set('height', String(canvas.height));
-            if (generationMode === 'missing') form.set('skipIfExists', 'true');
+            if (effectiveMode === 'missing') form.set('skipIfExists', 'true');
             form.set('file', blob, 'dispatch_' + cleanFilename(item.plate) + '_' + variant + '.webp');
             const response = await fetch('/api/hq/drivers/assets/upload', { method: 'POST', body: form });
             const result = await response.json().catch(() => ({}));
@@ -565,10 +591,17 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
       } catch (err) {
         setError('저장 후 카드 목록 갱신에 실패했습니다. 화면을 다시 열어 확인해 주세요.');
       }
+      setProfilePhotoChanged(false);
       if (generatedCount > 0) onAssetUpdated?.();
-      setMessage('PC·모바일 카드 ' + generatedCount + '장 저장 완료 · 기존 카드 ' +
-        skippedCount + '장 유지. 고객에게 자동 발송되지 않습니다.');
-      if (failures.length) setError('일부 생성 실패 — ' + failures.join(' / '));
+      if (failures.length === 0) {
+        onProfileUpdated?.();
+        setMessage('기사 정보 반영 완료 · PC·모바일 ' + generatedCount +
+          '장 최신 버전 저장 · 기존 ' + skippedCount + '장 유지. 고객에게 자동 발송하지 않았습니다.');
+      } else {
+        setMessage('반영 완료 ' + generatedCount + '장 · 실패 ' + failures.length +
+          '장. 기존 카드 일부는 갱신이 필요합니다. 다시 누르면 남은 카드부터 갱신합니다.');
+        setError('일부 갱신 실패 — ' + failures.join(' / '));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '배차카드 저장 실패');
     } finally {
@@ -595,14 +628,14 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
           <div className="flex w-full gap-2 sm:w-auto">
             <HqButton variant="subtle" onClick={closeModal} className="flex-1 sm:flex-none">닫기</HqButton>
             <HqButton variant="primary" className="min-w-0 flex-[2] whitespace-nowrap sm:flex-none" loading={busy}
-              disabled={!isComplete || !dbReady || !summaryLoaded || busy || portraitSaving || photoUploading || previewLoading || (generationMode === 'missing' && missingVehicles.length === 0)}
+              disabled={!isComplete || !dbReady || !summaryLoaded || busy || portraitSaving || photoUploading || previewLoading || (!needsCardRefresh && generationMode === 'missing' && missingVehicles.length === 0)}
               onClick={() => {
-                if (generationMode !== 'all' || window.confirm('준비된 모든 차량의 기존 카드를 새 버전으로 교체할까요?')) {
+                if (needsCardRefresh || generationMode !== 'all' || window.confirm('준비된 모든 차량의 기존 카드를 새 버전으로 교체할까요?')) {
                   void saveAllToAssetLibrary();
                 }
               }}>
               {busy ? (progress || '저장 중…') : (
-                <><CheckCircle2 className="size-4" />{generationMode === 'missing' ? '비어 있는 카드 등록하기' : generationMode === 'selected' ? '선택 차량 등록' : '전체 카드 재생성'}</>
+                <><CheckCircle2 className="size-4" />{needsCardRefresh ? '기사 정보 반영 · 전체 카드 갱신' : generationMode === 'missing' ? '비어 있는 카드 등록하기' : generationMode === 'selected' ? '선택 차량 등록' : '전체 카드 재생성'}</>
               )}
             </HqButton>
           </div>
@@ -657,7 +690,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
                   <span>외관 1장 · 실내 2장이 준비된 차량만 표시</span>
                   {summaryLoaded && vehicle && (
                     <span aria-live="polite">
-                      PC {currentCardStatus?.pc ? '등록 완료' : '미등록'} · 모바일 {currentCardStatus?.mobile ? '등록 완료' : '미등록'}
+                      PC {currentCardStatus?.pc ? '최신' : currentCardStatus?.stalePc ? '갱신 필요' : '미등록'} · 모바일 {currentCardStatus?.mobile ? '최신' : currentCardStatus?.staleMobile ? '갱신 필요' : '미등록'}
                     </span>
                   )}
                 </div>
@@ -729,11 +762,11 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
               <h3 className="mb-3 text-[13px] font-semibold text-[#526680]">파일 다운로드</h3>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <HqButton variant="secondary" onClick={() => void downloadSingle()}
-                  disabled={!isComplete || busy || portraitSaving || photoUploading || previewLoading} className="w-full sm:w-auto">
+                  disabled={!isComplete || busy || portraitSaving || photoUploading || previewLoading || needsCardRefresh} className="w-full sm:w-auto">
                   <Download className="size-4" /> 선택한 {orientation === 'pc' ? 'PC' : '모바일'} 카드 PNG
                 </HqButton>
                 <HqButton variant="secondary" onClick={() => void downloadAll()}
-                  disabled={!isComplete || busy || portraitSaving || photoUploading || previewLoading} className="w-full sm:w-auto">
+                  disabled={!isComplete || busy || portraitSaving || photoUploading || previewLoading || needsCardRefresh} className="w-full sm:w-auto">
                   <Download className="size-4" /> 준비된 차량 전체 ZIP
                 </HqButton>
               </div>
@@ -879,22 +912,17 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
                 기본 구도 복원
               </HqButton>
               <HqButton variant={cardSettingsDirty ? 'primary' : 'secondary'} size="sm"
-                disabled={!portraitSettingsLoaded || !cardSettingsDirty || !validCardProfile || busy || portraitSaving}
-                loading={portraitSaving}
-                onClick={() => {
-                  void persistCardSettings()
-                    .then(() => setMessage('기사 정보와 사진 구도를 저장했습니다. 이후 새 차량 카드에도 동일하게 적용됩니다.'))
-                    .catch(err => setError(err instanceof Error ? err.message : '사진 구도 저장 실패'));
-                }}>
-                기사 정보·구도 저장
+                disabled={!isComplete || !dbReady || !summaryLoaded || !needsCardRefresh || busy || portraitSaving || photoUploading}
+                loading={busy || portraitSaving}
+                onClick={() => { void saveAllToAssetLibrary(changedSharedInputs ? 'all' : 'missing'); }}>
+                정보 저장 · 전체 카드 갱신
               </HqButton>
             </div>
             <p className="mt-3 text-[11px] leading-relaxed text-[#8492A4]">
-              {portraitSettingsLoaded
-                ? cardSettingsDirty
-                  ? '변경사항 있음 · 등록 시 자동 저장'
-                  : '기사별 설정 저장됨 · 이후 만드는 PC·모바일 카드에 공통 적용 (기존 등록 카드는 유지)'
-                : '기사별 사진 설정 불러오는 중…'}
+              {!portraitSettingsLoaded ? '기사 정보 불러오는 중…' :
+                needsCardRefresh
+                  ? '변경된 기사 정보·사진은 이 기사의 모든 차량별 PC·모바일 카드에 새 버전으로 반영됩니다.'
+                  : '기사 정보 저장됨 · 기존 등록 카드가 최신 상태예요.'}
             </p>
           </HqCard>
 
