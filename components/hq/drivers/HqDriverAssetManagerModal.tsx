@@ -1,7 +1,7 @@
 'use client';
 
 import React, {useEffect,useMemo,useState} from 'react';
-import {AlertTriangle,ExternalLink,ImageIcon,Loader2,RefreshCw} from 'lucide-react';
+import {AlertTriangle,ExternalLink,ImageIcon,Loader2,RefreshCw,Share2,Download} from 'lucide-react';
 import type {HqDriverSummary} from '@/types/driverHq';
 import type {DriverVehicleAssetBundle} from '@/types/driverVehicleAsset';
 import {resolveDispatchCardPhotos} from '@/lib/dispatchCards/dispatchCardAssets';
@@ -16,6 +16,7 @@ import {HqButton,HqBadge,HqCard} from '@/components/hq/ui';
 import {HqModal} from '@/components/hq/ui/HqModal';
 import {HqSearchSelect} from '@/components/hq/ui/HqSearchSelect';
 import {HqDispatchCardBuilderModal} from './HqDispatchCardBuilderModal';
+import {prepareSavedDispatchCardPng,shareDispatchCardPng,supportsDispatchCardNativeShare} from '@/utils/shareDispatchCardPng';
 
 export interface HqDriverAssetManagerModalProps {
   isOpen:boolean;
@@ -47,11 +48,50 @@ export function HqDriverAssetManagerModal({
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState('');
   const [revision,setRevision]=useState(0);
+  type Variant='pc'|'mobile';
+  const [prepared,setPrepared]=useState<Record<Variant,{file:File;path:string}|null>>({pc:null,mobile:null});
+  const [preparing,setPreparing]=useState<Record<Variant,boolean>>({pc:false,mobile:false});
+  const [sharing,setSharing]=useState<Variant|null>(null);
+  const [shareFeedback,setShareFeedback]=useState('');
 
-  const imageVehicles=useMemo(
-    ()=>fleet.vehicles.filter(vehicle=>Boolean(resolveDispatchCardPhotos(vehicle))),
-    [fleet.vehicles],
-  );
+  // Convert from the authenticated same-origin proxy in advance, so sharing
+  // can start directly inside the user's click event (mobile gesture-safe).
+  useEffect(()=>{
+    let cancelled=false;
+    setPrepared({pc:null,mobile:null});
+    setPreparing({pc:false,mobile:false});
+    setShareFeedback('');
+    if(!isOpen||!bundle||!selectedVehiclePlate||bundle.driverId!==selectedDriverId||
+       bundle.vehiclePlate!==selectedVehiclePlate)return;
+    for(const variant of ['pc','mobile'] as const){
+      const asset=variant==='pc'?bundle.pcInfo:bundle.mobileInfo;
+      if(!asset?.filePath)continue;
+      setPreparing(previous=>({...previous,[variant]:true}));
+      const path=asset.filePath;
+      const fileName='VIP_'+bundle.driverName+'_'+bundle.vehiclePlate+'_'+variant;
+      void prepareSavedDispatchCardPng(path,fileName)
+        .then(file=>{if(!cancelled)setPrepared(previous=>({...previous,[variant]:{file,path}}));})
+        .catch(()=>{if(!cancelled)setShareFeedback('배차카드 PNG 준비에 실패했습니다. 새로고침 후 다시 시도해 주세요.');})
+        .finally(()=>{if(!cancelled)setPreparing(previous=>({...previous,[variant]:false}));});
+    }
+    return ()=>{cancelled=true;};
+  },[isOpen,bundle,selectedDriverId,selectedVehiclePlate]);
+
+  const handleShare=async(variant:Variant)=>{
+    const asset=variant==='pc'?bundle?.pcInfo:bundle?.mobileInfo;
+    const chosen=prepared[variant];
+    if(!asset?.filePath||!chosen||chosen.path!==asset.filePath||sharing)return;
+    setSharing(variant);setShareFeedback('');
+    try{
+      const outcome=await shareDispatchCardPng(chosen.file);
+      if(outcome==='downloaded')setShareFeedback('PNG 이미지가 저장됐습니다. 원하는 메신저에서 첨부해 주세요.');
+    }catch(e){
+      setShareFeedback(e instanceof Error?e.message:'이미지를 공유하지 못했습니다.');
+    }finally{setSharing(null);}
+  };
+
+  // All registered physical fleet vehicles, including photo-unready vehicles.
+  const imageVehicles=fleet.vehicles;
   useEffect(()=>{
     if(!isOpen)return;
     setSelectedDriverId(initialDriverId||drivers[0]?.id||'');
@@ -66,6 +106,7 @@ export function HqDriverAssetManagerModal({
   },[isOpen,initialDriverId,initialVehiclePlate]);
   const driver=drivers.find(item=>item.id===selectedDriverId)||null;
   const selectedVehicle=imageVehicles.find(v=>v.plate===selectedVehiclePlate)||null;
+  const selectedVehiclePhotoReady=Boolean(selectedVehicle&&resolveDispatchCardPhotos(selectedVehicle));
   const partitionedVehicles=useMemo(
     ()=>partitionDispatchCardVehicles(imageVehicles,vehicleSummary),
     [imageVehicles,vehicleSummary],
@@ -76,14 +117,14 @@ export function HqDriverAssetManagerModal({
       label:item.plate,
       subtitle:item.model,
       group:'등록된 차량',
-      status:getVehicleCardStatusMeta(vehicleSummary[item.uuid]).optionStatus,
+      status:!resolveDispatchCardPhotos(item)?'차량 이미지 미준비':getVehicleCardStatusMeta(vehicleSummary[item.uuid]).optionStatus,
     })),
     ...partitionedVehicles.unregistered.map(item=>({
       value:item.plate,
       label:item.plate,
       subtitle:item.model,
       group:'미등록 차량',
-      status:getVehicleCardStatusMeta(vehicleSummary[item.uuid]).optionStatus,
+      status:!resolveDispatchCardPhotos(item)?'차량 이미지 미준비':getVehicleCardStatusMeta(vehicleSummary[item.uuid]).optionStatus,
     })),
   ],[partitionedVehicles,vehicleSummary]);
 
@@ -221,12 +262,17 @@ export function HqDriverAssetManagerModal({
             <HqButton variant="subtle" size="sm" onClick={()=>setRevision(v=>v+1)} disabled={loading||summaryLoading}>
               <RefreshCw className="size-4"/> 새로고침
             </HqButton>
-            <HqButton variant="primary" size="sm" disabled={!driver||!selectedVehicle||fleet.loading}
+            <HqButton variant="primary" size="sm"
+              disabled={!driver||!selectedVehicle||!selectedVehiclePhotoReady||fleet.loading}
               onClick={()=>setBuilderOpen(true)}>
               <ImageIcon className="size-4"/> 카드 만들기·수정
             </HqButton>
           </div>
         </div>
+        {selectedVehicle&&!selectedVehiclePhotoReady&&<p role="status" className="text-[11px] text-[#A17C55]">
+          이 차량은 배차카드용 외관·실내 이미지가 아직 준비되지 않았어요. 차량 이미지를 등록한 뒤 카드를 만들 수 있습니다.
+        </p>}
+        {shareFeedback&&<p role="status" className="text-[11px] text-[#60728C]">{shareFeedback}</p>}
         {(loading||summaryLoading&&!selectedVehicle)?<div role="status" className="flex min-h-40 items-center justify-center gap-2 text-[12px] text-[#73839D]">
           <Loader2 className="size-4 animate-spin"/> 카드 불러오는 중…
         </div>:<div className="grid gap-3 sm:grid-cols-2">
@@ -259,6 +305,18 @@ export function HqDriverAssetManagerModal({
                     <span>{isStale?'기사 정보가 바뀌어 최신 버전으로 업데이트가 필요해요.':'카드 만들기·수정에서 배차카드를 만들어 주세요.'}</span>
                   </div>}
               </div>
+              {asset?.signedUrl&&<div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+                <HqButton variant="secondary" size="sm"
+                  disabled={!prepared[variant]||prepared[variant]?.path!==asset.filePath||preparing[variant]||Boolean(sharing)}
+                  onClick={()=>{void handleShare(variant);}}>
+                  {preparing[variant]?<Loader2 className="size-4 animate-spin"/>:
+                    prepared[variant]&&supportsDispatchCardNativeShare(prepared[variant]!.file)?
+                      <Share2 className="size-4"/>:<Download className="size-4"/>}
+                  {preparing[variant]?'PNG 준비 중…':
+                    prepared[variant]&&supportsDispatchCardNativeShare(prepared[variant]!.file)?
+                      'PNG 이미지 공유':'PNG 다운로드'}
+                </HqButton>
+              </div>}
             </HqCard>;
           })}
         </div>}

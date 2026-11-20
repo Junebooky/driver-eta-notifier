@@ -51,7 +51,16 @@ export async function readFleetRegistry(): Promise<FleetRegistryRecord[]> {
     const canonicalSprinter = canonical?.category === 'sprinter' ? canonical : null;
     const withoutTourer = (value: string) =>
       value.replace(/투어러|tourer/gi, '').replace(/\s+/g, ' ').trim();
-    const displayProfile: VipRealVehicle = canonicalSprinter ? {
+    const verifiedCarnival=canonical?.category==='carnival'&&
+      /하이리무진/i.test(canonical.model) ? canonical : null;
+    const displayProfile: VipRealVehicle = verifiedCarnival ? {
+      ...profile,
+      model:verifiedCarnival.model,
+      modelShort:verifiedCarnival.modelShort,
+      subType:verifiedCarnival.subType,
+      // Correct old ordinary-limousine records without losing actual vehicle identity.
+      imageUrl:profile.imageUrl||verifiedCarnival.imageUrl,
+    } : canonicalSprinter ? {
       ...profile,
       model: canonicalSprinter.model,
       modelShort: canonicalSprinter.modelShort,

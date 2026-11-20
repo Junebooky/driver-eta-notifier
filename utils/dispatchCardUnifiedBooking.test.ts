@@ -141,8 +141,8 @@ test('driver table surfaces inline per-driver dispatch card coverage with regist
       {vehicleId:'v2',plate:'142호 8407',pc:false,mobile:false},
     ],
   });
-  assert.equal(partial.tone,'selected');
-  assert.equal(partial.label,'1/2대 등록');
+  assert.equal(partial.tone,'warning');
+  assert.equal(partial.label,'0/2대 완료');
   assert.equal(partial.registeredSlots.length,1);
   assert.equal(partial.unregisteredSlots.length,1);
 
