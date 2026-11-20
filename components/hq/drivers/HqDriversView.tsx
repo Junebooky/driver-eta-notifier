@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { HqDriversTableView } from './HqDriversTableView';
 import { HqDriverDetailSplitView } from './HqDriverDetailSplitView';
@@ -29,6 +29,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
 
   const urlAdd = searchParams?.get('add') === 'true';
 
+  const tableScrollTop = useRef(0);
   const [viewMode, setViewMode] = useState<'table' | 'detail'>(() => {
     return urlView === 'detail' || Boolean(urlDriverId) ? 'detail' : 'table';
   });
@@ -109,9 +110,19 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
   };
 
   const handleSelectDriver = (driverId: string) => {
+    tableScrollTop.current = document.querySelector<HTMLElement>('main')?.scrollTop || 0;
     setSelectedDriverId(driverId);
     setViewMode('detail');
   };
+
+  // HQ scrolls inside <main>. Restore the roster after leaving profile.
+  useEffect(() => {
+    if (typeof window === 'undefined' ||
+        !window.matchMedia('(max-width: 1023px)').matches) return;
+    const scroller = document.querySelector<HTMLElement>('main');
+    if (scroller) scroller.scrollTop = viewMode === 'detail' ? 0 : tableScrollTop.current;
+    if (viewMode === 'detail') window.scrollTo(0,0);
+  }, [viewMode, selectedDriverId]);
 
   const handleBackToTable = () => {
     haptics.lightTap();
@@ -204,7 +215,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
 
   return (
     <div className="hq-drivers-a space-y-5">
-      {viewMode === 'table' ? (
+      <div className={viewMode === 'table' ? '' : 'hidden'}>
         <HqDriversTableView
           onSelectDriver={handleSelectDriver}
           initialSearchQuery={initialSearchQuery}
@@ -220,7 +231,8 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
           onDeleteDriver={deleteDriver}
           onCardAssetUpdated={refetch}
         />
-      ) : (
+      </div>
+      {viewMode === 'detail' && (
         <HqDriverDetailSplitView
           selectedDriverId={selectedDriverId || (drivers[0]?.id ?? '')}
           onSelectDriver={(id) => setSelectedDriverId(id)}
@@ -229,6 +241,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
           counts={counts}
           isLoading={isLoading}
           onUpdateDriver={updateDriver}
+          onDeleteDriver={deleteDriver}
           onRefreshDrivers={refetch}
         />
       )}

@@ -52,6 +52,7 @@ export function HqDriverAssetManagerModal({
   const [prepared,setPrepared]=useState<Record<Variant,{file:File;path:string}|null>>({pc:null,mobile:null});
   const [preparing,setPreparing]=useState<Record<Variant,boolean>>({pc:false,mobile:false});
   const [sharing,setSharing]=useState(false);
+  const [previewVariant,setPreviewVariant]=useState<'pc'|'mobile'>('mobile');
   const [shareFeedback,setShareFeedback]=useState('');
 
   // Convert from the authenticated same-origin proxy in advance, so sharing
@@ -280,13 +281,33 @@ export function HqDriverAssetManagerModal({
           이 차량은 배차카드용 외관·실내 이미지가 아직 준비되지 않았어요. 차량 이미지를 등록한 뒤 카드를 만들 수 있습니다.
         </p>}
         {shareFeedback&&<p role="status" className="text-[11px] text-[#60728C]">{shareFeedback}</p>}
+        <div className="flex flex-wrap items-center justify-stretch gap-2 sm:justify-end">
+          <HqButton variant="primary" size="md" className="w-full sm:w-auto"
+            disabled={!bothFilesPrepared||preparing.pc||preparing.mobile||sharing||loading}
+            aria-label="PC·모바일 배차카드 PNG 두 장 한 번에 공유"
+            onClick={()=>{void handleShareBoth();}}>
+            {sharing||preparing.pc||preparing.mobile?<Loader2 className="size-4 animate-spin"/>:
+              canNativeShare?<Share2 className="size-4"/>:<Download className="size-4"/>}
+            {sharing?'파일 공유 중…':preparing.pc||preparing.mobile?'PNG 2장 준비 중…':
+              !bothCardsReady?'두 카드 생성 후 공유':
+              canNativeShare?'PC·모바일 함께 공유':'PC·모바일 ZIP 저장'}
+          </HqButton>
+        </div>
+        <div className="flex gap-1 rounded-[12px] bg-[#F6F8FA] p-1 sm:hidden" aria-label="배차카드 미리보기 형식">
+          {(['pc','mobile'] as const).map(variant=><button key={variant} type="button"
+            aria-pressed={previewVariant===variant} onClick={()=>setPreviewVariant(variant)}
+            className={'min-h-10 flex-1 rounded-[9px] text-[12px] font-semibold '+
+              (previewVariant===variant?'bg-white text-[#1E60F3] shadow-[0_2px_8px_rgba(35,49,78,0.06)]':'text-[#73839D]')}>
+            {variant==='pc'?'PC 가로형':'모바일 세로형'}
+          </button>)}
+        </div>
         {(loading||summaryLoading&&!selectedVehicle)?<div role="status" className="flex min-h-40 items-center justify-center gap-2 text-[12px] text-[#73839D]">
           <Loader2 className="size-4 animate-spin"/> 카드 불러오는 중…
         </div>:<div className="grid gap-3 sm:grid-cols-2">
           {(['pc','mobile'] as const).map(variant=>{
             const asset=variant==='pc'?bundle?.pcInfo:bundle?.mobileInfo;
             const isStale=variant==='pc'?selectedSummary?.stalePc:selectedSummary?.staleMobile;
-            return <HqCard key={variant} className="p-3 sm:p-4">
+            return <HqCard key={variant} className={(variant===previewVariant?'':'hidden sm:block ')+'p-3 sm:p-4'}>
               <div className="mb-3 flex items-center justify-between gap-2">
                 <h3 className="text-[13px] font-semibold text-[#243750]">{variant==='pc'?'PC 가로형':'모바일 세로형'}</h3>
                 {asset?.signedUrl?(
@@ -315,18 +336,6 @@ export function HqDriverAssetManagerModal({
             </HqCard>;
           })}
         </div>}
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <HqButton variant="secondary" size="md"
-            disabled={!bothFilesPrepared||preparing.pc||preparing.mobile||sharing||loading}
-            aria-label="PC·모바일 배차카드 PNG 두 장 한 번에 공유"
-            onClick={()=>{void handleShareBoth();}}>
-            {sharing||preparing.pc||preparing.mobile?<Loader2 className="size-4 animate-spin"/>:
-              canNativeShare?<Share2 className="size-4"/>:<Download className="size-4"/>}
-            {sharing?'파일 공유 중…':preparing.pc||preparing.mobile?'PNG 2장 준비 중…':
-              !bothCardsReady?'두 카드 생성 후 공유':
-              canNativeShare?'PC·모바일 함께 공유':'PC·모바일 ZIP 저장'}
-          </HqButton>
-        </div>
         <p className="px-1 text-[11px] leading-relaxed text-[#8795A8]">
           기사 정보·사진 변경 시, 배차카드를 다시 갱신해 주세요.
         </p>
