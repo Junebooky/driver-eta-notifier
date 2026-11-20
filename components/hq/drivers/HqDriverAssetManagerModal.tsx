@@ -16,7 +16,7 @@ import {HqButton,HqBadge,HqCard} from '@/components/hq/ui';
 import {HqModal} from '@/components/hq/ui/HqModal';
 import {HqSearchSelect} from '@/components/hq/ui/HqSearchSelect';
 import {HqDispatchCardBuilderModal} from './HqDispatchCardBuilderModal';
-import {prepareSavedDispatchCardPng,shareDispatchCardPng,supportsDispatchCardNativeShare} from '@/utils/shareDispatchCardPng';
+import {prepareSavedDispatchCardPng,shareDispatchCardPngPair,supportsDispatchCardPairShare} from '@/utils/shareDispatchCardPng';
 
 export interface HqDriverAssetManagerModalProps {
   isOpen:boolean;
@@ -51,7 +51,7 @@ export function HqDriverAssetManagerModal({
   type Variant='pc'|'mobile';
   const [prepared,setPrepared]=useState<Record<Variant,{file:File;path:string}|null>>({pc:null,mobile:null});
   const [preparing,setPreparing]=useState<Record<Variant,boolean>>({pc:false,mobile:false});
-  const [sharing,setSharing]=useState<Variant|null>(null);
+  const [sharing,setSharing]=useState(false);
   const [shareFeedback,setShareFeedback]=useState('');
 
   // Convert from the authenticated same-origin proxy in advance, so sharing
@@ -77,17 +77,27 @@ export function HqDriverAssetManagerModal({
     return ()=>{cancelled=true;};
   },[isOpen,bundle,selectedDriverId,selectedVehiclePlate]);
 
-  const handleShare=async(variant:Variant)=>{
-    const asset=variant==='pc'?bundle?.pcInfo:bundle?.mobileInfo;
-    const chosen=prepared[variant];
-    if(!asset?.filePath||!chosen||chosen.path!==asset.filePath||sharing)return;
-    setSharing(variant);setShareFeedback('');
+  const handleShareBoth=async()=>{
+    const pc=prepared.pc,mobile=prepared.mobile;
+    if(!pc||!mobile||!bundle?.pcInfo?.filePath||!bundle?.mobileInfo?.filePath||
+      !bundle.pcInfo.signedUrl||!bundle.mobileInfo.signedUrl||
+      pc.path!==bundle.pcInfo.filePath||mobile.path!==bundle.mobileInfo.filePath||
+      bundle.driverId!==selectedDriverId||bundle.vehiclePlate!==selectedVehiclePlate||
+      sharing||preparing.pc||preparing.mobile)return;
+    setSharing(true);setShareFeedback('');
     try{
-      const outcome=await shareDispatchCardPng(chosen.file);
-      if(outcome==='downloaded')setShareFeedback('PNG 이미지가 저장됐습니다. 원하는 메신저에서 첨부해 주세요.');
+      // Two real PNG attachments in one native share. Unsupported browsers
+      // download one ZIP containing both full-resolution PNG files instead.
+      const outcome=await shareDispatchCardPngPair(
+        [pc.file,mobile.file],
+        'VIP_'+bundle.driverName+'_'+bundle.vehiclePlate+'_PC_Mobile',
+      );
+      if(outcome==='downloaded')setShareFeedback(
+        'PC·모바일 PNG 두 장을 ZIP으로 저장했어요. 메신저에 첨부해 주세요.',
+      );
     }catch(e){
-      setShareFeedback(e instanceof Error?e.message:'이미지를 공유하지 못했습니다.');
-    }finally{setSharing(null);}
+      setShareFeedback(e instanceof Error?e.message:'두 배차카드를 공유하지 못했습니다.');
+    }finally{setSharing(false);}
   };
 
   // All registered physical fleet vehicles, including photo-unready vehicles.
@@ -211,16 +221,19 @@ export function HqDriverAssetManagerModal({
     onAssetUpdated?.();
   };
   const selectedSummary=selectedVehicle?vehicleSummary[selectedVehicle.uuid]:undefined;
-  const statusText=bundle?.isFullyComplete
-    ?'PC·모바일 사용 가능'
-    :bundle?.isReadyForCustomerDispatch
-      ?'일부 카드 사용 가능'
-      :(selectedSummary?.stalePc||selectedSummary?.staleMobile)
-        ?'갱신 필요'
-        :'미등록';
-  const statusBadgeText=selectedVehicle
-    ?`${selectedVehicle.plate} · ${statusText}`
-    :(fleet.loading||summaryLoading?'차량 확인 중…':'선택된 차량 없음');
+  const pcReady=Boolean(bundle?.pcInfo?.signedUrl&&bundle.pcInfo.filePath);
+  const mobileReady=Boolean(bundle?.mobileInfo?.signedUrl&&bundle.mobileInfo.filePath);
+  const bothCardsReady=pcReady&&mobileReady;
+  const bothFilesPrepared=Boolean(
+    bothCardsReady&&bundle?.driverId===selectedDriverId&&
+    bundle?.vehiclePlate===selectedVehiclePlate&&
+    prepared.pc?.path===bundle?.pcInfo?.filePath&&
+    prepared.mobile?.path===bundle?.mobileInfo?.filePath&&
+    prepared.pc?.file&&prepared.mobile?.file,
+  );
+  const shareFiles=bothFilesPrepared
+    ?[prepared.pc!.file,prepared.mobile!.file] as [File,File]:null;
+  const canNativeShare=shareFiles?supportsDispatchCardPairShare(shareFiles):false;
 
   return <>
     <HqModal isOpen={isOpen&&!builderOpen} onClose={onClose}
@@ -252,22 +265,16 @@ export function HqDriverAssetManagerModal({
         </div>
         {fleet.error&&<p role="alert" className="text-[12px] text-[#B05B57]">{fleet.error}</p>}
         {error&&<p role="alert" className="text-[12px] text-[#B05B57]">{error}</p>}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <HqBadge tone={bundle?.isFullyComplete?'selected':bundle?.isReadyForCustomerDispatch?'warning':'neutral'}>
-              {statusBadgeText}
-            </HqBadge>
-          </div>
-          <div className="flex items-center gap-2">
-            <HqButton variant="subtle" size="sm" onClick={()=>setRevision(v=>v+1)} disabled={loading||summaryLoading}>
-              <RefreshCw className="size-4"/> 새로고침
-            </HqButton>
-            <HqButton variant="primary" size="sm"
-              disabled={!driver||!selectedVehicle||!selectedVehiclePhotoReady||fleet.loading}
-              onClick={()=>setBuilderOpen(true)}>
-              <ImageIcon className="size-4"/> 카드 만들기·수정
-            </HqButton>
-          </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <HqButton variant="subtle" size="sm"
+            onClick={()=>setRevision(v=>v+1)} disabled={loading||summaryLoading}>
+            <RefreshCw className="size-4"/> 새로고침
+          </HqButton>
+          <HqButton variant="primary" size="sm"
+            disabled={!driver||!selectedVehicle||!selectedVehiclePhotoReady||fleet.loading}
+            onClick={()=>setBuilderOpen(true)}>
+            <ImageIcon className="size-4"/> 카드 만들기·수정
+          </HqButton>
         </div>
         {selectedVehicle&&!selectedVehiclePhotoReady&&<p role="status" className="text-[11px] text-[#A17C55]">
           이 차량은 배차카드용 외관·실내 이미지가 아직 준비되지 않았어요. 차량 이미지를 등록한 뒤 카드를 만들 수 있습니다.
@@ -305,26 +312,24 @@ export function HqDriverAssetManagerModal({
                     <span>{isStale?'기사 정보가 바뀌어 최신 버전으로 업데이트가 필요해요.':'카드 만들기·수정에서 배차카드를 만들어 주세요.'}</span>
                   </div>}
               </div>
-              {asset?.signedUrl&&<div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-                <HqButton variant="secondary" size="sm"
-                  disabled={!prepared[variant]||prepared[variant]?.path!==asset.filePath||preparing[variant]||Boolean(sharing)}
-                  onClick={()=>{void handleShare(variant);}}>
-                  {preparing[variant]?<Loader2 className="size-4 animate-spin"/>:
-                    prepared[variant]&&supportsDispatchCardNativeShare(prepared[variant]!.file)?
-                      <Share2 className="size-4"/>:<Download className="size-4"/>}
-                  {preparing[variant]?'PNG 준비 중…':
-                    prepared[variant]&&supportsDispatchCardNativeShare(prepared[variant]!.file)?
-                      'PNG 이미지 공유':'PNG 다운로드'}
-                </HqButton>
-              </div>}
             </HqCard>;
           })}
         </div>}
-        <HqCard tone="muted" className="px-3.5 py-3">
-          <p className="text-[12px] leading-relaxed text-[#60728A]">
-            기사 정보(이름·직책·연락처)나 사진이 바뀌면 카드 만들기·수정에서 모든 차량 카드를 최신 버전으로 업데이트해 주세요.
-          </p>
-        </HqCard>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <HqButton variant="secondary" size="md"
+            disabled={!bothFilesPrepared||preparing.pc||preparing.mobile||sharing||loading}
+            aria-label="PC·모바일 배차카드 PNG 두 장 한 번에 공유"
+            onClick={()=>{void handleShareBoth();}}>
+            {sharing||preparing.pc||preparing.mobile?<Loader2 className="size-4 animate-spin"/>:
+              canNativeShare?<Share2 className="size-4"/>:<Download className="size-4"/>}
+            {sharing?'파일 공유 중…':preparing.pc||preparing.mobile?'PNG 2장 준비 중…':
+              !bothCardsReady?'두 카드 생성 후 공유':
+              canNativeShare?'PC·모바일 함께 공유':'PC·모바일 ZIP 저장'}
+          </HqButton>
+        </div>
+        <p className="px-1 text-[11px] leading-relaxed text-[#8795A8]">
+          기사 정보·사진 변경 시, 배차카드를 다시 갱신해 주세요.
+        </p>
       </div>
     </HqModal>
     {builderOpen&&driver&&(
