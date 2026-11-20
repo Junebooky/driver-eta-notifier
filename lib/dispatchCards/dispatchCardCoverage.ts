@@ -13,6 +13,8 @@ export interface DispatchCardCoverageSlot {
   plate: string;
   pc: boolean;
   mobile: boolean;
+  /** Rendering source images exist; independent of already-saved cards. */
+  imageReady?: boolean;
 }
 export interface DispatchCardCoverageDriver {
   id: string;
@@ -23,6 +25,8 @@ export interface DispatchCardCoverageDriver {
   identityReady: boolean;
   missingVariants: number;
   savedVariants: number;
+  imageReadyVehicles?: number;
+  imageMissingVehicles?: number;
   slots: DispatchCardCoverageSlot[];
 }
 export interface DispatchCardCoverage {
@@ -31,14 +35,18 @@ export interface DispatchCardCoverage {
   requiredVariants: number;
   savedVariants: number;
   missingVariants: number;
+  /** All registered, non-archived fleet entries; NOT only photo-ready ones. */
+  totalVehicles?: number;
+  imageReadyVehicles?: number;
+  imageMissingVehicles?: number;
 }
 const record = (value: unknown): Record<string,unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string,unknown> : {};
 
 /**
- * A virtual all-drivers × all-image-ready-vehicles mapping.
+ * All registered vehicles count in the denominator, regardless of photos.
  * DO NOT create dummy database asset rows; missing slots are only created
- * when a valid image is actually rendered and uploaded.
+ * only when a valid image is rendered and uploaded. Photo readiness is separate.
  * Existing cards are never rewritten merely to rebuild this matrix.
  */
 export function buildDispatchCardCoverage(
@@ -49,10 +57,15 @@ export function buildDispatchCardCoverage(
 ): DispatchCardCoverage {
   const seen = new Set<string>();
   const vehicles = fleet.filter(vehicle => {
-    if (!vehicle.uuid || seen.has(vehicle.uuid) || !resolveDispatchCardPhotos(vehicle)) return false;
+    if (!vehicle.uuid || seen.has(vehicle.uuid)) return false;
     seen.add(vehicle.uuid);
     return true;
   });
+  const imageReadyByVehicle=new Map(vehicles.map(vehicle=>[
+    vehicle.uuid,Boolean(resolveDispatchCardPhotos(vehicle)),
+  ]));
+  const imageReadyVehicles=vehicles.filter(vehicle=>imageReadyByVehicle.get(vehicle.uuid)).length;
+  const imageMissingVehicles=vehicles.length-imageReadyVehicles;
   const photoDrivers = new Set(portraits.map(p => p.driver_id));
   const portraitsByDriver = new Map(portraits.map(p => [p.driver_id, p.created_at]));
   const revisions = new Map(drivers.map(driver => [
@@ -86,6 +99,7 @@ export function buildDispatchCardCoverage(
       plate: vehicle.plate,
       pc: saved.has([driver.id,vehicle.uuid,'pc'].join(':')),
       mobile: saved.has([driver.id,vehicle.uuid,'mobile'].join(':')),
+      imageReady: imageReadyByVehicle.get(vehicle.uuid)===true,
     }));
     const savedVariants = slots.reduce((count,slot)=>count+Number(slot.pc)+Number(slot.mobile),0);
     return {
@@ -97,10 +111,14 @@ export function buildDispatchCardCoverage(
       identityReady:!!approved && portraitReady,
       missingVariants:slots.length*2-savedVariants,
       savedVariants,
+      imageReadyVehicles,
+      imageMissingVehicles,
       slots,
     };
   });
   const requiredVariants=drivers.length*vehicles.length*2;
   const savedVariants=coverage.reduce((n,d)=>n+d.savedVariants,0);
-  return {vehicles,drivers:coverage,requiredVariants,savedVariants,missingVariants:requiredVariants-savedVariants};
+  return {vehicles,drivers:coverage,requiredVariants,savedVariants,
+    missingVariants:requiredVariants-savedVariants,
+    totalVehicles:vehicles.length,imageReadyVehicles,imageMissingVehicles};
 }

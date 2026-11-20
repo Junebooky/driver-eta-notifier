@@ -70,8 +70,10 @@ export function HqDispatchCardCoveragePanel({
   },[refresh,onRefreshCoverage]);
 
   const selectedDriver=useMemo(() => drivers.find(d=>d.id===activeDriverId)||null,[drivers,activeDriverId]);
-  const ready=effectiveCoverage?.drivers.filter(d=>d.identityReady&&d.missingVariants>0)||[];
-  const blocked=effectiveCoverage?.drivers.filter(d=>!d.identityReady&&d.missingVariants>0)||[];
+  const canRender=(driver:DispatchCardCoverageDriver)=>
+    driver.slots.some(slot=>slot.imageReady!==false&&(!slot.pc||!slot.mobile));
+  const ready=effectiveCoverage?.drivers.filter(d=>d.identityReady&&canRender(d))||[];
+  const blocked=effectiveCoverage?.drivers.filter(d=>!d.identityReady&&canRender(d))||[];
 
   /** Desktop or mobile: one active render at a time, safe to retry after closing.
    * Keep stored English names where present; missing names use the fixed card romanization.
@@ -80,7 +82,8 @@ export function HqDispatchCardCoveragePanel({
    */
   const generateAllMissing=async()=>{
     if(!effectiveCoverage||generating||!ready.length)return;
-    const planned=ready.reduce((n,d)=>n+d.missingVariants,0);
+    const planned=ready.reduce((n,d)=>n+d.slots.reduce((sum,slot)=>
+      sum+(slot.imageReady===false?0:Number(!slot.pc)+Number(!slot.mobile)),0),0);
     if(!window.confirm('기사 '+ready.length+'명, 미생성 PC·모바일 카드 최대 '+planned+
       '장을 추가할까요?\n기존 카드는 유지하고, 기사 정보 미완성 '+blocked.length+
       '명은 생성하지 않습니다.'))return;
@@ -105,7 +108,7 @@ export function HqDispatchCardCoveragePanel({
         });
         const imagePath=typeof profileJson.profile?.filePath==='string'?profileJson.profile.filePath:'';
         if(!profileResponse.ok||!portraitResponse.ok||!identity||!imagePath) {
-          failed+=driver.missingVariants;
+          failed+=driver.slots.reduce((n,slot)=>n+(slot.imageReady===false?0:Number(!slot.pc)+Number(!slot.mobile)),0);
           failures.push(driver.name+': 기사 프로필을 확인할 수 없음');
           continue;
         }
@@ -113,6 +116,7 @@ export function HqDispatchCardCoveragePanel({
         const placement=normalizePortraitPlacement(portraitJson.placement);
         for(const slot of driver.slots) {
           if(cancelRef.current)break;
+          if(slot.imageReady===false)continue;
           const vehicle=effectiveCoverage.vehicles.find(v=>v.uuid===slot.vehicleId);
           const assets=vehicle?resolveDispatchCardPhotos(vehicle):null;
           if(!vehicle||!assets)continue;
@@ -175,7 +179,7 @@ export function HqDispatchCardCoveragePanel({
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="text-[12px] leading-relaxed text-[#73839D]">
         {effectiveLoading?'차량·기사 연결 확인 중…':effectiveCoverage
-          ? '사진 준비 차량 '+effectiveCoverage.vehicles.length+'대 · '+effectiveCoverage.drivers.length+'명 · PC·모바일 '+effectiveCoverage.savedVariants+'/'+effectiveCoverage.requiredVariants+'장 등록 · 미생성/갱신 '+effectiveCoverage.missingVariants+'장'
+          ? '전체 등록 차량 '+effectiveCoverage.vehicles.length+'대 · 이미지 준비 '+(effectiveCoverage.imageReadyVehicles??effectiveCoverage.vehicles.length)+'대 · '+effectiveCoverage.drivers.length+'명 · PC·모바일 '+effectiveCoverage.savedVariants+'/'+effectiveCoverage.requiredVariants+'장 등록 · 미생성/갱신 '+effectiveCoverage.missingVariants+'장'
           :'차량과 기사 연결 확인'}
       </div>
       <HqButton variant="subtle" size="sm" onClick={()=>void refresh()} disabled={effectiveLoading||generating}
@@ -218,7 +222,7 @@ export function HqDispatchCardCoveragePanel({
             <div className="min-w-0">
               <p className="text-[13px] font-semibold text-[#293D55]">{driver.name}</p>
               <p className="mt-1 text-[11px] text-[#7A8AA1]">
-                준비 차량 {driver.slots.length}대 · 완성 {savedPairCount}대 · 저장 {driver.savedVariants}/{driver.slots.length*2}장
+                전체 등록 차량 {driver.slots.length}대 · 완료 {savedPairCount}대 · 이미지 미준비 {driver.slots.filter(slot=>slot.imageReady===false).length}대 · 저장 {driver.savedVariants}/{driver.slots.length*2}장
               </p>
               {!driver.identityReady&&<p className="mt-1 text-[11px] text-[#A07954]">
                 {[
@@ -239,7 +243,7 @@ export function HqDispatchCardCoveragePanel({
               {driver.slots.map(slot=><div key={slot.vehicleId} className="flex items-center justify-between gap-2 rounded-lg bg-[#F8FAFC] px-2.5 py-2">
                 <span className="min-w-0 truncate">{slot.plate}</span>
                 <HqBadge tone={slot.pc&&slot.mobile?'selected':slot.pc||slot.mobile?'warning':'neutral'}>
-                  {slot.pc&&slot.mobile?'PC·모바일 완료':slot.pc||slot.mobile?'1종 등록':'미생성'}
+                  {slot.pc&&slot.mobile?'PC·모바일 완료':slot.pc||slot.mobile?'1종 등록':slot.imageReady===false?'차량 이미지 미준비':'미생성'}
                 </HqBadge>
               </div>)}
             </div>

@@ -769,8 +769,10 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex flex-wrap items-center gap-1.5">
                               <span className="text-[12px] font-semibold text-[#17233B]">{driver.name} 배차카드 차량별 현황</span>
-                              <HqBadge tone="selected">등록 {cardSummary.registeredSlots.length}대</HqBadge>
+                              <HqBadge tone="selected">완료 {cardSummary.completeVehicles}/{cardSummary.totalVehicles}대</HqBadge>
                               <HqBadge tone="neutral">미등록 {cardSummary.unregisteredSlots.length}대</HqBadge>
+                              {cardSummary.imageMissingSlots.length>0&&
+                                <HqBadge tone="warning">차량 이미지 미준비 {cardSummary.imageMissingSlots.length}대</HqBadge>}
                               {!cardSummary.identityReady && (
                                 <HqBadge tone="warning">
                                   {(cardSummary.missingIdentityLabels.join(' · ') || '기사 정보') + ' 확인 필요'}
@@ -791,11 +793,13 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                               <HqButton
                                 variant="primary"
                                 size="sm"
+                                disabled={!driverCoverage.slots.some(slot=>slot.imageReady!==false)}
                                 onClick={() => {
                                   haptics.lightTap();
                                   setCardBuilderTarget({
                                     driver,
-                                    vehicleId: cardSummary.unregisteredSlots[0]?.vehicleId || cardSummary.registeredSlots[0]?.vehicleId,
+                                    vehicleId: cardSummary.unregisteredSlots.find(slot=>slot.imageReady!==false)?.vehicleId ||
+                                      cardSummary.registeredSlots.find(slot=>slot.imageReady!==false)?.vehicleId,
                                   });
                                 }}
                               >

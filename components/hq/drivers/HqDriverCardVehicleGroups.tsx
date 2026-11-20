@@ -17,6 +17,7 @@ const dotClass={
   complete:'bg-[#5A9D83]',
   partial:'bg-[#DDA453]',
   missing:'bg-[#B7C1CE]',
+  photos_missing:'bg-[#B7C1CE]',
 } as const;
 
 export function HqDriverCardVehicleGroups({driverName,slots,vehicles,onView,onCreate}:Props){
@@ -25,7 +26,8 @@ export function HqDriverCardVehicleGroups({driverName,slots,vehicles,onView,onCr
     complete:sum.complete+group.complete,
     partial:sum.partial+group.partial,
     missing:sum.missing+group.missing,
-  }),{complete:0,partial:0,missing:0});
+    photos_missing:sum.photos_missing+group.photos_missing,
+  }),{complete:0,partial:0,missing:0,photos_missing:0});
 
   if(!slots.length)return <p className="py-4 text-[12px] text-[#8291A5]">
     사진 준비가 완료된 차량이 없습니다.
@@ -42,9 +44,12 @@ export function HqDriverCardVehicleGroups({driverName,slots,vehicles,onView,onCr
         <span aria-hidden="true" className={'size-1.5 rounded-full '+dotClass.partial}/>
         일부 등록 {totals.partial}대
       </span>}
-      {totals.missing>0&&<span className="inline-flex items-center gap-1.5">
+      {totals.missing+totals.photos_missing>0&&<span className="inline-flex items-center gap-1.5">
         <span aria-hidden="true" className={'size-1.5 rounded-full '+dotClass.missing}/>
-        미등록 {totals.missing}대
+        미등록 {totals.missing+totals.photos_missing}대
+      </span>}
+      {totals.photos_missing>0&&<span className="inline-flex items-center gap-1.5 text-[#8B97A8]">
+        · 이미지 미준비 {totals.photos_missing}대
       </span>}
     </div>
 
@@ -61,9 +66,9 @@ export function HqDriverCardVehicleGroups({driverName,slots,vehicles,onView,onCr
               <h4 className="text-[12px] font-semibold text-[#243750]">{group.label}</h4>
               <span className="text-[11px] tabular-nums text-[#8997A9]">{group.entries.length}대</span>
             </div>
-            {group.partial+group.missing>0&&
+            {group.partial+group.missing+group.photos_missing>0&&
               <HqBadge tone={group.partial>0?'warning':'neutral'}>
-                {group.partial+group.missing}대 확인 필요
+                {group.partial+group.missing+group.photos_missing}대 확인 필요
               </HqBadge>}
           </div>
           <div className="space-y-2.5">
@@ -72,7 +77,17 @@ export function HqDriverCardVehicleGroups({driverName,slots,vehicles,onView,onCr
               <div className="flex flex-wrap gap-1.5">
                 {entries.map(({slot,status,modelLabel})=>{
                   const label=status==='complete'?'PC·모바일 모두 완료':
-                    status==='partial'?(slot.pc?'PC만 등록':'모바일만 등록'):'카드 미등록';
+                    status==='partial'?(slot.pc?'PC만 등록':'모바일만 등록'):
+                    status==='photos_missing'?'차량 이미지 미준비':'카드 미등록';
+                  if(status==='photos_missing'){
+                    return <span key={slot.vehicleId}
+                      aria-label={driverName+' '+modelLabel+' '+slot.plate+' '+label}
+                      title={modelLabel+' · '+label+' · 차량 이미지가 준비되면 생성할 수 있어요.'}
+                      className="inline-flex min-h-9 items-center gap-1.5 rounded-[11px] bg-[#F3F5F8] px-2.5 text-[12px] font-medium text-[#8D9AAA]">
+                      <span aria-hidden="true" className={'size-1.5 shrink-0 rounded-full '+dotClass[status]}/>
+                      {slot.plate}
+                    </span>;
+                  }
                   return <HqButton key={slot.vehicleId} variant="subtle" size="sm"
                     className="max-w-full gap-1.5 rounded-[11px] px-2.5"
                     aria-label={driverName+' '+modelLabel+' '+slot.plate+' '+label+(status==='missing'?' · 카드 만들기':' · 카드 보기')}
@@ -89,7 +104,7 @@ export function HqDriverCardVehicleGroups({driverName,slots,vehicles,onView,onCr
       })}
     </div>
     <p className="text-[11px] text-[#8B99AA]">
-      등록된 차량번호를 누르면 카드를 볼 수 있고, 미등록 차량은 카드 만들기로 이동해요.
+      등록된 카드는 보기, 미생성 카드는 제작으로 이동해요. 이미지 미준비 차량은 원본 사진 등록 후 생성할 수 있어요.
     </p>
   </section>;
 }

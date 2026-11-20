@@ -7,7 +7,7 @@ import { buildDispatchCardCoverage } from '@/lib/dispatchCards/dispatchCardCover
 
 export const dynamic = 'force-dynamic';
 
-/** Complete but non-mutating all-drivers x image-ready fleet matrix. */
+/** Non-mutating all-drivers x ALL registered fleet; image readiness is a separate status. */
 export async function GET(request:NextRequest) {
   const auth=await requireHqAdmin(request);
   if(!auth.ok || !auth.session)
