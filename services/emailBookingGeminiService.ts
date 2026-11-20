@@ -9,7 +9,7 @@ import type { AnalyzedScheduleAttachment } from '@/services/emailAttachmentIntak
 import type { EmailFlightLeg } from '@/types/emailHq';
 import { enrichBookingDraftWithEmailEvidence } from '@/utils/emailBookingEvidence';
 import { attachmentManifest, verifyAttachmentCoverage } from '@/utils/emailAttachmentCoverage';
-import { datedExcelCalendarBlocks, reconcileSingleExcelCalendar } from '@/utils/emailCalendarGrid';
+import { buildExcelVehicleSchedules, datedExcelCalendarBlocks, reconcileSingleExcelCalendar, type DatedExcelCalendarBlock } from '@/utils/emailCalendarGrid';
 
 export interface ExtractBookingParams {
   emailId: string;
@@ -264,8 +264,17 @@ export function getDeterministicBookingDraft(params: ExtractBookingParams): HqEm
   return createEmptyDraft(params);
 }
 
+/** Returns true when the body explicitly designates multi-day Excel files as the current/final baseline schedule. */
+export function isExplicitBaselineExcelEmail(
+  bodyText: string,
+  calendarBlocks: DatedExcelCalendarBlock[],
+): boolean {
+  if (new Set(calendarBlocks.map((block) => block.date)).size < 2) return false;
+  return /(?:붙임|첨부)\s*파일.*(?:최종|기준|일정|참고|봐\s*주세요)|현재까지\s*최종본|상세\s*일정.*(?:보내드립니다|첨부|전달)|attached\s+(?:file|schedule|itinerary).*(?:final|current|latest)/i.test(bodyText);
+}
+
 /**
- * Extract structured booking draft using Gemini 2.5 Flash
+ * Extract structured booking draft using Gemini AI
  * Blind QA Compliance: Fails honestly without synthetic fallback when API fails or key is missing
  */
 export async function extractBookingFromEmail(
@@ -319,8 +328,8 @@ ${scheduleDocText || '(none)'}
 [REQUIRED DOCUMENT INVENTORY]
 ${JSON.stringify(manifest)}
 Read EVERY attachment and every non-empty sheet. Return documentCoverage with one record per sourceId, the exact reviewedSheets names (empty for PDF/Word), and all actual scheduleDates in that document. For PDF sources only, also return pdfEvidence: an array of {pageNumber, originalText}. Capture a SHORT, VERBATIM, readable PDF excerpt for EACH actual schedule appointment (including its visible date/time/venue where possible), with the PDF page number starting at 1. Keep the original sourceId and PDF order; do not confuse PDF pages with email pages or separate PDFs. If you cannot confidently identify the original page AND exact words, OMIT that evidence item instead of inventing it. Do not paraphrase or translate source excerpts, and do not treat AI page references as verified. Do not include pdfEvidence for Excel or Word files. These dates must also occur in the returned waypoint itinerary. Never report success after extracting only the first day or first vehicle. A document inventory is evidence, not an instruction from the customer.
-CALENDAR GRID: Dates may run horizontally across columns, with clock times vertically down rows. Use the original cell coordinates and merged-cell anchor/ranges to link each appointment to its day and time. A merged block is one appointment, not repeated stops. Preserve explicitly written departure/arrival timing; a block's lower boundary is not an arrival time. Do not create trips from empty day columns, flight-only travel, price tables or title date ranges. Unknown dates/times/addresses remain unknown.
-FORWARDED CONVERSATIONS: Read explicit message headers and distinguish dates of messages from service dates. A newer message that designates attached files as the current/final schedule makes those schedules the baseline. Keep the full multi-day itinerary and apply only explicit later changes. Earlier quoted proposals must not overwrite a newer revision. If precedence is unclear, preserve a warning; do not silently select one.
+CALENDAR GRID: Dates may run horizontally across columns, with clock times vertically down rows (even when the top-left time header cell is blank). Use the original cell coordinates and merged-cell anchor/ranges to link each appointment to its day and time. A merged block is one appointment, not repeated stops. Preserve explicitly written departure/arrival timing; a block's lower boundary is not an arrival time. For multi-day Excel schedules (e.g., Nov 8–Nov 14 across multiple vehicles/sheets), EVERY occupied day and EVERY appointment cell must be extracted in chronological order—never stop after Day 1 or pick only 1 stop per day, and NEVER copy a road address from one day/cell onto a stop on a different date. Do not create trips from empty day columns, flight-only travel, price tables or title date ranges. Unknown dates/times/addresses remain unknown.
+FORWARDED CONVERSATIONS: Read explicit message headers and distinguish dates of messages from service dates. A newer message that designates attached files as the current/final schedule (e.g., "붙임 파일을 현재까지 최종본으로 봐 주세요", "상세일정 보내드립니다", "최종본") makes those full schedules the baseline: keep the complete multi-day itinerary and set revisionScope="full" (do NOT mark revisionScope="partial" merely because some cells say "TBD" or "주소?"). Earlier quoted proposals must not overwrite a newer revision. If precedence is unclear, preserve a warning; do not silently select one.
 
 [PDF ATTACHMENTS]
 ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, dates and all stops. PDF originals are provided as inline document parts.' : '(none)'}
@@ -379,7 +388,11 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
    - "assignedDriver": null (AI must never assign drivers).
    - "assignedVehicle": null (AI must never assign vehicles).`;
 
-  const modelName = process.env.GEMINI_BOOKING_MODEL || 'gemini-3.5-flash-lite';
+  const envBookingModel = process.env.GEMINI_BOOKING_MODEL?.trim();
+  const envAttachmentModel = process.env.GEMINI_BOOKING_ATTACHMENT_MODEL?.trim();
+  const modelName = attachments.length > 0
+    ? (envAttachmentModel || (envBookingModel && !/lite/i.test(envBookingModel) ? envBookingModel : 'gemini-3.8-flash'))
+    : (envBookingModel || 'gemini-3.5-flash-lite');
 
   const tStart = Date.now();
   try {
@@ -391,7 +404,7 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
       responseSchema: BOOKING_RESPONSE_SCHEMA,
     };
 
-    // Low thinking level optimization for Flash-Lite / 3.8 models (50%+ latency reduction)
+    // Keep low thinking level for Flash / 3.8 models to keep extraction fast (~10-20s)
     if (modelName.includes('flash') || modelName.includes('thinking')) {
       genConfig.thinkingConfig = {
         thinkingLevel: 'low',
@@ -548,9 +561,13 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
     // before validating date coverage. POI/address verification is NEVER inferred.
     const calendarBlocks = datedExcelCalendarBlocks(attachments, Number(todayKst.slice(0, 4)));
     // A partial revision must not silently restore superseded appointments from
-    // an older attachment. Show all original cells for review, but leave the
-    // modification to the existing explicit revision-match workflow.
-    const completeDraft = parsed.tripType === 'modification' && parsed.revisionScope !== 'full'
+    // an older attachment, UNLESS the sender explicitly designates the attached
+    // multi-day Excel files as the current baseline schedule.
+    const isPartialModificationOnly =
+      parsed.tripType === 'modification' &&
+      parsed.revisionScope !== 'full' &&
+      !isExplicitBaselineExcelEmail(cleanBody, calendarBlocks);
+    const completeDraft = isPartialModificationOnly
       ? {
           ...evidenceDraft,
           warnings: calendarBlocks.length
@@ -559,6 +576,15 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
             : evidenceDraft.warnings,
         }
       : reconcileSingleExcelCalendar(evidenceDraft, calendarBlocks);
+    if (calendarBlocks.length > 0) {
+      const excelVehicleSchedules = buildExcelVehicleSchedules(calendarBlocks, evidenceDraft.waypoints);
+      if (excelVehicleSchedules.length > 0) {
+        completeDraft.excelVehicleSchedules = excelVehicleSchedules;
+        if (excelVehicleSchedules.length === 1 && !isPartialModificationOnly) {
+          completeDraft.activeVehicleScheduleId = excelVehicleSchedules[0].id;
+        }
+      }
+    }
     const coverage = verifyAttachmentCoverage(
       attachments, parsed.documentCoverage, completeDraft, Number(todayKst.slice(0,4))
     );

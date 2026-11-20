@@ -13,7 +13,7 @@ export function scheduleHeaderDate(label: string, referenceYear: number): string
   const text = label.trim();
   let year = referenceYear, month = 0, day = 0;
   const numeric = text.match(/^(?:(\d{4})[-/.년]\s*)?(\d{1,2})[-/.월]\s*(\d{1,2})(?:일)?(?:\s*\([^)]*\))?$/);
-  const english = text.match(/^(?:(?:Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday),?\s+)?(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+(\d{1,2})(?:,?\s+(\d{4}))?$/i);
+  const english = text.match(/^(?:(?:Sun(?:day)?|Mon(?:day)?|Tue(?:s(?:day)?)?|Wed(?:nesday)?|Thu(?:r(?:s(?:day)?)?)?|Fri(?:day)?|Sat(?:urday)?)\.?,?\s+)?(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+(\d{1,2})(?:,?\s+(\d{4}))?$/i);
   if (numeric) { year = Number(numeric[1] || year); month = Number(numeric[2]); day = Number(numeric[3]); }
   else if (english) {
     month = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(english[1].slice(0,3).toLowerCase()) + 1;

@@ -117,19 +117,6 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
     }
   };
 
-  // Helper to build vehicle subtext
-  const getVehicleSubtext = (driver: HqDriverSummary): string => {
-    const model = driver.vehicleModel && driver.vehicleModel !== '차량 미지정' ? driver.vehicleModel : '';
-    const plate = driver.carNumber && driver.carNumber !== '차량 미등록'
-      ? driver.carNumber
-      : (driver.vehicleNo && driver.vehicleNo !== '미지정' ? driver.vehicleNo : '');
-
-    if (model && plate) return `${model} · ${plate}`;
-    if (model) return model;
-    if (plate) return plate;
-    return '차량 미지정';
-  };
-
   // Filtered List (소속 기사 우선 노출)
   const filteredDrivers = useMemo(() => {
     const list = drivers.filter((driver) => {
@@ -464,7 +451,6 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
             ) : (
               paginatedDrivers.map((driver) => {
                 const opStatus = getDriverStatus(driver);
-                const vehicleSubtext = getVehicleSubtext(driver);
                 const isNew = isNewDriver(driver);
 
                 // Multi-language support check: only non-Korean languages shown as mini badge
@@ -481,7 +467,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                     onClick={() => handleRowClick(driver.id)}
                     className="hover:bg-blue-50/40 transition-colors cursor-pointer group"
                   >
-                    {/* 1열: 기사 정보 (Avatar + Name + Vehicle subtext) */}
+                    {/* 1열: 기사 정보 (Avatar + Name) */}
                     <td className="py-4 px-5">
                       <div className="flex items-center gap-3.5">
                         {driver.avatarUrl ? (
@@ -514,9 +500,6 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                                 신규
                               </span>
                             )}
-                          </div>
-                          <div className="text-[11px] text-slate-400 font-medium truncate mt-0.5">
-                            {vehicleSubtext}
                           </div>
                         </div>
                       </div>
