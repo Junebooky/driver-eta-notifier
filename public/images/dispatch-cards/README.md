@@ -25,12 +25,31 @@ A `.gitkeep` is just a Git folder placeholder, **not** an image.
 | `hyundai/staria-limousine/` | **7665, 9037, 8407, 1514** | **one shared photo set for all four vehicles** |
 | `kia/carnival-hi-limousine/` | **5336, 7681** | **one shared photo set for both vehicles** |
 | `genesis/gv80/5947/` | 5947 | vehicle-specific |
-| `genesis/g90-lwb/1336/` | 1336 | vehicle-specific |
-| `genesis/g90-standard/8839/` | 8839 | vehicle-specific |
-| `genesis/g90-limousine/4280/` | 4280 | vehicle-specific |
+| `genesis/g90-lwb/navy/1336/` | 116호 1336 | G90 LWB, navy interior/exterior |
+| `genesis/g90-lwb/black/4280/` | 107부 4280 | G90 LWB, black interior/exterior |
+| `genesis/g90-standard/8839/` | 8839 | standard G90, vehicle-specific |
 | `bus/limousine-bus/` | Not registered | placeholder only |
 
 This covers **20 registered vehicles** with **14 vehicle-specific folders + 2 shared model folders**, plus the bus placeholder. The registered Carnival vehicles, **101호 7681** and **193호 5336**, are **both Carnival Hi-Limousine**.
+
+## Genesis G90 long-wheelbase (LWB) colors
+
+Both **107부 4280** and **116호 1336** are **G90 LWB**, but their photos must remain distinct:
+
+```text
+genesis/g90-lwb/
+├── black/4280/
+│   ├── exterior.png
+│   ├── interior-01.png
+│   └── interior-02.png
+└── navy/1336/
+    ├── exterior.png
+    ├── interior-01.png
+    └── interior-02.png
+```
+
+Image filenames above are upload conventions; until a complete set exists, only `.gitkeep` is tracked.
+Do not substitute the black car's photos for the navy car or vice versa.
 
 ## Shared model photos
 

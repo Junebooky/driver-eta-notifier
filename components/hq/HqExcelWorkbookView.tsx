@@ -2,6 +2,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {ChevronDown,ChevronUp,ChevronLeft,ChevronRight,Expand,Minimize2,FileSpreadsheet,Pencil,Save,X,ArrowUpDown,ZoomIn,ZoomOut,MessageSquareText,Filter,RotateCcw,Rows3,Columns3,Plus,Check,Trash2,AlertTriangle} from 'lucide-react';
 import {HqSearchSelect} from './ui/HqSearchSelect';
+import {workbookMonthLabel} from '@/utils/reportWorkbookMonth';
 export type ReportExcelFocus={year:number;sheet:string;row:number;requestId:number};
 type Row={row:number;cells:string[];locked:string[]};
 type Grid={version:string;year:number;filename:string;month:string;months:string[];total:number;unfilteredTotal:number;filterOptions:{plate:string[];driver:string[];customer:string[]};offset:number;limit:number;rows:Row[];columns:string[];headers:string[];linkedRows:number[];manualRows:number[];rowGap:{after:number;before:number;gap:number}|null};
@@ -325,7 +326,7 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
    </div>
    <div role="tablist" aria-label="월별 시트" className="flex max-w-full gap-1.5 overflow-x-auto pb-1">
     {grid?.months.map(name=><button type="button" role="tab" aria-selected={month===name} key={name} onClick={()=>{setEdit(null);setError('');setHighlightedRow(null);setNavigateTo(null);resetFilters();setMonth(name);}}
-     className={'shrink-0 rounded-xl px-3 py-2 text-xs font-semibold '+(month===name?'bg-[#1E60F3] text-white':'bg-[#F2F4F6] text-[#6F809A]')}>{name}</button>)}
+     className={'shrink-0 rounded-xl px-3 py-2 text-xs font-semibold '+(month===name?'bg-[#1E60F3] text-white':'bg-[#F2F4F6] text-[#6F809A]')}>{workbookMonthLabel(name)}</button>)}
    </div>
    {grid?.rowGap&&<div role="status" className="flex flex-wrap items-center gap-2 rounded-xl bg-[#F7F9FC] px-3 py-2.5">
     <span className="min-w-0 flex-1 text-[12px] leading-5 text-[#63768E]">

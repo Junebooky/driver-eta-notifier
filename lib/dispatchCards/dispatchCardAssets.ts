@@ -57,6 +57,12 @@ export function dispatchCardKebabPath(vehicle: Car): string | null {
   }
   if (vehicle.category === 'genesis') {
     if (model.includes('gv80')) return 'genesis/gv80';
+    // Two G90 long-wheelbase vehicles have distinct exterior/interior colors.
+    // Use physical plate, not an outdated DB model label, to select the set.
+    const canonical = findVipVehicle(vehicle.plate);
+    const plate = canonical?.plateShort || vehicle.plateShort;
+    if (plate === '4280') return 'genesis/g90-lwb/black';
+    if (plate === '1336') return 'genesis/g90-lwb/navy';
     if (/g90l|lwb|롱휠/.test(model)) return 'genesis/g90-lwb';
     if (/리무진|limousine/.test(model)) return 'genesis/g90-limousine';
     if (model.includes('g90')) return 'genesis/g90-standard';

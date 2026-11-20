@@ -2,6 +2,7 @@ import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate';
 import { DOMParser } from '@xmldom/xmldom';
 import { normalizedPlate, validateKakaoExcelDraft, type KakaoExcelDraft } from '@/utils/kakaoExcelImport';
 import {reportRowCellStyles,widenReportColumns,reportRowHeight,routeColumnWidth} from '@/utils/reportExcelCellFormatting';
+import {findWorkbookMonthSheetName} from '@/utils/reportWorkbookMonth';
 
 const MAX_BYTES = 12 * 1024 * 1024;
 export interface KakaoWorkbookResult { bytes: Uint8Array; sheetName: string; rowNumber: number; createdMonth: boolean }
@@ -83,7 +84,9 @@ function sameDate(v: unknown, date: string, date1904: boolean): boolean {
 export function appendKakaoExcelReport(bytes: Uint8Array, draft: KakaoExcelDraft): KakaoWorkbookResult {
   const errors = validateKakaoExcelDraft(draft);
   if (errors.length) throw new Error(errors.join(' '));
-  const wb = workbookFromFile(bytes), sheetName = Number(draft.date.slice(5,7))+'월';
+  const wb = workbookFromFile(bytes);
+  const monthNumber=Number(draft.date.slice(5,7));
+  const sheetName=findWorkbookMonthSheetName(wb.SheetNames,monthNumber,Number(draft.date.slice(0,4)))??monthNumber+'월';
   const sheet = wb.Sheets[sheetName];
   if (!sheet) throw new Error(sheetName+' 시트가 없습니다. Excel에서 회사가 승인한 월별 템플릿을 복제한 뒤 다시 열어 주세요. 임의 양식은 생성하지 않습니다.');
   const entries = unzipSync(bytes);

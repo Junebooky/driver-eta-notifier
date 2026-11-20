@@ -6,8 +6,8 @@
  * [현대 스타리아 리무진] 4대: 125호 7665, 125호 9037, 142호 8407, 116허 1514
  * [기아 카니발 하이리무진] 2대: 101호 7681, 193호 5336
  * [제네시스 GV80] 1대: 203호 5947
- * [제네시스 G90 리무진] 1대: 107부 4280
- * [제네시스 G90L] 1대: 116호 1336
+ * [제네시스 G90 LWB 블랙] 1대: 107부 4280
+ * [제네시스 G90 LWB 네이비] 1대: 116호 1336
  * [제네시스 G90] 1대: 125호 8839
  * [벤츠 S560] 1대: 01호 3343
  *
@@ -411,39 +411,41 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     imageUrl: '/images/vehicles/gv80.webp',
   },
 
-  // 8. [제네시스 G90 리무진] 1대
+  // 8. [제네시스 G90 LWB 블랙] 1대
   {
     id: 'veh-gn-4280',
     uuid: 'e0f7c22a-0001-4c12-8800-000000004280',
     plate: '107부 4280',
     plateShort: '4280',
-    model: '제네시스 G90 리무진',
-    modelShort: 'G90 리무진',
+    model: '제네시스 G90 LWB',
+    modelShort: 'G90 LWB',
     brand: '제네시스',
     category: 'genesis',
     categoryLabel: '제네시스',
-    subType: 'G90 리무진',
+    subType: 'G90 LWB',
     capacity: '4인승',
     status: '운행 중',
     fuelType: '가솔린',
+    color: '블랙',
     imageUrl: '/images/vehicles/g90_black.webp',
   },
 
-  // 9. [제네시스 G90L] 1대
+  // 9. [제네시스 G90 LWB 네이비] 1대
   {
     id: 'veh-gn-2269',
     uuid: 'e0f7c22a-0001-4c12-8800-000000002269',
     plate: '116호 1336',
     plateShort: '1336',
-    model: '제네시스 G90L',
-    modelShort: 'G90L (롱휠베이스)',
+    model: '제네시스 G90 LWB',
+    modelShort: 'G90 LWB',
     brand: '제네시스',
     category: 'genesis',
     categoryLabel: '제네시스',
-    subType: 'G90L',
+    subType: 'G90 LWB',
     capacity: '4인승',
     status: '운행 중',
     fuelType: '가솔린',
+    color: '네이비',
     imageUrl: '/images/vehicles/g90_lwb.webp',
   },
 
@@ -519,7 +521,7 @@ export const VIP_VEHICLE_FLEET_CATEGORIES = [
     totalCount: 4,
     activeCount: 3,
     availableCount: 1,
-    details: 'GV80 1대 · G90 리무진 1대 · G90L 1대 · G90 1대',
+    details: 'GV80 1대 · G90 LWB 2대(블랙·네이비) · G90 1대',
     plates: ['203호 5947', '107부 4280', '116호 1336', '125호 8839'],
   },
   {
@@ -757,11 +759,11 @@ export function getVehicleImage(
     return '/images/vehicles/g90_black.webp';
   }
 
-  // 7. Genesis G90L (1 vehicle: 116호 1336 / legacy 208호 2269)
+  // 7. Genesis G90 LWB navy (1 vehicle: 116호 1336 / legacy 208호 2269)
   if (
     plateShort === '1336' ||
     plateShort === '2269' ||
-    (category === 'genesis' && (model.includes('G90L') || subType.includes('G90L')))
+    (category === 'genesis' && (/G90\s*(?:LWB|L)/i.test(model) || /G90\s*(?:LWB|L)/i.test(subType)))
   ) {
     return '/images/vehicles/g90_lwb.webp';
   }

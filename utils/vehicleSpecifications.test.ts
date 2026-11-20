@@ -71,6 +71,13 @@ test('all Genesis vehicles use gasoline and existing plate identities are unchan
   const genesis = VIP_REAL_VEHICLES.filter((v) => v.category === 'genesis');
   assert.equal(genesis.length, 4);
   for (const v of genesis) assert.equal(v.fuelType, '가솔린', v.plate);
+  for (const [plate, color] of [['4280','블랙'],['1336','네이비']]) {
+    const car=registered(plate);
+    assert.equal(car.model,'제네시스 G90 LWB');
+    assert.equal(car.modelShort,'G90 LWB');
+    assert.equal(car.subType,'G90 LWB');
+    assert.equal(car.color,color);
+  }
 });
 
 test('stale browser custom vehicle specs cannot override the verified fleet registry', () => {

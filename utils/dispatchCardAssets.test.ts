@@ -83,15 +83,19 @@ test('kebab-case dispatch-cards paths map cleanly and keep fallback when folders
     '5336': 'kia/carnival-hi-limousine',
     '7681': 'kia/carnival-hi-limousine',
     '5947': 'genesis/gv80',
-    '1336': 'genesis/g90-lwb',
+    '1336': 'genesis/g90-lwb/navy',
     '8839': 'genesis/g90-standard',
-    '4280': 'genesis/g90-limousine',
+    '4280': 'genesis/g90-lwb/black',
   };
   for (const [plateShort, expected] of Object.entries(expectedByPlate)) {
     const vehicle = VIP_REAL_VEHICLES.find(v => v.plateShort === plateShort);
     assert.ok(vehicle, plateShort);
     assert.equal(dispatchCardKebabPath(vehicle), expected);
   }
+  const black = VIP_REAL_VEHICLES.find(v => v.plateShort === '4280')!;
+  const navy = VIP_REAL_VEHICLES.find(v => v.plateShort === '1336')!;
+  assert.equal(dispatchCardKebabPath({...black,model:'제네시스 G90 리무진'}),'genesis/g90-lwb/black');
+  assert.equal(dispatchCardKebabPath({...navy,model:'제네시스 G90L'}),'genesis/g90-lwb/navy');
 });
 
 test('each chauffeur can save an independent bounded crop, with a safe default', () => {

@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { requireHqAdmin } from '@/lib/auth/serverAuth';
 import { supabaseAdmin as db } from '@/lib/supabase/server';
 import { check, currentWorkbook } from '@/lib/driverReports/service';
+import { parseWorkbookMonthSheet } from '@/utils/reportWorkbookMonth';
 import { privateJson, failure, UUID } from '@/lib/driverReports/http';
 
 export const dynamic = 'force-dynamic';
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
   const row = Number(params.get('row'));
   const version = params.get('version') || '';
   if (!Number.isInteger(year) || year < 2000 || year > 2099 ||
-      !/^(?:[1-9]|1[0-2])월$/.test(month) ||
+      !parseWorkbookMonthSheet(month,year) ||
       !Number.isInteger(row) || row < 2 || row > 25000 ||
       !UUID.test(version)) {
     return privateJson({ ok: false, error: '원문 조회 위치를 확인해 주세요.' }, 400);
