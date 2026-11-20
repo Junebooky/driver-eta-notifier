@@ -45,6 +45,8 @@ import { CustomerBrandLogo } from './CustomerBrandLogo';
 import { HqCustomerRegisterModal } from './HqCustomerRegisterModal';
 import { HqCustomerEditModal } from './HqCustomerEditModal';
 import { HqCustomerAddContactModal, type NewCustomerContact } from './HqCustomerAddContactModal';
+import {HqCustomerEditContactModal} from './HqCustomerEditContactModal';
+import {updateContactDetails,type ContactChannelDraft} from '@/lib/customers/contactChannels';
 import { HqComposeEmailModal } from '@/components/hq/email/HqComposeEmailModal';
 import { haptics } from '@/utils/haptics';
 import {
@@ -60,7 +62,7 @@ import { HqBadge, HqButton, HqCard, HqIconButton, HqSegmentedTabs } from '@/comp
 import { HqCustomerOverview } from './HqCustomerOverview';
 import { HqCustomerActivityPanels } from './HqCustomerActivityPanels';
 import { HqCustomerContactMemoModal } from './HqCustomerContactMemoModal';
-import { saveCustomerContactMemoInDb } from '@/utils/crmCustomerSync';
+import { saveCustomerContactMemoInDb,saveCustomerContactDetailsInDb } from '@/utils/crmCustomerSync';
 import { HqModal } from '@/components/hq/ui/HqModal';
 
 export interface HqCustomersViewProps {
@@ -85,6 +87,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
   const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [contactMemoTarget, setContactMemoTarget] = useState<{customerId:string;contactId:string}|null>(null);
+  const [contactEditTarget, setContactEditTarget] = useState<{customerId:string;contactId:string}|null>(null);
 
   const isFetchingRef = React.useRef(false);
 
@@ -381,6 +384,8 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
       contactName: draft.name.trim(),
       contactPhone: draft.phone.trim(),
       contactEmail: draft.email.trim(),
+      contactPhones: draft.phones,
+      contactEmails: draft.emails,
       role: draft.role.trim() || '예약 담당자',
       department: draft.department.trim() || '의전예약',
     });
@@ -396,6 +401,36 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
     setSelectedCustomerId(result.clientId);
     setActiveTab('overview');
     setDbErrorMessage(null);
+    return null;
+  };
+
+  const handleEditContact=async(contactId:string,details:ContactChannelDraft):Promise<string|null>=>{
+    if(!selectedCustomer||contactEditTarget?.customerId!==selectedCustomer.id||
+       contactEditTarget.contactId!==contactId)return '현재 선택한 담당자가 달라졌습니다. 다시 열어 주세요.';
+    const customerId=selectedCustomer.id;
+    const result=await saveCustomerContactDetailsInDb(customerId,contactId,details);
+    if(!result.ok)return result.error||'담당자 정보 수정에 실패했습니다.';
+    const refreshed=await fetchHqCustomersFromDb();
+    if(refreshed.ok){
+      setCustomers(refreshed.customers);
+      setDbErrorMessage(null);
+    }else{
+      // DB write already succeeded: reflect edited values without submitting
+      // a second write and creating duplicate records.
+      setCustomers(previous=>previous.map(customer=>{
+        if(customer.id!==customerId)return customer;
+        const updated=updateContactDetails(customer.contacts,contactId,details);
+        const person=customer.contacts.find(p=>p.id===contactId);
+        const primary=person?.isPrimary||
+          (person?.name===customer.primaryContactName&&!customer.contacts.some(p=>p.isPrimary));
+        return {...customer,contacts:updated.contacts,
+          ...(primary?{primaryContactName:details.name,mainPhone:details.phones[0]||'',
+            mainEmail:details.emails[0]||''}:{})};
+      }));
+      setDbErrorMessage('담당자 정보는 저장됐지만 목록 새로고침에 실패했습니다. 다시 열면 최신 정보가 표시됩니다.');
+    }
+    setOperationFeedbackTone('success');
+    setOperationMessage('담당자 이름·연락처·이메일 변경사항이 저장되었습니다.');
     return null;
   };
 
@@ -823,6 +858,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
               expenseCount={billingStats.count} expenseTotal={billingStats.total}
               onAddContact={()=>setIsAddContactOpen(true)}
               onEditContactMemo={person=>setContactMemoTarget({customerId:selectedCustomer.id,contactId:person.id})}
+              onEditContact={person=>setContactEditTarget({customerId:selectedCustomer.id,contactId:person.id})}
               onEditCompanyNotes={()=>setEditModalConfig({isOpen:true,mode:'notes'})}
               onEditPreferences={()=>setEditModalConfig({isOpen:true,mode:'preferences'})}
               onComposeEmail={email=>setComposeModalState({isOpen:true,to:email,
@@ -990,6 +1026,18 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
         onClose={() => setIsAddContactOpen(false)}
         onSave={handleAddContact}
       />
+
+      {/* Edit an EXISTING contact by stable ID; do not create a duplicate. */}
+      {contactEditTarget&&selectedCustomer?.id===contactEditTarget.customerId&&
+        selectedCustomer.contacts.find(person=>person.id===contactEditTarget.contactId)&&(
+          <HqCustomerEditContactModal isOpen
+            key={contactEditTarget.customerId+':'+contactEditTarget.contactId}
+            companyName={selectedCustomer.name}
+            contact={selectedCustomer.contacts.find(person=>person.id===contactEditTarget.contactId)!}
+            onClose={()=>setContactEditTarget(null)}
+            onSave={handleEditContact}
+          />
+        )}
 
       {/* Contact-specific note, separate from company-wide memo. */}
       {contactMemoTarget&&selectedCustomer?.id===contactMemoTarget.customerId&&

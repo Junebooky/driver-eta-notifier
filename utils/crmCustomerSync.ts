@@ -5,6 +5,7 @@
  */
 
 import { HqCustomer, CustomerContact, CustomerTier } from '@/types/customerHq';
+import type {ContactChannelDraft} from '@/lib/customers/contactChannels';
 import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
 import { ensureClientAuth } from '@/utils/cockpitClientAuth';
 import { saveHqCustomers } from '@/utils/settlementStorage';
@@ -163,6 +164,30 @@ export async function saveCustomerContactMemoInDb(
   }
 }
 
+/**
+ * Narrow, guarded edit endpoint for ONE existing contact. Never POST new
+ * duplicate contacts when an administrator merely adds a missing email.
+ */
+export async function saveCustomerContactDetailsInDb(
+  customerId:string,contactId:string,contact:ContactChannelDraft,
+):Promise<{ok:boolean;error?:string}>{
+  try{
+    await ensureClientAuth('hq');
+    const res=await fetch('/api/hq/customers',{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:customerId,contactId,contact}),
+    });
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok||!data.ok)return {ok:false,error:data.error||'담당자 정보를 저장하지 못했습니다.'};
+    // The caller refreshes the authoritative customer list after saving.
+    broadcastCrmCustomersUpdate();
+    return {ok:true};
+  }catch(error){
+    return {ok:false,error:error instanceof Error?error.message:'담당자 정보를 저장하지 못했습니다.'};
+  }
+}
+
 export interface DeleteHqCustomerResult {
   ok: boolean;
   deletedId?: string;
@@ -315,6 +340,8 @@ export interface SaveContactToCrmParams {
   contactName: string;
   contactPhone?: string;
   contactEmail?: string;
+  contactPhones?: string[];
+  contactEmails?: string[];
   role?: string;
   department?: string;
   notes?: string;

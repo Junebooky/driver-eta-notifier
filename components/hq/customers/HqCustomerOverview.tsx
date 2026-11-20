@@ -1,21 +1,23 @@
 'use client';
 
 import {useEffect,useState} from 'react';
-import {ArrowRight, CalendarDays, CarFront, FileText, Heart, Mail, MessageSquare, Phone, Plus, Users} from 'lucide-react';
+import {ArrowRight, CalendarDays, CarFront, FileText, Heart, Mail, MessageSquare, Phone, Plus, Users, Pencil} from 'lucide-react';
 import type {HqCustomer,CustomerContact} from '@/types/customerHq';
 import {HqBadge,HqButton,HqCard} from '@/components/hq/ui';
 import {formatKRW} from '@/utils/expense';
+import {contactPhones,contactEmails} from '@/lib/customers/contactChannels';
 
 interface Props {
   customer:HqCustomer; expenseCount:number; expenseTotal:number;
   onAddContact:()=>void; onEditContactMemo:(contact:CustomerContact)=>void;
+  onEditContact:(contact:CustomerContact)=>void;
   onEditCompanyNotes:()=>void; onEditPreferences:()=>void;
   onComposeEmail:(email:string)=>void;
   onNavigate:(tab:'operations'|'billing'|'conversations')=>void;
 }
 
 export function HqCustomerOverview({
-  customer,expenseCount,expenseTotal,onAddContact,onEditContactMemo,
+  customer,expenseCount,expenseTotal,onAddContact,onEditContactMemo,onEditContact,
   onEditCompanyNotes,onEditPreferences,onComposeEmail,onNavigate,
 }:Props){
   const [showAll,setShowAll]=useState(false);
@@ -45,19 +47,30 @@ export function HqCustomerOverview({
               <p className="mt-0.5 text-[11px] text-[#7889A1]">
                 {[person.role,person.department].filter(Boolean).join(' · ')||'담당자'}
               </p>
-              {person.phone&&<p className="mt-1 text-[11px] text-[#667995]">{person.phone}</p>}
-              {person.email&&<p className="break-all text-[11px] text-[#667995]">{person.email}</p>}
             </div>
-            <div className="flex shrink-0 gap-1">
-              {person.phone&&<a href={'tel:'+person.phone} aria-label={person.name+' 전화'}
-                className="flex size-9 items-center justify-center rounded-xl bg-white text-[#667995] focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25">
-                <Phone className="size-4"/>
-              </a>}
-              {person.email&&<HqButton variant="subtle" size="sm"
-                aria-label={person.name+' 메일'} onClick={()=>onComposeEmail(person.email)}>
-                <Mail className="size-4"/>
-              </HqButton>}
-            </div>
+            <HqButton variant="secondary" size="sm" className="shrink-0"
+              aria-label={person.name+' 정보 수정'} onClick={()=>onEditContact(person)}>
+              <Pencil className="size-3.5"/> 수정
+            </HqButton>
+          </div>
+          <div className="mt-2 space-y-1.5">
+            {contactPhones(person).map((phone,index)=><a key={phone+index}
+              href={'tel:'+phone} aria-label={person.name+' 전화 '+phone}
+              className="flex min-w-0 items-center gap-2 break-all text-[11px] text-[#526680] hover:underline">
+              <Phone className="size-3.5 shrink-0 text-[#8190A5]"/>
+              <span>{phone}</span>
+              {index===0&&contactPhones(person).length>1&&<span className="text-[#8D99AA]">기본</span>}
+            </a>)}
+            {contactEmails(person).map((email,index)=><button type="button"
+              key={email+index} onClick={()=>onComposeEmail(email)}
+              aria-label={person.name+' 이메일 '+email}
+              className="flex min-w-0 cursor-pointer items-center gap-2 break-all text-left text-[11px] text-[#526680] hover:underline">
+              <Mail className="size-3.5 shrink-0 text-[#8190A5]"/>
+              <span className="min-w-0 break-all">{email}</span>
+              {index===0&&contactEmails(person).length>1&&<span className="text-[#8D99AA]">기본</span>}
+            </button>)}
+            {!contactPhones(person).length&&!contactEmails(person).length&&
+              <p className="text-[11px] text-[#99A5B4]">연락처 미등록 · 수정에서 추가 가능</p>}
           </div>
           {person.memo&&<p className="mt-2 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-[#53657F]">
             {person.memo}
