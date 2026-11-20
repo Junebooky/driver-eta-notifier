@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { UserPlus } from 'lucide-react';
 import { HqModal } from '@/components/hq/ui/HqModal';
 import { HqButton, HqInput } from '@/components/hq/ui';
 
@@ -57,7 +56,14 @@ export function HqCustomerAddContactModal({
 
   return (
     <HqModal isOpen={isOpen} title="담당자 추가" subtitle={companyName}
-      icon={<div className="flex size-11 items-center justify-center rounded-[15px] bg-[#F2F6FD] text-[#526D99]"><UserPlus size={20} /></div>}
+      icon={
+        <img
+          src="/images/icons/clients/icon_clients.png"
+          alt="고객관리 아이콘"
+          draggable={false}
+          className="size-11 shrink-0 object-contain"
+        />
+      }
       onClose={close} className="max-w-[470px]">
       <form onSubmit={submit} className="space-y-4" id="hq-customer-contact-add">
         <div className="grid gap-4 sm:grid-cols-2">

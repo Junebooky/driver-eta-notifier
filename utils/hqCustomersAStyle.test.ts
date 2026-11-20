@@ -5,6 +5,7 @@ const read=(p:string)=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const view=read('components/hq/customers/HqCustomersView.tsx');
 const create=read('components/hq/customers/HqCustomerRegisterModal.tsx');
 const edit=read('components/hq/customers/HqCustomerEditModal.tsx');
+const addContact=read('components/hq/customers/HqCustomerAddContactModal.tsx');
 const css=read('app/globals.css');
 
 test('CRM uses white A-plan cards and soft active selections',()=>{
@@ -17,6 +18,12 @@ test('CRM uses white A-plan cards and soft active selections',()=>{
   assert.match(view,/handleToggleFavorite\(cust\.id, e\)/);
   assert.match(view,/setTierFilter\(/);
   assert.match(view,/setActiveTab\(/);
+  assert.match(view,/deleteHqCustomerInDb/);
+  assert.match(view,/<HqModal/);
+  assert.match(view,/<HqButton/);
+  assert.match(view,/<HqIconButton/);
+  assert.match(view,/고객사 삭제/);
+  assert.doesNotMatch(view,/window\.confirm\(|\balert\(/);
 });
 
 test('customer creation/editing remove blue-black gradient headers without altering submit flows',()=>{
@@ -34,4 +41,7 @@ test('customer creation/editing remove blue-black gradient headers without alter
   assert.match(css,/HQ customer list search only\. Customer create\/edit forms use HqInput\/Select\/Textarea/);
   assert.match(css,/\.hq-ui-field/);
   assert.doesNotMatch(css,/\.hq-customer-modal-a :is\(input:not\(\[type="checkbox"\]\), select, textarea\)/);
+  for(const target of [view,create,edit,addContact]){
+    assert.match(target,/\/images\/icons\/clients\/icon_clients\.png/);
+  }
 });

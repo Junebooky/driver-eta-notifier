@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import test from 'node:test';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { signCockpitSession } from '@/lib/auth/serverAuth';
-import { GET, POST, PUT } from '@/app/api/hq/customers/route';
+import { GET, POST, PUT, DELETE } from '@/app/api/hq/customers/route';
 import { NextRequest } from 'next/server';
 
 interface MockCustomerRow {
@@ -120,6 +120,9 @@ test('CRM Full Round-Trip & Quality Gate Test Suite (Zero Live DB Mutation)', as
       },
       delete: () => ({
         eq: async (field: string, val: any) => {
+          if (simulateDbError) {
+            return { error: { message: 'Simulated DB delete failure' } };
+          }
           const idx = mockRows.findIndex((r) => (r as any)[field] === val);
           if (idx >= 0) {
             mockRows.splice(idx, 1);
@@ -338,6 +341,22 @@ test('CRM Full Round-Trip & Quality Gate Test Suite (Zero Live DB Mutation)', as
     const notFoundPut = await PUT(makeReq('PUT', { id: 'cust-nonexistent-999999', name: '새 이름' }));
     assert.strictEqual(notFoundPut.status, 404);
 
+    // 5-H: 401/403/400/404 validation on DELETE
+    const noTokenDelete = await DELETE(makeReq('DELETE', { id: 'cust-chanel', confirm: true }, ''));
+    assert.strictEqual(noTokenDelete.status, 401);
+
+    const driverDelete = await DELETE(makeReq('DELETE', { id: 'cust-chanel', confirm: true }, driverToken));
+    assert.strictEqual(driverDelete.status, 403);
+
+    const badDeleteNoId = await DELETE(makeReq('DELETE', { id: '', confirm: true }));
+    assert.strictEqual(badDeleteNoId.status, 400);
+
+    const badDeleteNoConfirm = await DELETE(makeReq('DELETE', { id: 'cust-chanel' }));
+    assert.strictEqual(badDeleteNoConfirm.status, 400);
+
+    const notFoundDelete = await DELETE(makeReq('DELETE', { id: 'cust-nonexistent-999999', confirm: true }));
+    assert.strictEqual(notFoundDelete.status, 404);
+
     // 5-G: 403 Forbidden on ?demo=true in production environment
     const prevEnv = process.env.NODE_ENV;
     try {
@@ -362,6 +381,9 @@ test('CRM Full Round-Trip & Quality Gate Test Suite (Zero Live DB Mutation)', as
 
       const dbErrPut = await PUT(makeReq('PUT', { id: 'cust-chanel', tier: 'VIP' }));
       assert.strictEqual(dbErrPut.status, 500, 'Database failure on PUT must return 500 status');
+
+      const dbErrDelete = await DELETE(makeReq('DELETE', { id: 'cust-chanel', confirm: true }));
+      assert.strictEqual(dbErrDelete.status, 500, 'Database failure on DELETE must return 500 status');
     } finally {
       simulateDbError = false;
     }
@@ -435,6 +457,29 @@ test('CRM Full Round-Trip & Quality Gate Test Suite (Zero Live DB Mutation)', as
       (global as any).window = originalWindow;
       (global as any).localStorage = originalLocalStorage;
     }
+
+    // =========================================================================
+    // 8. Full Round-Trip Verification: Delete Customer Permanently
+    // =========================================================================
+    const deleteRes = await DELETE(makeReq('DELETE', { id: savedBulgari.id, confirm: true }));
+    const deleteData = await deleteRes.json();
+    assert.strictEqual(deleteRes.status, 200);
+    assert.strictEqual(deleteData.ok, true);
+    assert.strictEqual(deleteData.deletedId, savedBulgari.id);
+
+    const getAfterDelete = await GET(makeReq('GET'));
+    const getAfterDeleteData = await getAfterDelete.json();
+    assert.strictEqual(getAfterDelete.status, 200);
+    assert.strictEqual(
+      getAfterDeleteData.customers.some((c: any) => c.id === savedBulgari.id),
+      false,
+      'Deleted customer must not appear in subsequent GET'
+    );
+    assert.strictEqual(
+      getAfterDeleteData.customers.some((c: any) => c.id === 'cust-chanel'),
+      true,
+      'Other customers must remain intact after delete'
+    );
 
     console.log('✓ All CRM round-trip, full-field persistence, and failure scenario tests passed (0 live DB mutations).');
   } finally {

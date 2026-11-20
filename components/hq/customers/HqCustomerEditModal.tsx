@@ -2,7 +2,7 @@
 
 import { HqTextarea, HqButton } from '@/components/hq/ui';
 import React, { useState } from 'react';
-import { X, Heart, FileText, Check, Loader2 } from 'lucide-react';
+import { X, Check, Loader2 } from 'lucide-react';
 import { HqCustomer } from '@/types/customerHq';
 import { haptics } from '@/utils/haptics';
 
@@ -61,12 +61,13 @@ export const HqCustomerEditModal: React.FC<HqCustomerEditModalProps> = ({
       <div className="hq-customer-modal-a flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-[26px] bg-[#FAFBFD] shadow-[0_24px_64px_rgba(27,45,77,0.16),0_4px_14px_rgba(27,45,77,0.04)]">
         {/* Header */}
         <div className="flex items-center justify-between gap-3 bg-white px-5 py-5 sm:px-6 sm:py-6">
-          <div className="flex items-center gap-2">
-            {mode === 'preferences' ? (
-              <Heart className="size-5 text-[#73839D]" />
-            ) : (
-              <FileText className="size-5 text-[#73839D]" />
-            )}
+          <div className="flex items-center gap-2.5">
+            <img
+              src="/images/icons/clients/icon_clients.png"
+              alt="고객관리 아이콘"
+              draggable={false}
+              className="size-11 shrink-0 object-contain"
+            />
             <h2 className="text-[18px] font-bold tracking-[-0.025em] text-[#17233B]">
               {customer.name} - {mode === 'preferences' ? '주요 선호사항 수정' : '의전 메모 수정'}
             </h2>

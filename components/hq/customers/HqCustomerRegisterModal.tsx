@@ -2,7 +2,7 @@
 
 import { HqInput, HqTextarea, HqButton } from '@/components/hq/ui';
 import React, { useState } from 'react';
-import { X, Building2, User, Plus, Loader2 } from 'lucide-react';
+import { X, User, Plus, Loader2 } from 'lucide-react';
 import { HqCustomer, CustomerTier } from '@/types/customerHq';
 import { haptics } from '@/utils/haptics';
 import { formatPhoneNumber } from '@/utils/formatters';
@@ -127,9 +127,12 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
         {/* Modal Header */}
         <div className="flex items-center justify-between gap-3 bg-white px-5 py-5 sm:px-6 sm:py-6">
           <div className="flex items-center gap-2.5">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-[15px] bg-[#EEF3FF] text-[#1E60F3]">
-              <Building2 className="size-5 text-[#1E60F3]" />
-            </div>
+            <img
+              src="/images/icons/clients/icon_clients.png"
+              alt="고객관리 아이콘"
+              draggable={false}
+              className="size-11 shrink-0 object-contain"
+            />
             <div>
               <h2 className="text-[19px] font-bold tracking-[-0.03em] text-[#17233B]">신규 고객사 등록</h2>
               <p className="mt-1 text-[12px] font-medium leading-relaxed text-[#73839D]">

@@ -139,6 +139,47 @@ export async function updateHqCustomerInDb(customer: HqCustomer): Promise<boolea
   }
 }
 
+export interface DeleteHqCustomerResult {
+  ok: boolean;
+  deletedId?: string;
+  deletedName?: string;
+  error?: string;
+}
+
+/**
+ * Permanently delete a customer record from Supabase DB via /api/hq/customers
+ */
+export async function deleteHqCustomerInDb(customerId: string): Promise<DeleteHqCustomerResult> {
+  try {
+    await ensureClientAuth('hq');
+    const res = await fetch('/api/hq/customers', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: customerId, confirm: true }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok) {
+      await fetchHqCustomersFromDb().catch(() => {});
+      broadcastCrmCustomersUpdate();
+      return {
+        ok: true,
+        deletedId: data.deletedId || customerId,
+        deletedName: data.deletedName,
+      };
+    }
+    return {
+      ok: false,
+      error: data.error || data.message || `고객사 삭제 실패 (${res.status})`,
+    };
+  } catch (err: any) {
+    console.error('[CRM] DB delete customer error:', err);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : '네트워크 오류로 고객사를 삭제하지 못했습니다.',
+    };
+  }
+}
+
 export function getStoredCustomers(): HqCustomer[] {
   if (typeof window === 'undefined') {
     return inMemoryCustomers || [];

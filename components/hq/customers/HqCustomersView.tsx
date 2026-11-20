@@ -28,6 +28,7 @@ import {
   X,
   Building2,
   Loader2,
+  Trash2,
 } from 'lucide-react';
 import { HqCustomer } from '@/types/customerHq';
 import {
@@ -36,6 +37,7 @@ import {
   fetchHqCustomersFromDb,
   saveContactToCrmDb,
   updateHqCustomerInDb,
+  deleteHqCustomerInDb,
   CRM_CUSTOMERS_UPDATE_EVENT,
   CRM_CUSTOMERS_STORAGE_KEY,
 } from '@/utils/crmCustomerSync';
@@ -54,6 +56,8 @@ import { HqExpenseRecord, HqExpenseStatus } from '@/types/expenseHq';
 import { formatKRW } from '@/utils/expense';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
+import { HqBadge, HqButton, HqCard, HqIconButton } from '@/components/hq/ui';
+import { HqModal } from '@/components/hq/ui/HqModal';
 
 export interface HqCustomersViewProps {
   initialSearchQuery?: string;
@@ -72,6 +76,10 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
   const [dbErrorMessage, setDbErrorMessage] = useState<string | null>(null);
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
   const [operationMessage, setOperationMessage] = useState<string | null>(null);
+  const [operationFeedbackTone, setOperationFeedbackTone] = useState<'error' | 'info' | 'success'>('error');
+  const [deleteTargetCustomer, setDeleteTargetCustomer] = useState<HqCustomer | null>(null);
+  const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const isFetchingRef = React.useRef(false);
 
@@ -294,6 +302,12 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
 
   // Paginated customers
   const totalPages = Math.ceil(filteredCustomers.length / ITEMS_PER_PAGE) || 1;
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const paginatedCustomers = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
     return filteredCustomers.slice(start, start + ITEMS_PER_PAGE);
@@ -307,6 +321,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
     if (!currentTarget || isTogglingFavorite) return;
 
     setIsTogglingFavorite(true);
+    setOperationFeedbackTone('error');
     setOperationMessage(null);
     const updated = { ...currentTarget, isFavorite: !currentTarget.isFavorite };
 
@@ -333,6 +348,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
   const handleRegisterCustomer = async (newCustomerDraft: HqCustomer): Promise<boolean> => {
     setIsLoadingDb(true);
     setDbErrorMessage(null);
+    setOperationFeedbackTone('error');
     setOperationMessage(null);
 
     try {
@@ -381,6 +397,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
   // Update customer handler - strictly awaits DB update
   const handleUpdateCustomer = async (updated: HqCustomer): Promise<boolean> => {
     setIsLoadingDb(true);
+    setOperationFeedbackTone('error');
     setOperationMessage(null);
     try {
       const ok = await updateHqCustomerInDb(updated);
@@ -425,6 +442,47 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
     setActiveTab('contacts');
     setDbErrorMessage(null);
     return null;
+  };
+
+  const openDeleteCustomerModal = (customer: HqCustomer, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    haptics.lightTap();
+    setDeleteError(null);
+    setDeleteTargetCustomer(customer);
+  };
+
+  const closeDeleteCustomerModal = () => {
+    if (isDeletingCustomer) return;
+    setDeleteTargetCustomer(null);
+    setDeleteError(null);
+  };
+
+  const handleConfirmDeleteCustomer = async () => {
+    if (!deleteTargetCustomer || isDeletingCustomer) return;
+    const target = deleteTargetCustomer;
+    setIsDeletingCustomer(true);
+    setDeleteError(null);
+    try {
+      const res = await deleteHqCustomerInDb(target.id);
+      if (!res.ok) {
+        haptics.errorAlert();
+        setDeleteError(res.error || '고객사를 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+        return;
+      }
+      haptics.mediumTap();
+      const nextCustomers = customers.filter((c) => c.id !== target.id);
+      setCustomers(nextCustomers);
+      saveStoredCustomers(nextCustomers, false);
+      if (selectedCustomerId === target.id) {
+        setSelectedCustomerId(nextCustomers[0]?.id || '');
+      }
+      setDeleteTargetCustomer(null);
+      setDeleteError(null);
+      setOperationFeedbackTone('success');
+      setOperationMessage(`'${target.name}' 고객사를 삭제했습니다.`);
+    } finally {
+      setIsDeletingCustomer(false);
+    }
   };
 
   return (
@@ -514,6 +572,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
 
           <HqInlineFeedback
             message={operationMessage}
+            tone={operationFeedbackTone}
             onDismiss={() => setOperationMessage(null)}
             className="mx-5 mb-3 sm:mx-6"
           />
@@ -542,8 +601,14 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
             ) : paginatedCustomers.length === 0 ? (
               <div className="p-12 text-center text-slate-400">
                 <Users className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                <p className="text-xs font-bold text-slate-600">검색된 고객사가 없습니다.</p>
-                <p className="text-[11px] text-slate-400 mt-1">검색어 또는 필터를 변경해보세요.</p>
+                <p className="text-xs font-bold text-slate-600">
+                  {customers.length === 0 ? '등록된 고객사가 없습니다.' : '검색된 고객사가 없습니다.'}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  {customers.length === 0
+                    ? "우측 상단의 '고객 등록' 버튼으로 새 고객사를 추가해 보세요."
+                    : '검색어 또는 필터를 변경해보세요.'}
+                </p>
               </div>
             ) : (
               paginatedCustomers.map((cust) => {
@@ -621,6 +686,17 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                             }`}
                         />
                       </button>
+
+                      <HqIconButton
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`${cust.name} 고객사 삭제`}
+                        title="고객사 삭제"
+                        onClick={(e) => openDeleteCustomerModal(cust, e)}
+                        className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-opacity"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </HqIconButton>
                     </div>
                   </div>
                 );
@@ -733,20 +809,31 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                   </div>
                 </div>
 
-                {/* Star Favorite Button */}
-                <button
-                  type="button"
-                  onClick={() => handleToggleFavorite(selectedCustomer.id)}
-                  className="p-1.5 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
-                  title="즐겨찾기 토글"
-                >
-                  <Star
-                    className={`w-5 h-5 ${selectedCustomer.isFavorite
-                      ? 'text-amber-400 fill-amber-400'
-                      : 'text-slate-300'
-                      }`}
-                  />
-                </button>
+                {/* Star Favorite & Delete Actions */}
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleFavorite(selectedCustomer.id)}
+                    className="p-1.5 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+                    title="즐겨찾기 토글"
+                  >
+                    <Star
+                      className={`w-5 h-5 ${selectedCustomer.isFavorite
+                        ? 'text-amber-400 fill-amber-400'
+                        : 'text-slate-300'
+                        }`}
+                    />
+                  </button>
+                  <HqButton
+                    variant="subtle"
+                    size="sm"
+                    onClick={() => openDeleteCustomerModal(selectedCustomer)}
+                    aria-label={`${selectedCustomer.name} 고객사 삭제`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>삭제</span>
+                  </HqButton>
+                </div>
               </div>
 
               {/* Sub-Navigation Tabs with Active Blue Underline */}
@@ -1535,6 +1622,61 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
         initialTo={composeModalState.to}
         initialSubject={composeModalState.subject}
       />
+
+      {/* 3-A. Modal: 고객사 영구 삭제 확인 */}
+      <HqModal
+        isOpen={Boolean(deleteTargetCustomer)}
+        title="고객사 삭제"
+        subtitle={deleteTargetCustomer ? `${deleteTargetCustomer.name} 고객사를 목록에서 영구 삭제합니다.` : undefined}
+        icon={
+          <img
+            src="/images/icons/clients/icon_clients.png"
+            alt="고객관리 아이콘"
+            draggable={false}
+            className="size-11 shrink-0 object-contain"
+          />
+        }
+        onClose={closeDeleteCustomerModal}
+        footer={
+          <>
+            <HqButton variant="subtle" onClick={closeDeleteCustomerModal} disabled={isDeletingCustomer}>
+              취소
+            </HqButton>
+            <HqButton
+              variant="danger"
+              loading={isDeletingCustomer}
+              onClick={() => void handleConfirmDeleteCustomer()}
+            >
+              {isDeletingCustomer ? '삭제 중...' : '고객사 삭제'}
+            </HqButton>
+          </>
+        }
+      >
+        {deleteTargetCustomer && (
+          <div className="space-y-4">
+            <HqCard tone="muted" className="p-4 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[14px] font-bold text-[#17233B]">{deleteTargetCustomer.name}</span>
+                <HqBadge tone={deleteTargetCustomer.tier === 'VIP' ? 'selected' : 'neutral'}>
+                  {deleteTargetCustomer.tier}
+                </HqBadge>
+              </div>
+              <p className="text-[12px] text-[#60728A]">
+                {deleteTargetCustomer.primaryContactName
+                  ? `대표 담당자: ${deleteTargetCustomer.primaryContactName}${deleteTargetCustomer.contacts.length > 1 ? ` 외 ${deleteTargetCustomer.contacts.length - 1}명` : ''}`
+                  : `등록된 담당자 ${deleteTargetCustomer.contacts.length}명`}
+              </p>
+            </HqCard>
+
+            <p className="text-[12px] leading-relaxed text-[#60728A]">
+              삭제 시 고객사 프로필과 등록된 담당자 정보가 DB에서 영구 삭제되며 되돌릴 수 없습니다.
+              기존 배차·운행일지·경비 내역은 삭제되지 않고 유지됩니다.
+            </p>
+
+            <HqInlineFeedback message={deleteError} onDismiss={() => setDeleteError(null)} />
+          </div>
+        )}
+      </HqModal>
 
       {/* 4. Modal: 영수증 사진 및 증빙 상세 확인 */}
       {previewReceipt && (

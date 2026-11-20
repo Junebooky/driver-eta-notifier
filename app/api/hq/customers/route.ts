@@ -490,3 +490,68 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
   }
 }
+
+/**
+ * DELETE: Permanently delete a customer record from cockpit.customers DB.
+ * Requires HQ admin session and explicit confirm: true flag.
+ */
+export async function DELETE(req: NextRequest) {
+  try {
+    const auth = await requireHqAdmin(req);
+    if (!auth.ok || !auth.session) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+
+    const body = await req.json().catch(() => null);
+    const id = typeof body?.id === 'string' ? body.id.trim() : '';
+
+    if (!id) {
+      return NextResponse.json(
+        { ok: false, error: '삭제할 고객사 ID(id)가 필요합니다.' },
+        { status: 400 }
+      );
+    }
+
+    if (body?.confirm !== true) {
+      return NextResponse.json(
+        { ok: false, error: '고객사 삭제 확인(confirm: true)이 필요합니다.' },
+        { status: 400 }
+      );
+    }
+
+    const { data: existing, error: findErr } = await supabaseAdmin
+      .from('customers')
+      .select('id, name')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (findErr) {
+      console.error('[HQ Customers DELETE] Find error:', findErr);
+      return NextResponse.json({ ok: false, error: findErr.message }, { status: 500 });
+    }
+
+    if (!existing) {
+      return NextResponse.json({ ok: false, error: '해당 고객사를 찾을 수 없습니다.' }, { status: 404 });
+    }
+
+    const { error: deleteErr } = await supabaseAdmin
+      .from('customers')
+      .delete()
+      .eq('id', id);
+
+    if (deleteErr) {
+      console.error('[HQ Customers DELETE] Delete error:', deleteErr);
+      return NextResponse.json({ ok: false, error: deleteErr.message }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      deletedId: existing.id,
+      deletedName: existing.name,
+      message: `고객사 [${existing.name}]가 삭제되었습니다.`,
+    });
+  } catch (err: any) {
+    console.error('[HQ Customers DELETE] Unhandled error:', err);
+    return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
+  }
+}
