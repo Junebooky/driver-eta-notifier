@@ -1217,9 +1217,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                               {/* 4. 운영 상태 & 최종 업데이트 병합 */}
                               <td className="py-3.5 px-5 whitespace-nowrap">
                                 <div className="flex flex-col items-start gap-1">
-                                  <span
-                                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border shadow-2xs ${statusConfig.badgeClass}`}
-                                  >
+                                  <HqBadge tone={statusConfig.isLive?'selected':'neutral'} className="gap-1.5">
                                     {statusConfig.isLive ? (
                                       <span className="relative flex h-2 w-2">
                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#1E60F3] opacity-75" />
@@ -1229,7 +1227,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                                       <StatusIcon className="w-3 h-3" />
                                     )}
                                     <span>{statusConfig.label}</span>
-                                  </span>
+                                  </HqBadge>
                                   <span className="text-[10px] text-slate-400 font-semibold pl-1">
                                     {item.operationUpdatedAt || '오후 03:34'}
                                   </span>
@@ -1259,7 +1257,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                   </div>
 
                   {/* Mobile Cards View (Visible on mobile only) */}
-                  <div className="md:hidden divide-y divide-slate-100">
+                  <div className="divide-y divide-[#F0F3F6] md:hidden">
                     {visibleSchedules.map((item, idx) => {
                       const statusConfig = STATUS_CONFIG[item.operationStatus] || STATUS_CONFIG.ready;
                       const driverTitle = formatDriverTitle(item.driverName);
@@ -1268,31 +1266,38 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                       return (
                         <div
                           key={item.id}
+                          role="button" tabIndex={0}
+                          onKeyDown={(event) => {
+                            if(event.target!==event.currentTarget)return;
+                            if(event.key==='Enter'||event.key===' '){
+                              event.preventDefault();
+                              haptics.lightTap();
+                              setSelectedSchedule(item);
+                            }
+                          }}
                           onClick={() => {
                             haptics.lightTap();
                             setSelectedSchedule(item);
                           }}
-                          className="group cursor-pointer space-y-3 p-4 transition-colors hover:bg-[#FAFBFD]"
+                          className="group min-w-0 cursor-pointer space-y-2.5 px-3 py-3 transition-colors hover:bg-[#FAFBFD] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#1E60F3] sm:p-4"
                         >
                           {/* Row 1: Vehicle, Driver, Status */}
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 min-w-0">
-                              <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl text-xs font-black bg-[#F4F6FA] text-slate-700 border border-slate-200/70 shrink-0">
+                              <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-xl bg-[#F7F9FC] text-[11px] font-semibold text-[#61728A]">
                                 {vehicleIndex}호
                               </span>
                               <div className="min-w-0">
-                                <div className="font-extrabold text-slate-900 group-hover:text-[#1E60F3] transition-colors text-sm truncate">
+                                <div className="truncate text-[13px] font-semibold text-[#17233B] group-hover:text-[#1E60F3]">
                                   {driverTitle}
                                 </div>
-                                <div className="font-mono text-[11px] font-bold text-slate-500">
+                                <div className="truncate font-mono text-[11px] font-medium text-[#73839D]">
                                   {item.vehiclePlate}
                                 </div>
                               </div>
                             </div>
 
-                            <span
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border shadow-2xs shrink-0 ${statusConfig.badgeClass}`}
-                            >
+                            <HqBadge tone={statusConfig.isLive?'selected':'neutral'} className="shrink-0 gap-1.5">
                               {statusConfig.isLive && (
                                 <span className="relative flex h-1.5 w-1.5">
                                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#1E60F3] opacity-75" />
@@ -1300,11 +1305,11 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                                 </span>
                               )}
                               <span>{statusConfig.label}</span>
-                            </span>
+                            </HqBadge>
                           </div>
 
                           {/* Row 2: Route box */}
-                          <div className="p-2.5 rounded-2xl bg-slate-50  space-y-1.5 text-xs">
+                          <div className="min-w-0 space-y-1.5 rounded-xl bg-[#F7F9FC] p-2.5 text-[12px]">
                             {isMultiDateGroup && (
                               <div className="text-[11px] font-semibold text-[#73839D]">
                                 {item.startDate.slice(5)} · {item.startTime}
@@ -1318,38 +1323,32 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                                   className="w-3 h-3 object-contain"
                                 />
                               </div>
-                              <span className="font-bold text-slate-900 truncate">{item.pickupLocation}</span>
+                              <span className="min-w-0 truncate font-medium text-[#17233B]">{item.pickupLocation}</span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <div className="w-5 h-5 rounded-full bg-red-50 border border-red-100/80 flex items-center justify-center shrink-0">
+                              <div className="flex size-5 shrink-0 items-center justify-center rounded-full bg-white">
                                 <img
                                   src="/images/icons/driver_ui/icon_destination.png"
                                   alt="목적지"
                                   className="w-3 h-3 object-contain"
                                 />
                               </div>
-                              <span className="font-bold text-slate-700 truncate">{item.dropoffLocation}</span>
+                              <span className="min-w-0 truncate font-medium text-[#526680]">{item.dropoffLocation}</span>
                             </div>
                           </div>
 
                           {/* Row 3: Meta & Action */}
-                          <div className="flex items-center justify-between gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
-                            <span className="text-[11px] text-slate-400 font-semibold">
+                          <div className="flex min-w-0 items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
+                            <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-[#8492A4]">
                               {item.vehicleModel} · {item.operationUpdatedAt || '오후 03:34'}
                             </span>
 
-                            <button
-                              type="button"
-                              onClick={(e) => handleSendArrivalNotice(e, item)}
-                              className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[13px] bg-white px-3.5 text-[12px] font-semibold text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.045)] transition-colors hover:bg-[#F5F8FF]"
-                            >
-                              <img
-                                src="/images/icons/driver_ui/icon_talk.png"
-                                alt="알림"
-                                className="w-3.5 h-3.5 object-contain shrink-0"
-                              />
+                            <HqButton variant="subtle" size="sm"
+                              className="shrink-0 px-2.5" onClick={(e) => handleSendArrivalNotice(e, item)}>
+                              <img src="/images/icons/driver_ui/icon_talk.png"
+                                alt="" aria-hidden="true" className="size-4 shrink-0 object-contain"/>
                               <span>도착 알림</span>
-                            </button>
+                            </HqButton>
                           </div>
                         </div>
                       );
