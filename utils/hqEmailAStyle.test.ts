@@ -6,6 +6,9 @@ const inbox=r('components/hq/email/HqEmailInboxView.tsx');
 const step=r('components/hq/email/HqStep1ExtractView.tsx');
 const compose=r('components/hq/email/HqComposeEmailModal.tsx');
 const batch=r('components/hq/email/HqEmailBatchRevisionPanel.tsx');
+const detail=r('components/hq/email/HqStep2BookingDetailView.tsx');
+const step5=r('components/hq/email/HqStep5AssignmentPanel.tsx');
+const placeSearch=r('components/hq/HqPlaceSearchInput.tsx');
 const css=r('app/globals.css');
 
 test('inbox A-plan keeps live IMAP, manual AI and safe dispatch controls',()=>{
@@ -56,4 +59,26 @@ test('A02 multi-day/vehicle atomic approval panel remains available',()=>{
   assert.match(batch,/onApprove/);
   assert.match(batch,/onAssignment/);
   assert.match(batch,/onCancelReason/);
+});
+
+test('Step 5 removes redundant verification cards, groups routes by date with inline TMAP edit, flight hints, shared CTA, and mobile placeholder sizing',()=>{
+  assert.doesNotMatch(step5,/HqRoutePlaceVerification/);
+  assert.match(step5,/<HqButton[\s\S]*variant="primary"/);
+  assert.match(step5,/배차 확정 및 알림 전송/);
+  assert.match(step5,/<HqSegmentedTabs/);
+
+  assert.doesNotMatch(detail,/날짜별 장소·종료시간 확인/);
+  assert.match(detail,/emailDispatchDays\(/);
+  assert.match(detail,/id="email-route-place-verification"/);
+  assert.match(detail,/<HqPlaceSearchInput/);
+  assert.match(detail,/confirmEmailRouteStop/);
+  assert.match(detail,/<HqFlightInfoHint/);
+  assert.match(detail,/<HqCard/);
+  assert.match(detail,/<HqBadge/);
+  assert.match(detail,/<HqButton/);
+  assert.match(detail,/<HqSegmentedTabs/);
+
+  assert.match(placeSearch,/hq-place-search-input/);
+  assert.match(placeSearch,/placeholder:text-\[11px\]/);
+  assert.match(css,/input\.hq-place-search-input.*placeholder|input\.hq-place-search-input:not\(:focus\):placeholder-shown/);
 });

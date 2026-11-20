@@ -9,7 +9,14 @@ import type { AnalyzedScheduleAttachment } from '@/services/emailAttachmentIntak
 import type { EmailFlightLeg } from '@/types/emailHq';
 import { enrichBookingDraftWithEmailEvidence } from '@/utils/emailBookingEvidence';
 import { attachmentManifest, verifyAttachmentCoverage } from '@/utils/emailAttachmentCoverage';
-import { buildExcelVehicleSchedules, datedExcelCalendarBlocks, reconcileSingleExcelCalendar, type DatedExcelCalendarBlock } from '@/utils/emailCalendarGrid';
+import {
+  buildExcelVehicleSchedules,
+  datedExcelCalendarBlocks,
+  extractExcelCalendarFlights,
+  mergeDraftFlights,
+  reconcileSingleExcelCalendar,
+  type DatedExcelCalendarBlock,
+} from '@/utils/emailCalendarGrid';
 
 export interface ExtractBookingParams {
   emailId: string;
@@ -370,8 +377,10 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
        - If all stops are on the same single day, set "date" to the pickupDate for all waypoints.
      * "time": Stop time (HH:MM 24h format, e.g. "10:00").
      * "location": Clean place or landmark name for TMAP search (do not include floor/gate).
-     * "clientAddress": EXACT original road/street address written in the email, if present. It must not be lost or replaced with a landmark name.
+       CRITICAL FOR EXCEL / SCHEDULE CELLS: Always inspect ALL lines in a cell (* Location:, 장소:, Venue:, airport codes like GMP/ICN, or hotel/restaurant names). NEVER output a generic activity headline like "Dinner with HNW client" or "Flight to Seoul" when a venue or airport appears on lower lines (e.g. "* Location : Ra Yeon, Shilla Hotel / 신라호텔 중식당 라연" -> "신라호텔 중식당 라연"; "arriving into GMP at 3pm (KE2102 from HND)" -> "김포국제공항 국제선"). Prefer the Korean venue name when both English and Korean appear.
+     * "clientAddress": EXACT original road/street address or explicit venue detail written after Address:/Location:/주소:/장소: if present (excluding unknown "?"/"TBD"). It must not be lost or replaced with a landmark name.
      * "notes": Arrival/pickup vs departure timing, standby, floor, and gate instructions.
+     * Also capture any flight codes written inside Excel/PDF schedule cells (e.g. "(KE2102 from HND)") into the top-level "flights" array.
      * If "16:30 Head to Incheon Airport" appears, 16:30 is DEPARTURE FROM THE PREVIOUS STOP, NOT arrival at the airport. Leave airport arrival time empty and preserve departure as a note on the previous stop. "17:30 Head back to Conrad" likewise does not mean arrival at Conrad at 17:30. Preserve "13:15 Head to POBA" as departure; POBA appointment time is 14:00.
      * If a location is TBA, never infer a venue or address.
      If the email is for a simple 1-leg trip (single departure to destination), "waypoints" can be empty or omitted.
@@ -586,6 +595,15 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
           : evidenceDraft.warnings,
       }
       : reconcileSingleExcelCalendar(evidenceDraft, calendarBlocks);
+    if (!isPartialModificationOnly && calendarBlocks.length > 0) {
+      const excelFlights = extractExcelCalendarFlights(calendarBlocks);
+      if (excelFlights.length > 0) {
+        completeDraft.flights = mergeDraftFlights(completeDraft.flights, excelFlights);
+        if (!completeDraft.flightNumber) {
+          completeDraft.flightNumber = completeDraft.flights[0]?.flightNumber || '';
+        }
+      }
+    }
     if (calendarBlocks.length > 0) {
       const excelVehicleSchedules = buildExcelVehicleSchedules(calendarBlocks, evidenceDraft.waypoints);
       if (excelVehicleSchedules.length > 0) {

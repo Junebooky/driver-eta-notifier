@@ -43,6 +43,7 @@ import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 import { HqSourceText } from '@/components/hq/ui/HqSourceText';
 import { findEmailSourceRanges } from '@/utils/emailWorkflowReview';
 import { HqPlaceSearchInput, PoiResult } from '@/components/hq/HqPlaceSearchInput';
+import { HqFlightInfoHint } from './HqFlightInfoHint';
 import { saveContactToCrm } from '@/utils/crmCustomerSync';
 import { HqEmailAddressCandidate } from './HqEmailAddressCandidate';
 import type { EmailBatchReviewRow } from '@/utils/emailBatchRevision';
@@ -1036,11 +1037,24 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                         <span className="text-slate-500 ml-1.5">{flight.date.slice(5)} · {flight.originAirport || '?'}-{flight.destinationAirport || '?'}</span>
                         {roleLabel && <span className="ml-1.5 text-slate-500">({roleLabel})</span>}
                         {shownClock && <span className="ml-1.5 text-slate-500">· {flight.role === 'arrival' ? '도착' : '출발'} {shownClock}</span>}
+                        <HqFlightInfoHint
+                          className="ml-1.5"
+                          flightNumber={flight.flightNumber}
+                          date={flight.date}
+                          role={flight.role}
+                          originAirport={flight.originAirport}
+                          destinationAirport={flight.destinationAirport}
+                          scheduledArrival={flight.scheduledArrival}
+                          scheduledDeparture={flight.scheduledDeparture}
+                        />
                         {flight.passengers?.length ? <span className="block text-[10px] text-slate-500">{flight.passengers.join(', ')} · {flight.passengers.length}명</span> : null}
                       </div>
                     );
                   }) : flightNumber ? (
-                    <span className="font-mono font-bold text-slate-900">{flightNumber}</span>
+                    <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
+                      <span className="font-mono font-bold text-slate-900">{flightNumber}</span>
+                      <HqFlightInfoHint flightNumber={flightNumber} date={extractedDraft?.pickupDate} />
+                    </div>
                   ) : (
                     <span className="font-medium text-slate-600">미정 (출국 전 확인 필요)</span>
                   )}

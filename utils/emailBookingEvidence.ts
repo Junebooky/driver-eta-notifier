@@ -44,11 +44,21 @@ function datedLines(body: string, pickupDate: string): Array<{ line: string; dat
 }
 
 const KOREAN_AIRPORTS = new Set(['ICN', 'GMP', 'PUS', 'CJU', 'TAE', 'CJJ', 'MWX']);
+const NL_FLIGHT_PREFIX_EXCLUDE = new Set(['AM', 'PM', 'AT', 'IN', 'TO', 'ON', 'BY', 'OR', 'OF', 'NO', 'T1', 'T2', 'T3', 'T4', 'B1', 'B2']);
 
-/** Picks up every explicit flight leg, including two arrivals and onward connections. */
+function extractNaturalClock(text: string): string {
+  const m12 = text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
+  if (m12) return normalizeClock(m12[1], m12[2] || '00', m12[3]);
+  const m24 = text.match(/\b(\d{1,2}):(\d{2})\b/);
+  if (m24) return normalizeClock(m24[1], m24[2]);
+  return '';
+}
+
+/** Picks up every explicit flight leg, including two arrivals, onward connections, and natural-language flight lines. */
 export function extractFlightEvidence(body: string, pickupDate: string): EmailFlightLeg[] {
   const found: EmailFlightLeg[] = [];
-  for (const { line, date } of datedLines(body, pickupDate)) {
+  const linesWithDates = datedLines(body, pickupDate);
+  for (const { line, date } of linesWithDates) {
     const flightPattern = /\b([A-Z0-9]{2}\s?\d{2,4})\s+([A-Z]{3})\s*[-–]\s*([A-Z]{3})\s+(\d{3,4})\s*\/\s*(\d{3,4})\b/gi;
     const matches = [...line.matchAll(flightPattern)];
     if (!matches.length) continue;
@@ -68,6 +78,76 @@ export function extractFlightEvidence(body: string, pickupDate: string): EmailFl
         passengers,
         role: KOREAN_AIRPORTS.has(destination) ? 'arrival'
           : KOREAN_AIRPORTS.has(origin) ? 'departure' : 'connection',
+      });
+    }
+  }
+
+  // Secondary natural-language pass for wrapped blocks like:
+  // "Arnold is arriving into GMP at 3pm (KE2102 from HND)"
+  const seenKeys = new Set(found.map((item) => item.date + ':' + item.flightNumber.toUpperCase()));
+  for (let i = 0; i < linesWithDates.length; i++) {
+    const { line, date } = linesWithDates[i];
+    if (!line) continue;
+
+    const nlMatches = [...line.matchAll(/\b([A-Z]{2}|[A-Z]\d|\d[A-Z])\s?(\d{2,4})\b(?=\s*(?:from|to|into|[-–/]|$|\)))/gi)];
+    if (!nlMatches.length) continue;
+
+    // Collect immediate surrounding lines in the same non-empty block on the same date,
+    // without crossing blank lines or another flight's line.
+    const above: string[] = [];
+    for (let j = i - 1; j >= Math.max(0, i - 2); j--) {
+      const prev = linesWithDates[j];
+      if (!prev.line || prev.date !== date) break;
+      if (/\b([A-Z]{2}|[A-Z]\d|\d[A-Z])\s?\d{2,4}\b/.test(prev.line) && !NL_FLIGHT_PREFIX_EXCLUDE.has(prev.line.match(/\b([A-Z]{2}|[A-Z]\d|\d[A-Z])\s?\d{2,4}\b/i)?.[1]?.toUpperCase() || '')) {
+        break;
+      }
+      above.unshift(prev.line);
+    }
+    const below: string[] = [];
+    for (let j = i + 1; j <= Math.min(linesWithDates.length - 1, i + 1); j++) {
+      const next = linesWithDates[j];
+      if (!next.line || next.date !== date) break;
+      below.push(next.line);
+    }
+    const windowText = [...above, line, ...below].join(' ');
+    if (!/(?:flight|arriving|arrive|depart(?:ing|ure)?|\b(?:ICN|GMP|HND|NRT|KIX|PUS|CJU)\b|공항|입국|출국|도착|출발)/i.test(windowText)) {
+      continue;
+    }
+
+    for (const match of nlMatches) {
+      const prefix = match[1].toUpperCase();
+      if (NL_FLIGHT_PREFIX_EXCLUDE.has(prefix)) continue;
+      const number = prefix + match[2];
+      const key = date + ':' + number;
+      if (seenKeys.has(key)) continue;
+
+      const pair = windowText.toUpperCase().match(/\b([A-Z]{3})\s*[-–/→>]\s*([A-Z]{3})\b/);
+      let origin = pair?.[1] || windowText.toUpperCase().match(/\bFROM\s+([A-Z]{3})\b/)?.[1];
+      let destination = pair?.[2] || windowText.toUpperCase().match(/\b(?:INTO|TO)\s+([A-Z]{3})\b/)?.[1];
+      if (!destination && origin !== 'GMP' && /\bGMP\b|gimpo|김포/i.test(windowText)) destination = 'GMP';
+      if (!destination && origin !== 'ICN' && /\bICN\b|incheon|인천/i.test(windowText)) destination = 'ICN';
+      if (!origin && !destination) continue;
+
+      const role: EmailFlightLeg['role'] = destination && KOREAN_AIRPORTS.has(destination)
+        ? 'arrival'
+        : origin && KOREAN_AIRPORTS.has(origin)
+          ? 'departure'
+          : /\b(?:arriving|arrive|arrival)\b|도착|입국/i.test(windowText)
+            ? 'arrival'
+            : /\b(?:departing|depart|departure)\b|출발|출국/i.test(windowText)
+              ? 'departure'
+              : 'connection';
+      const clock = extractNaturalClock(windowText);
+      seenKeys.add(key);
+      found.push({
+        flightNumber: number,
+        date,
+        ...(origin ? { originAirport: origin } : {}),
+        ...(destination ? { destinationAirport: destination } : {}),
+        ...(role === 'arrival' && clock ? { scheduledArrival: clock } : {}),
+        ...(role === 'departure' && clock ? { scheduledDeparture: clock } : {}),
+        passengers: [],
+        role,
       });
     }
   }

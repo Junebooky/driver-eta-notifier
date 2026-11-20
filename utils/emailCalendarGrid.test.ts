@@ -335,3 +335,58 @@ test('parseExcelWaypointNotes separates Excel cell provenance from plain notes',
   assert.deepEqual(parseExcelWaypointNotes('   '), {});
   assert.deepEqual(parseExcelWaypointNotes(undefined), {});
 });
+
+test('extracts Korean venue from multiline Location label and natural-language airport flight from Excel cells', () => {
+  const rows: (string | number)[][] = [
+    ['Date', 'Sunday, Nov. 8', 'Monday, Nov. 9'],
+    ['3:00 PM', '', 'Flight to Seoul\n\nArnold is arriving into\nGMP at 3pm\n(KE2102 from HND)'],
+    ['6:00 PM', 'Dinner with HNW client\nat 6:00 pm\n(CPB Client)\n\n * Location : Ra Yeon, Shilla Hotel\n    신라호텔 중식당 라연\n * accompanied by Jeff', 'Dinner with Owner\n* dinner venue address?'],
+  ];
+  const book = utils.book_new();
+  utils.book_append_sheet(book, utils.aoa_to_sheet(rows), '일정표');
+  const analyzed = analyzeScheduleAttachments([{
+    filename: 'CPB.xlsx',
+    contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    content: Buffer.from(write(book, { type: 'buffer', bookType: 'xlsx' })),
+  }]).analyzed[0];
+
+  const blocks = datedExcelCalendarBlocks([analyzed], 2026);
+  const nov8Dinner = blocks.find(b => b.date === '2026-11-08');
+  assert.equal(nov8Dinner?.time, '18:00');
+  assert.equal(nov8Dinner?.extractedLocation, '신라호텔 중식당 라연');
+  assert.match(nov8Dinner?.clientAddress || '', /신라호텔 중식당 라연/);
+
+  const nov9Flight = blocks.find(b => b.date === '2026-11-09' && b.time === '15:00');
+  assert.equal(nov9Flight?.extractedLocation, '김포국제공항 국제선');
+  assert.deepEqual(nov9Flight?.extractedFlight, {
+    flightNumber: 'KE2102',
+    originAirport: 'HND',
+    destinationAirport: 'GMP',
+    role: 'arrival',
+  });
+
+  const nov9Unknown = blocks.find(b => b.date === '2026-11-09' && b.time === '18:00');
+  assert.equal(nov9Unknown?.clientAddress, undefined);
+  assert.equal(nov9Unknown?.extractedLocation, undefined);
+
+  const draft = createEmptyDraft({ emailId: 'cpb-test', subject: 'CPB Schedule', sender: 'sender@example.invalid', bodyText: '' });
+  const reconciled = reconcileSingleExcelCalendar(draft, blocks);
+  const wps = reconciled.waypoints || [];
+  assert.equal(wps.find(w => w.date === '2026-11-08')?.location, '신라호텔 중식당 라연');
+  assert.equal(wps.find(w => w.date === '2026-11-09' && w.time === '15:00')?.location, '김포국제공항 국제선');
+  assert.ok(wps.every(w => w.isPoiConfirmed === false));
+  assert.equal(reconciled.flightNumber, 'KE2102');
+  assert.deepEqual(reconciled.flights?.map(f => ({
+    flightNumber: f.flightNumber,
+    originAirport: f.originAirport,
+    destinationAirport: f.destinationAirport,
+    scheduledArrival: f.scheduledArrival,
+    role: f.role,
+  })), [{
+    flightNumber: 'KE2102',
+    originAirport: 'HND',
+    destinationAirport: 'GMP',
+    scheduledArrival: '15:00',
+    role: 'arrival',
+  }]);
+});

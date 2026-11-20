@@ -189,3 +189,29 @@ test('one real file plus inline signature image produces one attachment icon', (
   ];
   assert.deepEqual(selectUserEmailAttachments(files).map(f=>f.filename), ['schedule.xlsx']);
 });
+
+test('extractFlightEvidence captures natural-language arriving flight lines across line breaks', () => {
+  const prose = [
+    'Nov 9',
+    'Flight to Seoul',
+    'Arnold is arriving into',
+    'GMP at 3pm',
+    '(KE2102 from HND)',
+  ].join('\n');
+  const flights = extractFlightEvidence(prose, '2026-11-08');
+  assert.deepEqual(flights.map(f => ({
+    flightNumber: f.flightNumber,
+    date: f.date,
+    originAirport: f.originAirport,
+    destinationAirport: f.destinationAirport,
+    scheduledArrival: f.scheduledArrival,
+    role: f.role,
+  })), [{
+    flightNumber: 'KE2102',
+    date: '2026-11-09',
+    originAirport: 'HND',
+    destinationAirport: 'GMP',
+    scheduledArrival: '15:00',
+    role: 'arrival',
+  }]);
+});

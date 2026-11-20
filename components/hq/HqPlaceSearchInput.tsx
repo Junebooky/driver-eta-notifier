@@ -266,7 +266,7 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
           }}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className={`w-full bg-transparent text-sm text-slate-900 placeholder:text-slate-400 outline-none ${isNeutral ? 'font-medium' : 'font-semibold'}`}
+          className={`hq-place-search-input w-full min-w-0 bg-transparent text-xs sm:text-[13px] text-slate-900 placeholder:text-[11px] sm:placeholder:text-xs placeholder:text-slate-400 outline-none ${isNeutral ? 'font-medium' : 'font-semibold'}`}
         />
 
         {isSearching && (
