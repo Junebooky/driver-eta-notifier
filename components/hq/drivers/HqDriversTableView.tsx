@@ -33,7 +33,7 @@ import { HqButton, HqBadge, HqCard } from '@/components/hq/ui';
 import { HqDriverEditModal } from './HqDriverEditModal';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 import { HqModal } from '@/components/hq/ui/HqModal';
-import { HqDispatchCardCoveragePanel } from './HqDispatchCardCoveragePanel';
+import { HqDriverCardVehicleGroups } from './HqDriverCardVehicleGroups';
 import { HqDriverAssetManagerModal } from './HqDriverAssetManagerModal';
 import { HqDispatchCardBuilderModal } from './HqDispatchCardBuilderModal';
 
@@ -85,7 +85,6 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
   const onRetry = propOnRetry ?? hookState.refetch;
 
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
-  const [cardToolsOpen, setCardToolsOpen] = useState(false);
   const [affiliationFilter, setAffiliationFilter] = useState<'all' | 'employed' | 'freelance'>('all');
   const [residenceFilter, setResidenceFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'driving' | 'off' | 'active' | 'vacation'>('all');
@@ -268,17 +267,6 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
-        <HqButton
-          variant={cardToolsOpen ? 'secondary' : 'subtle'}
-          aria-expanded={cardToolsOpen}
-          onClick={() => {
-            haptics.lightTap();
-            setCardToolsOpen(value => !value);
-          }}
-        >
-          <span>배차카드 관리</span>
-          <ChevronDown className={`size-4 transition-transform duration-150 ${cardToolsOpen ? 'rotate-180' : ''}`} />
-        </HqButton>
         {/* Quick Add Driver Action */}
         <button
           type="button"
@@ -290,15 +278,6 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
         </button>
         </div>
       </div>
-
-      {cardToolsOpen && <HqDispatchCardCoveragePanel
-        drivers={drivers}
-        sharedCoverage={coverage}
-        sharedLoading={coverageLoading}
-        sharedError={coverageError}
-        onRefreshCoverage={refreshCoverage}
-        onAssetUpdated={handleCardAssetUpdated}
-        embedded />}
 
       {/* 1. Control & Filter Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-5 text-[12px] sm:px-6">
@@ -825,55 +804,19 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                             </div>
                           </div>
 
-                          {cardSummary.registeredSlots.length > 0 && (
-                            <div className="space-y-1.5">
-                              <p className="text-[11px] font-semibold text-[#526680]">
-                                등록된 차량 ({cardSummary.registeredSlots.length}대)
-                              </p>
-                              <div className="flex flex-wrap gap-1.5">
-                                {cardSummary.registeredSlots.map(slot => (
-                                  <button
-                                    key={slot.vehicleId}
-                                    type="button"
-                                    onClick={() => {
-                                      haptics.lightTap();
-                                      setCardPreviewTarget({ driverId: driver.id, vehiclePlate: slot.plate });
-                                    }}
-                                    className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-[11px] bg-[#F7F9FC] px-2.5 py-1.5 text-[12px] font-semibold text-[#253552] transition-colors hover:bg-[#EEF3FF]"
-                                  >
-                                    <span>{slot.plate}</span>
-                                    <HqBadge tone={slot.pc && slot.mobile ? 'selected' : 'warning'}>
-                                      {slot.pc && slot.mobile ? 'PC·모바일' : slot.pc ? 'PC만' : '모바일만'}
-                                    </HqBadge>
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {cardSummary.unregisteredSlots.length > 0 && (
-                            <div className={`space-y-1.5 ${cardSummary.registeredSlots.length > 0 ? 'border-t border-[#EDF1F6] pt-2.5' : ''}`}>
-                              <p className="text-[11px] font-semibold text-[#73839D]">
-                                미등록 차량 ({cardSummary.unregisteredSlots.length}대)
-                              </p>
-                              <div className="flex flex-wrap gap-1.5">
-                                {cardSummary.unregisteredSlots.map(slot => (
-                                  <button
-                                    key={slot.vehicleId}
-                                    type="button"
-                                    onClick={() => {
-                                      haptics.lightTap();
-                                      setCardBuilderTarget({ driver, vehicleId: slot.vehicleId });
-                                    }}
-                                    className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-[11px] bg-[#F7F9FC] px-2.5 py-1.5 text-[12px] font-medium text-[#60728A] transition-colors hover:bg-[#EEF3FF] hover:text-[#1E60F3]"
-                                  >
-                                    <span>{slot.plate}</span>
-                                    <HqBadge tone="neutral">미등록</HqBadge>
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                          <HqDriverCardVehicleGroups
+                             driverName={driver.name}
+                             slots={driverCoverage.slots}
+                             vehicles={coverage?.vehicles || []}
+                             onView={slot=>{
+                               haptics.lightTap();
+                               setCardPreviewTarget({driverId:driver.id,vehiclePlate:slot.plate});
+                             }}
+                             onCreate={slot=>{
+                               haptics.lightTap();
+                               setCardBuilderTarget({driver,vehicleId:slot.vehicleId});
+                             }}
+                           />
                         </HqCard>
                       </td>
                     </tr>
