@@ -1,5 +1,6 @@
 import type { FieldKnowledgeItem } from '@/types/fieldKnowledge';
 import { isValidFieldKnowledgeImageUrl } from '@/utils/hqKnowledgeImageUrl';
+import { validateFieldKnowledgeGuide } from '@/utils/fieldKnowledgeGuide';
 
 export type SharedKnowledgeItem = FieldKnowledgeItem & { version: number };
 export const FIELD_KNOWLEDGE_ORG = 'vip_limousine_korea';
@@ -52,12 +53,15 @@ export function normalizeKnowledgeItem(value: unknown):
       return { ok: false, error: '홈페이지 주소는 https://로 시작해야 합니다.' };
     }
   }
+  const guideResult = row.guide===undefined ? null : validateFieldKnowledgeGuide(row.guide);
+  if (guideResult && !guideResult.ok) return { ok:false,error:guideResult.error };
   const item: FieldKnowledgeItem = {
     id, title: clean.title, subtitle: clean.subtitle,
     category: row.category as FieldKnowledgeItem['category'],
     categoryBadge: clean.categoryBadge || String(row.category),
     description: clean.description, address: clean.address,
     imageUrl, photos: photos.map((p: string) => p.trim()),
+    ...(guideResult?.ok ? { guide: guideResult.guide } : {}),
     phone: clean.phone, website: clean.website,
     freeParkingNotice: clean.freeParkingNotice,
     sprinterWaiting: clean.sprinterWaiting,

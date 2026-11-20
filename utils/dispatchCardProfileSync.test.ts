@@ -59,8 +59,11 @@ test('builder saves shared identity once and regenerates every vehicle/variant w
   const store=readFileSync(join(process.cwd(),'lib/assets/driverAssetServerStore.ts'),'utf8');
   const profileApi=readFileSync(join(process.cwd(),'app/api/hq/drivers/assets/card-profile/route.ts'),'utf8');
   const uploadApi=readFileSync(join(process.cwd(),'app/api/hq/drivers/assets/upload/route.ts'),'utf8');
-  assert.match(builder,/정보 저장 · 전체 카드 갱신/);
-  assert.match(builder,/saveAllToAssetLibrary\(changedSharedInputs \? 'all' : 'missing'\)/);
+  // The shared save action now lives in the modal footer; no duplicated
+  // action below a long sidebar of photo sliders.
+  assert.match(builder,/기사 정보 반영 · 전체 카드 갱신/);
+  assert.match(builder,/void saveAllToAssetLibrary\(\)/);
+  assert.match(builder,/await persistCardSettings\(\)/);
   assert.match(builder,/for \(const variant of \['pc', 'mobile'\] as const\)/);
   assert.match(builder,/staleCardCount/);
   assert.match(builder,/profilePhotoChanged/);
