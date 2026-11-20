@@ -28,6 +28,8 @@ test('HQ header controls use light tooltips without removing their actions',()=>
   assert.match(header,/onOpenNotifications\?\.\(\)/);
   assert.match(header,/onOpenQuoteModal\(\)/);
   assert.match(header,/onRefresh\(\)/);
-  assert.match(header,/onOpenMobileMenu\(\)/);
+  assert.doesNotMatch(header,/onOpenMobileMenu/);
+  const nav=readFileSync(new URL('../components/hq/HqMobileNav.tsx',import.meta.url),'utf8');
+  assert.match(nav,/onMenu/);
   assert.match(header,/onOpenAdminLogin\(\)/);
 });

@@ -23,8 +23,10 @@ test('HQ all-menu and dispatch header open the same lazy, vehicle-first card fin
  assert.match(global,/<HqDispatchCardBuilderModal/);
  assert.match(global,/initialDriverId=\{previewTarget\.driverId\}/);
  assert.match(global,/initialVehiclePlate=\{previewTarget\.plate\}/);
- // No extra sixth navigation destination; existing five primary actions remain.
- assert.equal((mobileNav.match(/\{id:'/g)||[]).length,5);
+ // Four essential navigation/actions, without a redundant vehicle tab.
+ assert.equal((mobileNav.match(/\{id:'/g)||[]).length,4);
+ assert.doesNotMatch(mobileNav,/id:'vehicles'/);
+ assert.match(mobileNav,/id:'menu',label:'전체메뉴'/);
 });
 
 test('assigned booking opens the actual driver and plate-specific card; unassigned bookings remain guarded',()=>{

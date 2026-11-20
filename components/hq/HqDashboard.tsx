@@ -485,7 +485,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
   };
 
   return (
-    <div className="hq-app min-h-dvh bg-[#F8FAFC] flex font-sans antialiased text-slate-800 pb-[calc(88px+env(safe-area-inset-bottom))] lg:pb-0">
+    <div className="hq-app min-h-dvh bg-[#F8FAFC] flex font-sans antialiased text-slate-800 pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-0">
       {/* 1. Desktop Sidebar + Mobile Slide-over Drawer */}
       <HqSidebar
         activeTab={activeSidebarTab}
@@ -505,7 +505,6 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
             operationalCounts.totalActionNeeded,
             escalationSummary.alerts.length
           )}
-          onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
           onRefresh={() => fetchSharedBookings(false)}
           isRefreshing={isRefreshing}
           lastSyncedLabel={lastSyncedLabel}
@@ -644,8 +643,10 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
         </main>
       </div>
 
-      <HqMobileNav activeTab={activeSidebarTab} formOpen={isQuickDispatchModalOpen} actionCount={operationalCounts.totalActionNeeded}
-        onNavigate={navigateWorkspace} onQuickBooking={handleOpenQuickPhoneBookingModal} onMenu={() => setIsMobileSidebarOpen(true)} />
+      <HqMobileNav activeTab={activeSidebarTab} formOpen={isQuickDispatchModalOpen}
+        menuOpen={isMobileSidebarOpen} actionCount={operationalCounts.totalActionNeeded}
+        onNavigate={navigateWorkspace} onQuickBooking={handleOpenQuickPhoneBookingModal}
+        onMenu={() => setIsMobileSidebarOpen(true)} />
 
       {/* 4-A. Fast Booking & Quick Dispatch Modal (New Booking or Row-Click Edit / Assignment) */}
       {isQuickDispatchModalOpen && (
