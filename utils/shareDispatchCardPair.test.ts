@@ -31,11 +31,12 @@ test('one ZIP fallback contains both untouched PNG files under distinct names',a
 
 test('native share receives two different PNG attachments in one call',async()=>{
   const previous=Object.getOwnPropertyDescriptor(globalThis,'navigator');
-  let shared:ShareData|null=null,called=0;
+  const captured:{shared?:ShareData}={};
+  let called=0;
   Object.defineProperty(globalThis,'navigator',{
     configurable:true,value:{
       canShare:(data:ShareData)=>data.files?.length===2,
-      share:async(data:ShareData)=>{called++;shared=data;},
+      share:async(data:ShareData)=>{called++;captured.shared=data;},
     },
   });
   try{
@@ -43,9 +44,9 @@ test('native share receives two different PNG attachments in one call',async()=>
     assert.equal(supportsDispatchCardPairShare(files),true);
     assert.equal(await shareDispatchCardPngPair(files,'VIP_193호_5336_PC_Mobile'),'shared');
     assert.equal(called,1);
-    assert.equal(shared?.files?.length,2);
-    assert.equal(shared?.files?.[0],files[0]);
-    assert.equal(shared?.files?.[1],files[1]);
+    assert.equal(captured.shared?.files?.length,2);
+    assert.equal(captured.shared?.files?.[0],files[0]);
+    assert.equal(captured.shared?.files?.[1],files[1]);
   }finally{
     if(previous)Object.defineProperty(globalThis,'navigator',previous);
     else Reflect.deleteProperty(globalThis,'navigator');
@@ -70,17 +71,17 @@ test('cancelled native share never downloads files',async()=>{
 
 test('asset manager uses one pair action, requires both current cards, removes noisy badge and shortens copy',()=>{
   const source=read('components/hq/drivers/HqDriverAssetManagerModal.tsx');
-  assert.match(source,/shareDispatchCardPngPair\\(/);
-  assert.match(source,/onClick=\\{\\(\\)=>\\{void handleShareBoth\\(\\);\\}\\}/);
-  assert.match(source,/prepared\\.pc\\?\\.path===bundle\\?\\.pcInfo\\?\\.filePath/);
-  assert.match(source,/prepared\\.mobile\\?\\.path===bundle\\?\\.mobileInfo\\?\\.filePath/);
-  assert.match(source,/!bothFilesPrepared\\|\\|preparing\\.pc\\|\\|preparing\\.mobile/);
+  assert.match(source,/shareDispatchCardPngPair\(/);
+  assert.match(source,/onClick=\{\(\)=>\{void handleShareBoth\(\);\}\}/);
+  assert.match(source,/prepared\.pc\?\.path===bundle\?\.pcInfo\?\.filePath/);
+  assert.match(source,/prepared\.mobile\?\.path===bundle\?\.mobileInfo\?\.filePath/);
+  assert.match(source,/!bothFilesPrepared\|\|preparing\.pc\|\|preparing\.mobile/);
   assert.match(source,/두 카드 생성 후 공유/);
   assert.match(source,/PC·모바일 함께 공유/);
   assert.match(source,/PC·모바일 ZIP 저장/);
   assert.match(source,/기사 정보·사진 변경 시, 배차카드를 다시 갱신해 주세요/);
   assert.doesNotMatch(source,/PC·모바일 사용 가능/);
   assert.doesNotMatch(source,/PNG 이미지 공유/);
-  assert.doesNotMatch(source,/handleShare\\(variant\\)/);
-  assert.equal((source.match(/handleShareBoth\\(\\)/g)||[]).length,1);
+  assert.doesNotMatch(source,/handleShare\(variant\)/);
+  assert.equal((source.match(/handleShareBoth\(\)/g)||[]).length,1);
 });
