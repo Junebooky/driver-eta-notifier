@@ -33,7 +33,7 @@ import { HqModal } from '@/components/hq/ui/HqModal';
 import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
 import { CHAUFFEUR_POSITION_OPTIONS, formatBilingualChauffeurName, getEnglishPosition, validateDispatchCardProfile, type ChauffeurPositionCode } from '@/lib/dispatchCards/chauffeurIdentity';
 import { formatKoreanMobileInternationalInput, KOREA_MOBILE_PREFIX } from '@/utils/koreanInternationalPhone';
-import { formatKoreanEnglishName, resolveDispatchCardEnglishName } from '@/utils/koreanNameRomanization';
+import { formatKoreanEnglishName } from '@/utils/koreanNameRomanization';
 
 interface Props {
   isOpen: boolean;
@@ -78,16 +78,23 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   );
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [name, setName] = useState(driver.name);
-  // English name is filled automatically in one company-wide format; never choose among candidates.
-  // A previously saved spelling is retained until the Korean name itself changes.
+  // Show one company-standard name as a placeholder. A tap explicitly applies it;
+  // never silently save a suggestion or overwrite an already confirmed spelling.
+  const [englishName, setEnglishName] = useState('');
   const [storedEnglishName, setStoredEnglishName] = useState('');
   const [storedKoreanName, setStoredKoreanName] = useState('');
-  const englishName = useMemo(
-    () => name.trim() === storedKoreanName
-      ? resolveDispatchCardEnglishName(name, storedEnglishName)
-      : formatKoreanEnglishName(name),
-    [name, storedEnglishName, storedKoreanName],
-  );
+  const suggestedEnglishName = useMemo(() => formatKoreanEnglishName(name), [name]);
+  const applySuggestedEnglishName = () => {
+    if (suggestedEnglishName && !englishName.trim()) setEnglishName(suggestedEnglishName);
+  };
+  const updateKoreanName = (nextName: string) => {
+    if (nextName !== name) {
+      // The previously confirmed English spelling only belongs to the saved Korean name.
+      // If the Korean name is restored, restore that confirmed spelling too.
+      setEnglishName(nextName.trim() === storedKoreanName ? storedEnglishName : '');
+    }
+    setName(nextName);
+  };
   const [positionCode, setPositionCode] = useState<ChauffeurPositionCode | ''>('');
   const [savedIdentity, setSavedIdentity] = useState('');
   const [phone, setPhone] = useState(formatKoreanMobileInternationalInput(driver.phone || KOREA_MOBILE_PREFIX));
@@ -160,6 +167,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     if (!isOpen) return;
     const id = ++currentRequest.current;
     setName(driver.name);
+    setEnglishName('');
     setStoredEnglishName('');
     setStoredKoreanName('');
     setPositionCode('');
@@ -246,6 +254,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
         setPortraitSavedPlacement(placement);
         if (data.profile) {
           setName(data.profile.koreanName || driver.name);
+          setEnglishName(data.profile.englishName || '');
           setStoredEnglishName(data.profile.englishName || '');
           setStoredKoreanName((data.profile.koreanName || driver.name).trim());
           setPositionCode(data.profile.positionCode || '');
@@ -600,23 +609,45 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
             </div>
             <div className="space-y-3">
               {([
-                { label: '한국어 성명', value: name, onChange: setName, placeholder: '윤태준' },
-                { label: '영문 성명', value: englishName, onChange: (_value: string) => {}, placeholder: 'Tae-jun Yoon', readOnly: true },
-                { label: '전화번호', value: phone, onChange: setPhone, placeholder: '+82-10-1234-5678' },
+                { label: '한국어 성명', value: name, onChange: updateKoreanName, placeholder: '윤태준', id: 'dispatch-card-korean-name' },
+                { label: '영문 성명', value: englishName, onChange: setEnglishName, placeholder: suggestedEnglishName || 'Tae-jun Yoon', id: 'dispatch-card-english-name' },
+                { label: '전화번호', value: phone, onChange: setPhone, placeholder: '+82-10-1234-5678', id: 'dispatch-card-phone' },
               ] as const).map(field => (
-                <label key={field.label} className="block space-y-1.5">
-                  <span className="text-[12px] font-medium text-[#526680]">{field.label}</span>
-                  <HqInput value={field.value}
-                    readOnly={'readOnly' in field && field.readOnly === true}
-                    onChange={event => field.onChange(field.label === '전화번호'
-                      ? formatKoreanMobileInternationalInput(event.target.value) : event.target.value)}
-                    placeholder={field.placeholder} maxLength={field.label === '전화번호' ? 24 : 90}
-                    inputMode={field.label === '전화번호' ? 'tel' : 'text'} />
-                </label>
+                <div key={field.id} className="space-y-1.5">
+                  <label htmlFor={field.id} className="block text-[12px] font-medium text-[#526680]">
+                    {field.label}
+                  </label>
+                  <div className="relative">
+                    <HqInput
+                      id={field.id}
+                      value={field.value}
+                      onChange={event => field.onChange(field.label === '전화번호'
+                        ? formatKoreanMobileInternationalInput(event.target.value) : event.target.value)}
+                      onFocus={field.label === '영문 성명' ? applySuggestedEnglishName : undefined}
+                      onClick={field.label === '영문 성명' ? applySuggestedEnglishName : undefined}
+                      placeholder={field.placeholder}
+                      maxLength={field.label === '전화번호' ? 24 : 90}
+                      inputMode={field.label === '전화번호' ? 'tel' : 'text'}
+                      style={field.label === '영문 성명' && suggestedEnglishName && englishName !== suggestedEnglishName
+                        ? { paddingRight: '108px' } : undefined}
+                    />
+                    {field.label === '영문 성명' && suggestedEnglishName && englishName !== suggestedEnglishName && (
+                      <button
+                        type="button"
+                        disabled={busy || portraitSaving}
+                        onClick={() => setEnglishName(suggestedEnglishName)}
+                        className="absolute right-1 top-1/2 min-h-10 -translate-y-1/2 rounded-[10px] bg-[#F1F5FB] px-3 text-[12px] font-semibold text-[#1E60F3] disabled:opacity-50"
+                        aria-label={'추천 영문 성명 ' + suggestedEnglishName + ' 적용'}
+                      >
+                        {englishName ? '표준 적용' : '추천 적용'}
+                      </button>
+                    )}
+                  </div>
+                </div>
               ))}
               <p className="rounded-[12px] bg-[#F7F9FC] px-3 py-2.5 text-[11px] leading-relaxed text-[#718198]">
-                영문 성명은 회사 표준 형식으로 자동 표시돼요. 예: 윤태준 → Tae-jun Yoon.
-                이미 저장된 영문 표기는 유지하고, 한국어 이름을 바꾸면 새 표기가 자동 적용돼요.
+                영문 성명 입력창에 추천 이름이 표시돼요. 입력창을 한 번 누르거나 ‘추천 적용’을 누르면 채워집니다.
+                이미 저장된 영문 이름은 그대로 유지하고, 한국어 성명을 바꾸면 추천도 함께 바뀌어요.
               </p>
               <div className="space-y-1.5">
                 <span className="block text-[12px] font-medium text-[#526680]">직책</span>
