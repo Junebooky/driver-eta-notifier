@@ -16,19 +16,25 @@ test('all active stock drivers map to every photo-ready vehicle, including new c
   const drivers=[
     {id:'d1',driver_name:'김민수',phone:'01012345678',driver_meta:readyIdentity},
     {id:'d2',driver_name:'박민수',phone:'01012345678',driver_meta:{}},
+    {id:'d3',driver_name:'윤태준',phone:'01012345678',driver_meta:{
+      dispatch_card_identity:{koreanName:'윤태준',englishName:'',positionCode:'chauffeur',phone:'01012345678'},
+    }},
   ];
   const sprinter9982=cars.find(c=>c.plateShort==='9982')!;
-  const data=buildDispatchCardCoverage(drivers,cars,[{driver_id:'d1'},{driver_id:'d2'}],[
+  const data=buildDispatchCardCoverage(drivers,cars,[{driver_id:'d1'},{driver_id:'d2'},{driver_id:'d3'}],[
     {driver_id:'d1',vehicle_id:sprinter9982.uuid,variant:'mobile'},
     {driver_id:'d1',vehicle_id:sprinter9982.uuid,variant:'pc'},
     {driver_id:'d1',vehicle_id:sprinter9982.uuid,variant:'mobile'}, // duplicate history
   ]);
   assert.equal(data.vehicles.length,13);
-  assert.equal(data.requiredVariants,52);
+  assert.equal(data.requiredVariants,78);
   assert.equal(data.savedVariants,2);
-  assert.equal(data.missingVariants,50);
+  assert.equal(data.missingVariants,76);
   assert.equal(data.drivers[0].identityReady,true);
   assert.equal(data.drivers[1].identityReady,false);
+  assert.equal(data.drivers[1].englishNameReady,true);
+  assert.equal(data.drivers[2].englishNameReady,true);
+  assert.equal(data.drivers[2].identityReady,true); // No saved English name: fixed format generated automatically
   assert.equal(data.drivers[1].slots.length,13);
   assert.equal(data.drivers[0].slots.find(s=>s.vehicleId===sprinter9982.uuid)?.mobile,true);
   assert.equal(data.drivers[0].slots.find(s=>s.vehicleId===sprinter9982.uuid)?.pc,true);

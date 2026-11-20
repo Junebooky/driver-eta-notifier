@@ -1,7 +1,8 @@
 /**
- * Korean personal-name romanization suggestions (not identity verification).
- * Hangul syllable decomposition + conventional family-name options.
- * Keep approved passport/preferred English spelling untouched.
+ * Single, consistent VIP LIMOUSINE KOREA card format: Given-name Syllables-Hyphenated Surname.
+ * Example: 윤태준 -> Tae-jun Yoon.
+ * This is name romanization, not translation or legal/passport identity verification.
+ * Already saved English names are preserved by the calling profile workflow.
  */
 const INITIAL = ['g','kk','n','d','tt','r','m','b','pp','s','ss','','j','jj','ch','k','t','p','h'];
 const VOWEL = ['a','ae','ya','yae','eo','e','yeo','ye','o','wa','wae','oe','yo','u','wo','we','wi','yu','eu','ui','i'];
@@ -31,22 +32,20 @@ function romanizeSyllable(char:string):string {
 function capitalized(value:string):string {
   return value ? value[0].toUpperCase()+value.slice(1) : '';
 }
-/** Suggestions only: even a common surname has multiple valid personal spellings. */
-export function suggestKoreanEnglishNames(input:string):string[] {
+/** One deterministic display name; no candidate selection UI or network API. */
+export function formatKoreanEnglishName(input:string):string {
   const name=input.replace(/\s+/g,'').trim();
-  if(!/^[가-힣]{2,6}$/.test(name))return [];
+  if(!/^[가-힣]{2,6}$/.test(name))return '';
   const familySize=DOUBLE_FAMILY.some(s=>name.startsWith(s))?2:1;
-  if(name.length<=familySize)return [];
+  if(name.length<=familySize)return '';
   const family=name.slice(0,familySize),given=name.slice(familySize);
-  const familyPreferred=FAMILY_NAMES[family]||capitalized([...family].map(romanizeSyllable).join(''));
-  const familyRevised=capitalized([...family].map(romanizeSyllable).join(''));
-  const givenPieces=[...given].map(romanizeSyllable);
-  const givenJoined=capitalized(givenPieces.join(''));
-  const givenHyphen=givenPieces.length>1 ? capitalized(givenPieces[0])+'-'+givenPieces.slice(1).join('') : givenJoined;
-  // Cards currently display a given-name-first English identity.
-  return [...new Set([
-    givenJoined+' '+familyPreferred,
-    givenHyphen+' '+familyPreferred,
-    givenJoined+' '+familyRevised,
-  ])].filter(Boolean);
+  const surname=FAMILY_NAMES[family]||capitalized([...family].map(romanizeSyllable).join(''));
+  const givenName=[...given].map(romanizeSyllable).map((part,i)=>i===0?capitalized(part):part).join('-');
+  return givenName+' '+surname;
+}
+
+/** Respect an already approved spelling; otherwise fill the fixed card format. */
+export function resolveDispatchCardEnglishName(koreanName:string,existingEnglishName?:string|null):string {
+  const saved=existingEnglishName?.trim().replace(/\s+/g,' ')||'';
+  return saved||formatKoreanEnglishName(koreanName);
 }

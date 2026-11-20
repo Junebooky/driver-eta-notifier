@@ -33,7 +33,7 @@ import { HqModal } from '@/components/hq/ui/HqModal';
 import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
 import { CHAUFFEUR_POSITION_OPTIONS, formatBilingualChauffeurName, getEnglishPosition, validateDispatchCardProfile, type ChauffeurPositionCode } from '@/lib/dispatchCards/chauffeurIdentity';
 import { formatKoreanMobileInternationalInput, KOREA_MOBILE_PREFIX } from '@/utils/koreanInternationalPhone';
-import { suggestKoreanEnglishNames } from '@/utils/koreanNameRomanization';
+import { formatKoreanEnglishName, resolveDispatchCardEnglishName } from '@/utils/koreanNameRomanization';
 
 interface Props {
   isOpen: boolean;
@@ -78,8 +78,16 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   );
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [name, setName] = useState(driver.name);
-  const [englishName, setEnglishName] = useState('');
-  const englishNameSuggestions = useMemo(() => suggestKoreanEnglishNames(name), [name]);
+  // English name is filled automatically in one company-wide format; never choose among candidates.
+  // A previously saved spelling is retained until the Korean name itself changes.
+  const [storedEnglishName, setStoredEnglishName] = useState('');
+  const [storedKoreanName, setStoredKoreanName] = useState('');
+  const englishName = useMemo(
+    () => name.trim() === storedKoreanName
+      ? resolveDispatchCardEnglishName(name, storedEnglishName)
+      : formatKoreanEnglishName(name),
+    [name, storedEnglishName, storedKoreanName],
+  );
   const [positionCode, setPositionCode] = useState<ChauffeurPositionCode | ''>('');
   const [savedIdentity, setSavedIdentity] = useState('');
   const [phone, setPhone] = useState(formatKoreanMobileInternationalInput(driver.phone || KOREA_MOBILE_PREFIX));
@@ -152,7 +160,8 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     if (!isOpen) return;
     const id = ++currentRequest.current;
     setName(driver.name);
-    setEnglishName('');
+    setStoredEnglishName('');
+    setStoredKoreanName('');
     setPositionCode('');
     setPhone(formatKoreanMobileInternationalInput(driver.phone || KOREA_MOBILE_PREFIX));
     setPhotoUrl('');
@@ -237,7 +246,8 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
         setPortraitSavedPlacement(placement);
         if (data.profile) {
           setName(data.profile.koreanName || driver.name);
-          setEnglishName(data.profile.englishName || '');
+          setStoredEnglishName(data.profile.englishName || '');
+          setStoredKoreanName((data.profile.koreanName || driver.name).trim());
           setPositionCode(data.profile.positionCode || '');
           setPhone(formatKoreanMobileInternationalInput(data.profile.phone || driver.phone || KOREA_MOBILE_PREFIX));
           const saved = validateDispatchCardProfile(data.profile);
@@ -269,6 +279,8 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
       if (!response.ok || result.ok !== true) throw new Error(result.error || '배차카드 기사 정보 저장 실패');
       setPortraitSavedPlacement(normalizePortraitPlacement(result.placement));
       setSavedIdentity(JSON.stringify(result.profile));
+      setStoredEnglishName(result.profile.englishName);
+      setStoredKoreanName(result.profile.koreanName);
     } finally {
       setPortraitSaving(false);
     }
@@ -589,41 +601,23 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
             <div className="space-y-3">
               {([
                 { label: '한국어 성명', value: name, onChange: setName, placeholder: '윤태준' },
-                { label: '영문 성명', value: englishName, onChange: setEnglishName, placeholder: 'Tae-jun Yun' },
+                { label: '영문 성명', value: englishName, onChange: (_value: string) => {}, placeholder: 'Tae-jun Yoon', readOnly: true },
                 { label: '전화번호', value: phone, onChange: setPhone, placeholder: '+82-10-1234-5678' },
               ] as const).map(field => (
                 <label key={field.label} className="block space-y-1.5">
                   <span className="text-[12px] font-medium text-[#526680]">{field.label}</span>
                   <HqInput value={field.value}
+                    readOnly={'readOnly' in field && field.readOnly === true}
                     onChange={event => field.onChange(field.label === '전화번호'
                       ? formatKoreanMobileInternationalInput(event.target.value) : event.target.value)}
                     placeholder={field.placeholder} maxLength={field.label === '전화번호' ? 24 : 90}
                     inputMode={field.label === '전화번호' ? 'tel' : 'text'} />
                 </label>
               ))}
-              {englishNameSuggestions.length > 0 && (
-                <div className="rounded-[14px] bg-[#F7F9FC] p-3">
-                  <p className="text-[12px] font-semibold text-[#455B78]">영문 성명 추천</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {englishNameSuggestions.map(candidate => (
-                      <button type="button" key={candidate}
-                        disabled={busy || portraitSaving}
-                        aria-pressed={englishName === candidate}
-                        onClick={() => setEnglishName(candidate)}
-                        className={'min-h-10 rounded-[11px] px-3 text-[12px] font-medium transition-colors ' +
-                          (englishName === candidate
-                            ? 'bg-[#1E60F3] text-white'
-                            : 'bg-white text-[#455B78] shadow-[0_2px_8px_rgba(25,42,67,0.05)] hover:bg-[#EEF2F8]')}>
-                        {candidate}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="mt-2 text-[11px] leading-relaxed text-[#7A8AA1]">
-                    발음 기준 자동 추천이에요. 여권·본인이 사용하는 영문 이름이 있다면 직접 입력한 표기를 우선하세요.
-                    추천을 눌러도 저장 전까지는 기존 배차카드에 반영되지 않아요.
-                  </p>
-                </div>
-              )}
+              <p className="rounded-[12px] bg-[#F7F9FC] px-3 py-2.5 text-[11px] leading-relaxed text-[#718198]">
+                영문 성명은 회사 표준 형식으로 자동 표시돼요. 예: 윤태준 → Tae-jun Yoon.
+                이미 저장된 영문 표기는 유지하고, 한국어 이름을 바꾸면 새 표기가 자동 적용돼요.
+              </p>
               <div className="space-y-1.5">
                 <span className="block text-[12px] font-medium text-[#526680]">직책</span>
                 <HqSearchSelect

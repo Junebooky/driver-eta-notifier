@@ -6,6 +6,7 @@ import type {HqDriverSummary} from '@/types/driverHq';
 import type {DispatchCardCoverage,DispatchCardCoverageDriver} from '@/lib/dispatchCards/dispatchCardCoverage';
 import {resolveDispatchCardPhotos,dispatchCardVehicleLabel} from '@/lib/dispatchCards/dispatchCardAssets';
 import {validateDispatchCardProfile,getEnglishPosition,formatBilingualChauffeurName} from '@/lib/dispatchCards/chauffeurIdentity';
+import {resolveDispatchCardEnglishName} from '@/utils/koreanNameRomanization';
 import {normalizePortraitPlacement} from '@/lib/dispatchCards/portraitCrop';
 import {renderDispatchCard} from '@/lib/dispatchCards/renderDispatchCard';
 import {HqDispatchCardBuilderModal} from './HqDispatchCardBuilderModal';
@@ -47,14 +48,15 @@ export function HqDispatchCardCoveragePanel({drivers,onAssetUpdated}:{
   const blocked=coverage?.drivers.filter(d=>!d.identityReady&&d.missingVariants>0)||[];
 
   /** Desktop or mobile: one active render at a time, safe to retry after closing.
-   * Use the already-approved English identity; recommendations are never auto-published.
+   * Keep stored English names where present; missing names use the fixed card romanization.
+   * No candidate selection UI, and existing card assets are never overwritten.
    * Backend skipIfExists protects existing PC/mobile versions even under races.
    */
   const generateAllMissing=async()=>{
     if(!coverage||generating||!ready.length)return;
     const planned=ready.reduce((n,d)=>n+d.missingVariants,0);
     if(!window.confirm('기사 '+ready.length+'명, 미생성 PC·모바일 카드 최대 '+planned+
-      '장을 추가할까요?\n기존 카드는 유지하고, 영문 이름·직책 미확정 기사 '+blocked.length+
+      '장을 추가할까요?\n기존 카드는 유지하고, 기사 정보 미완성 '+blocked.length+
       '명은 생성하지 않습니다.'))return;
     cancelRef.current=false;setGenerating(true);setError('');setResult('');
     let created=0,skipped=0,failed=0;
@@ -68,7 +70,13 @@ export function HqDispatchCardCoveragePanel({drivers,onAssetUpdated}:{
           fetch('/api/hq/drivers/assets/card-profile?driverId='+id,{cache:'no-store'}),
         ]);
         const [profileJson,portraitJson]=await Promise.all([profileResponse.json(),portraitResponse.json()]);
-        const identity=validateDispatchCardProfile(portraitJson.profile);
+        const rawProfile=portraitJson.profile || {};
+        const koreanName=String(rawProfile.koreanName || driver.name).trim();
+        const identity=validateDispatchCardProfile({
+          ...rawProfile,
+          koreanName,
+          englishName:resolveDispatchCardEnglishName(koreanName,rawProfile.englishName),
+        });
         const imagePath=typeof profileJson.profile?.filePath==='string'?profileJson.profile.filePath:'';
         if(!profileResponse.ok||!portraitResponse.ok||!identity||!imagePath) {
           failed+=driver.missingVariants;
@@ -179,7 +187,7 @@ export function HqDispatchCardCoveragePanel({drivers,onAssetUpdated}:{
       </button>
     </div>
     {blocked.length>0&&<p className="mt-3 flex items-start gap-2 text-[12px] leading-relaxed text-[#8B6B4C]">
-      <ShieldAlert className="mt-0.5 size-4 shrink-0"/> 기사 {blocked.length}명은 영문 이름·직책 또는 프로필 확인이 필요해요. 추천 영문 이름은 확인 후 저장할 수 있습니다.
+      <ShieldAlert className="mt-0.5 size-4 shrink-0"/> 기사 {blocked.length}명은 직책·연락처 또는 프로필 확인이 필요해요. 영문 성명은 회사 표준 형식으로 자동 입력됩니다.
     </p>}
     {generating&&<div role="status" className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-[#F7F9FC] p-3 text-[12px] text-[#526680]">
       <span className="min-w-0 break-words">{progress||'배차카드 일괄 생성 준비 중…'}</span>
@@ -200,7 +208,7 @@ export function HqDispatchCardCoveragePanel({drivers,onAssetUpdated}:{
               {!driver.identityReady&&<p className="mt-1 text-[11px] text-[#A07954]">
                 {[
                   !driver.portraitReady?'프로필 사진':null,
-                  !driver.englishNameReady?'영문 성명':null,
+                  !driver.englishNameReady?'영문 성명 생성 불가':null,
                   !driver.positionReady?'직책':null,
                   ].filter(Boolean).join(' · ')||'기사 연락처/표기'} 확인 필요
               </p>}
