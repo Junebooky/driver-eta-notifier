@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { requireHqAdmin } from '@/lib/auth/serverAuth';
 import { HqCustomer, CustomerContact } from '@/types/customerHq';
+import {readPersistedCustomerContacts,updateContactMemoById} from '@/lib/customers/contactMemo';
+import {normalizeContactChannels,updateContactDetails} from '@/lib/customers/contactChannels';
 import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
 
 export const dynamic = 'force-dynamic';
@@ -138,6 +140,8 @@ export async function POST(req: NextRequest) {
       contactName: rawContact,
       contactPhone = '',
       contactEmail = '',
+      contactPhones,
+      contactEmails,
       role = '예약 담당자',
       department = '의전예약',
       notes = '',
@@ -174,8 +178,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const cleanPhone = contactPhone.includes('@') ? '' : contactPhone.trim();
-    const cleanEmail = contactEmail.trim().toLowerCase();
+    let cleanPhone = typeof contactPhone==='string' && !contactPhone.includes('@') ? contactPhone.trim() : '';
+    let cleanEmail = typeof contactEmail==='string' ? contactEmail.trim().toLowerCase() : '';
+    const hasMultipleMethods = contactPhones!==undefined || contactEmails!==undefined;
+    let multiPhones=cleanPhone?[cleanPhone]:[];
+    let multiEmails=cleanEmail?[cleanEmail]:[];
+    if(hasMultipleMethods){
+      const checked=normalizeContactChannels({name:contactName,role,department,
+        phones:contactPhones===undefined?multiPhones:contactPhones,
+        emails:contactEmails===undefined?multiEmails:contactEmails});
+      if(!checked.ok)return NextResponse.json({ok:false,success:false,error:checked.error},{status:400});
+      multiPhones=checked.value.phones;
+      multiEmails=checked.value.emails;
+      cleanPhone=multiPhones[0]||'';
+      cleanEmail=multiEmails[0]||'';
+    }
     const targetNorm = normalizeCompanyName(companyName);
 
     // 1. Fetch current customers from DB to ensure deduplication
@@ -284,6 +301,8 @@ export async function POST(req: NextRequest) {
         role: role || '예약 담당자',
         phone: cleanPhone,
         email: cleanEmail,
+        phones: multiPhones,
+        emails: multiEmails,
         department: department || '의전예약',
         isPrimary: existingContacts.length === 0,
       };
@@ -352,6 +371,8 @@ export async function POST(req: NextRequest) {
       role: role || '예약 담당자',
       phone: cleanPhone,
       email: cleanEmail,
+      phones: multiPhones,
+      emails: multiEmails,
       department: department || '의전예약',
       isPrimary: true,
     };
@@ -488,6 +509,67 @@ export async function PUT(req: NextRequest) {
   } catch (err: any) {
     console.error('[HQ Customers PUT] Unhandled error:', err);
     return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
+  }
+}
+
+/**
+ * PATCH: Update exactly one contact's internal memo. Keep company-wide notes,
+ * other contacts and all other pricing_preset keys intact.
+ */
+export async function PATCH(req:NextRequest){
+  try{
+    const auth=await requireHqAdmin(req);
+    if(!auth.ok||!auth.session)return NextResponse.json({ok:false,error:auth.error},{status:auth.statusCode});
+    const body=await req.json().catch(()=>null);
+    const id=typeof body?.id==='string'?body.id.trim():'';
+    const contactId=typeof body?.contactId==='string'?body.contactId.trim():'';
+    const editingDetails=body?.contact!==undefined;
+    const memo=body?.memo;
+    if(!id||!contactId||(!editingDetails&&(typeof memo!=='string'||memo.length>3000))){
+      return NextResponse.json({ok:false,error:'고객사·담당자 ID 및 수정할 내용을 확인해 주세요.'},{status:400});
+    }
+    const details=editingDetails?normalizeContactChannels(body.contact):null;
+    if(details&&!details.ok)return NextResponse.json({ok:false,error:details.error},{status:400});
+
+    const {data:row,error:readError}=await supabaseAdmin.from('customers')
+      .select('id,pricing_preset,contact_person,phone,email,updated_at')
+      .eq('id',id).maybeSingle();
+    if(readError)return NextResponse.json({ok:false,error:readError.message},{status:500});
+    if(!row)return NextResponse.json({ok:false,error:'고객사를 찾을 수 없습니다.'},{status:404});
+    const preset=row.pricing_preset&&typeof row.pricing_preset==='object'
+      ?row.pricing_preset as Record<string,unknown>:{};
+    const contacts=readPersistedCustomerContacts({...row,pricing_preset:preset});
+    const original=contacts.find(person=>person.id===contactId);
+    if(!original)return NextResponse.json({ok:false,error:'해당 담당자를 찾을 수 없습니다.'},{status:404});
+    const updated=details?.ok
+      ?updateContactDetails(contacts,contactId,details.value)
+      :updateContactMemoById(contacts,contactId,memo);
+    if(!updated.found)return NextResponse.json({ok:false,error:'해당 담당자를 찾을 수 없습니다.'},{status:404});
+
+    const changes:Record<string,unknown>={
+      pricing_preset:{...preset,contacts:updated.contacts},updated_at:new Date().toISOString(),
+    };
+    // Sync legacy top-level contact fields only for the primary contact.
+    // Editing a secondary person's details must never replace the company's
+    // representative phone/email/name.
+    const isPrimary=Boolean(original.isPrimary)||
+      (row.contact_person&&row.contact_person.trim()===original.name.trim()&&
+       !contacts.some(person=>person.isPrimary));
+    if(details?.ok&&isPrimary){
+      changes.contact_person=details.value.name;
+      changes.phone=details.value.phones[0]||'';
+      changes.email=details.value.emails[0]||'';
+    }
+    // Guard against concurrent JSONB edits (e.g. notes, other contacts).
+    let query=supabaseAdmin.from('customers').update(changes).eq('id',id);
+    query=row.updated_at?query.eq('updated_at',row.updated_at):query.is('updated_at',null);
+    const {data:saved,error:writeError}=await query.select('id').maybeSingle();
+    if(writeError)return NextResponse.json({ok:false,error:writeError.message},{status:500});
+    if(!saved)return NextResponse.json({ok:false,error:'고객사 정보가 다른 곳에서 변경됐습니다. 새로고침 후 다시 저장해 주세요.'},{status:409});
+    return NextResponse.json({ok:true,contactId,
+      ...(details?.ok?{contact:updated.contacts.find(person=>person.id===contactId)}:{memo})});
+  }catch(error){
+    return NextResponse.json({ok:false,error:error instanceof Error?error.message:'담당자 저장 오류'},{status:500});
   }
 }
 

@@ -6,11 +6,18 @@ export interface CustomerContact {
   id: string;
   name: string;
   role: string;
+  /** First preferred number. Kept for legacy CRM consumers. */
   phone: string;
+  /** First preferred email. Kept for legacy CRM consumers. */
   email: string;
+  /** Ordered contact channels; the first is the preferred one. */
+  phones?: string[];
+  emails?: string[];
   department?: string;
   language?: string;
   isPrimary?: boolean;
+  /** Internal note for this specific contact; separate from company-wide notes. */
+  memo?: string;
 }
 
 export interface CustomerRequestItem {
