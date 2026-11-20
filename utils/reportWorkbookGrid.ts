@@ -23,7 +23,8 @@ function sheetEntry(entries:Record<string,Uint8Array>,sheet:string){
  return full;
 }
 export const excelCellColumn=(col:string)=>COLS.includes(col)&&col.length===1;
-export type WorkbookViewRow={row:number;cells:string[];locked:string[]};
+/** row = actual XLSX row for edits/source links; displayRow = stable visible report sequence. */
+export type WorkbookViewRow={row:number;displayRow:number|null;cells:string[];locked:string[]};
 /** Read-only view options; sorting never changes a stored Excel row index. */
 export type WorkbookSortColumn=string;
 export type WorkbookGridQuery={
@@ -58,6 +59,11 @@ export function readWorkbookGrid(bytes:Uint8Array,month:string,limit=300,offset=
   after:actualRecords[index],before:row,gap:row-actualRecords[index]-1,
  })).filter(x=>x.gap>=3).sort((x,y)=>y.gap-x.gap);
  const rowGap=discontinuities[0]??null;
+ // A formatted XLSX can store the next chauffeur report at row 200 while the
+ // preceding record occupies row 61. Show a continuous report SEQUENCE in HQ,
+ // but never swap the actual row used for edits, source links or Excel exports.
+ // Determine the sequence from the complete month, before filters or paging.
+ const displayRowByActual=new Map(actualRecords.map((row,index)=>[row,index+2]));
  const collator=new Intl.Collator('ko-KR',{numeric:true,sensitivity:'base'});
  // Footer calculations and detached handwritten notes are not vehicle/customer
  // filter choices. A report row has a person/company or a date plus a plate.
@@ -71,6 +77,12 @@ export function readWorkbookGrid(bytes:Uint8Array,month:string,limit=300,offset=
  // A report's location is always its actual Excel row, even when filters were set.
  let visible=focusRow===undefined&&selected.length?
   live.filter(row=>selected.every(([col,value])=>cell(col,row)===value)):live;
+ // When the original has a physical gap, keep all dated report records together
+ // above detached footer calculations/notes. All cells and actual row IDs remain.
+ if(rowGap&&!query.sortBy){
+  const reports=visible.filter(row=>displayRowByActual.has(row));
+  visible=[...reports,...visible.filter(row=>!displayRowByActual.has(row))];
+ }
  if(focusRow===undefined&&query.sortBy&&COLS.includes(query.sortBy)){
   const column=query.sortBy,sign=query.sortDirection==='desc'?-1:1;
   visible=[...visible].sort((a,b)=>{
@@ -94,7 +106,7 @@ export function readWorkbookGrid(bytes:Uint8Array,month:string,limit=300,offset=
   offset=Math.floor(target/limit)*limit;
  }
  const rows:WorkbookViewRow[]=visible.slice(offset,offset+limit).map(row=>({
-  row,cells:columns.map(col=>{const value=sheet.cells[col+row]?.v;if(col==='A'&&typeof value==='number'&&value>20000&&value<100000){return new Date((book.date1904?Date.UTC(1904,0,1):Date.UTC(1899,11,30))+value*86400000).toISOString().slice(0,10);}return String(value??'');}),
+  row,displayRow:displayRowByActual.get(row)??null,cells:columns.map(col=>{const value=sheet.cells[col+row]?.v;if(col==='A'&&typeof value==='number'&&value>20000&&value<100000){return new Date((book.date1904?Date.UTC(1904,0,1):Date.UTC(1899,11,30))+value*86400000).toISOString().slice(0,10);}return String(value??'');}),
   locked:columns.filter(col=>formulas.has(col+row))
  }));
  return {months:workbookMonthSheetNames(book.SheetNames),month,rows,total:visible.length,unfilteredTotal:live.length,filterOptions,rowGap,manualRows:addedRows,offset,limit,columns,headers:columns.map((col,i)=>i<12?DEFAULT_HEADERS[i]:String(sheet.cells[col+'1']?.v??col+'열'))};
