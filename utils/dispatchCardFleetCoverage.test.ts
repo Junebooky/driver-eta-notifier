@@ -73,19 +73,21 @@ test('101호 7681 stays Carnival HI-LIMOUSINE even if DB still carries old ordin
   assert.match(ui,/onView\(slot\)/);
 });
 
-test('card manager shares the IMAGE as a PNG file, never only a signed URL',()=>{
+test('card manager shares both PNGs in a single action, never only signed URLs',()=>{
   const manager=source('components/hq/drivers/HqDriverAssetManagerModal.tsx');
   const share=source('utils/shareDispatchCardPng.ts');
   const view=source('components/hq/drivers/HqDriversTableView.tsx');
   const coverage=source('lib/dispatchCards/dispatchCardCoverage.ts');
   assert.match(share,/new File\(\[png\]/);
-  assert.match(share,/navigator\.share\(\{files:\[file\]/);
-  assert.match(share,/downloadDispatchCardPng\(file\)/);
+  assert.match(share,/navigator\.share\(\{/);
+  assert.match(share,/files:\[\.\.\.files\]/);
+  assert.match(share,/createDispatchCardPairZip/);
   assert.match(share,/\/api\/hq\/drivers\/assets\/preview\?path=/);
   assert.match(manager,/prepareSavedDispatchCardPng\(path,fileName\)/);
-  assert.match(manager,/shareDispatchCardPng\(chosen.file\)/);
-  assert.match(manager,/PNG 이미지 공유/);
-  assert.match(manager,/PNG 다운로드/);
+  assert.match(manager,/shareDispatchCardPngPair\(/);
+  assert.match(manager,/PC·모바일 함께 공유/);
+  assert.match(manager,/PC·모바일 ZIP 저장/);
+  assert.doesNotMatch(manager,/PNG 이미지 공유|PNG 다운로드/);
   assert.match(manager,/selectedVehiclePhotoReady/);
   assert.match(coverage,/imageReady: imageReadyByVehicle\.get/);
   assert.match(view,/완료 \{cardSummary\.completeVehicles\}\/\{cardSummary\.totalVehicles\}대/);
