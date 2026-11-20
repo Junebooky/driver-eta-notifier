@@ -42,8 +42,8 @@ test('driver profile details, schedule and table actions remain hooked up',()=>{
   assert.match(table,/<HqDriverCardPickerModal/);
   assert.match(table,/<HqDispatchCardQuickFindModal/);
   assert.doesNotMatch(table,/setMenuOpenDriverId|setDriverToRemove/);
-  assert.match(detail,/deleteDriver\\(activeDriver\\.id\\)/);
-  assert.match(detail,/setShowRemoveConfirm\\(true\\)/);
+  assert.match(detail,/deleteDriver\(activeDriver\.id\)/);
+  assert.match(detail,/setShowRemoveConfirm\(true\)/);
   assert.match(detail,/<HqModal/);
   assert.match(detail,/onSelectDriver\(driver\.id\)/);
   assert.match(detail,/onBackToTable/);
