@@ -1,4 +1,19 @@
 {
+  "genesis/g90-lwb/black/4280": {
+    "exterior": "/images/dispatch-cards/genesis/g90-lwb/black/4280/exterior.webp",
+    "interiorOne": "/images/dispatch-cards/genesis/g90-lwb/black/4280/interior-01.webp",
+    "interiorTwo": "/images/dispatch-cards/genesis/g90-lwb/black/4280/interior-02.webp"
+  },
+  "genesis/g90-lwb/navy/1336": {
+    "exterior": "/images/dispatch-cards/genesis/g90-lwb/navy/1336/exterior.webp",
+    "interiorOne": "/images/dispatch-cards/genesis/g90-lwb/navy/1336/interior-01.webp",
+    "interiorTwo": "/images/dispatch-cards/genesis/g90-lwb/navy/1336/interior-02.webp"
+  },
+  "genesis/g90-standard/8839": {
+    "exterior": "/images/dispatch-cards/genesis/g90-standard/8839/exterior.webp",
+    "interiorOne": "/images/dispatch-cards/genesis/g90-standard/8839/interior-01.webp",
+    "interiorTwo": "/images/dispatch-cards/genesis/g90-standard/8839/interior-02.webp"
+  },
   "hyundai/staria-limousine": {
     "exterior": "/images/dispatch-cards/hyundai/staria-limousine/exterior.webp",
     "interiorOne": "/images/dispatch-cards/hyundai/staria-limousine/interior-01.webp",
