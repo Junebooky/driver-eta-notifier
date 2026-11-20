@@ -230,7 +230,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
   };
 
   return (
-    <div className="relative z-20 rounded-[23px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)]">
+    <div className="relative z-10 rounded-[23px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)]">
       {/* Card Header: Icon + Title + Count */}
       <div className="flex items-center justify-between gap-3 px-5 py-5 sm:px-6">
         <div className="flex items-center gap-2.5">
@@ -292,7 +292,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                 setAffiliationFilter('all');
                 setCurrentPage(1);
               }}
-              className={`min-h-10 cursor-pointer rounded-[13px] px-3.5 text-[12px] font-semibold transition-colors ${affiliationFilter === 'all'
+              className={`min-h-10 cursor-pointer whitespace-nowrap rounded-[13px] px-3.5 text-[12px] font-semibold transition-colors ${affiliationFilter === 'all'
                 ? 'bg-[#EEF3FF] text-[#1E60F3] font-semibold'
                 : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.04)] hover:bg-[#F7F9FC] hover:text-[#17233B]'
                 }`}
@@ -308,7 +308,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                 setAffiliationFilter('employed');
                 setCurrentPage(1);
               }}
-              className={`min-h-10 cursor-pointer rounded-[13px] px-3.5 text-[12px] font-semibold transition-colors ${affiliationFilter === 'employed'
+              className={`min-h-10 cursor-pointer whitespace-nowrap rounded-[13px] px-3.5 text-[12px] font-semibold transition-colors ${affiliationFilter === 'employed'
                 ? 'bg-[#EEF3FF] text-[#1E60F3] font-semibold'
                 : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.04)] hover:bg-[#F7F9FC] hover:text-[#17233B]'
                 }`}
@@ -325,7 +325,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                   setAffiliationFilter('freelance');
                   setCurrentPage(1);
                 }}
-                className={`min-h-10 cursor-pointer rounded-[13px] px-3.5 text-[12px] font-semibold transition-colors ${affiliationFilter === 'freelance'
+                className={`min-h-10 cursor-pointer whitespace-nowrap rounded-[13px] px-3.5 text-[12px] font-semibold transition-colors ${affiliationFilter === 'freelance'
                   ? 'bg-[#EEF3FF] text-[#1E60F3] font-semibold'
                   : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.04)] hover:bg-[#F7F9FC] hover:text-[#17233B]'
                   }`}
@@ -376,9 +376,9 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
         </div>
 
         {/* Right: Search */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex w-full items-center gap-2.5 sm:w-auto">
           {/* Search Bar */}
-          <div className="relative w-56 sm:w-64">
+          <div className="relative w-full sm:w-64">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -388,7 +388,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                 setCurrentPage(1);
               }}
               placeholder="기사명, 차종, 연락처로 검색"
-              className="w-full pl-9 pr-3.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1E60F3] focus:bg-white transition-all shadow-2xs"
+              className="hq-drivers-search h-10 w-full pl-9 pr-3.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-[11px] sm:placeholder:text-xs placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1E60F3] focus:bg-white transition-all shadow-2xs"
             />
           </div>
         </div>
@@ -398,7 +398,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/60 text-xs font-medium text-slate-400 select-none">
+            <tr className="border-b border-slate-100 bg-slate-50/60 text-xs font-medium text-slate-400 select-none whitespace-nowrap">
               <th className="py-3.5 px-5 font-medium">기사 정보</th>
               <th className="py-3.5 px-5 font-medium">운행 상태</th>
               <th className="py-3.5 px-5 font-medium">배차카드</th>
@@ -523,8 +523,8 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                     className="hover:bg-blue-50/40 transition-colors cursor-pointer group"
                   >
                     {/* 1열: 기사 정보 (Avatar + Name) */}
-                    <td className="py-4 px-5">
-                      <div className="flex items-center gap-3.5">
+                    <td className="py-4 px-5 whitespace-nowrap">
+                      <div className="flex items-center gap-3">
                         {driver.avatarUrl ? (
                           <img
                             src={driver.avatarUrl}
@@ -539,23 +539,21 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                             {driver.name.slice(0, 1)}
                           </div>
                         )}
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-slate-900 group-hover:text-[#1E60F3] transition-colors">
-                              {driver.name}
+                        <div className="flex items-center gap-1.5 whitespace-nowrap">
+                          <span className="whitespace-nowrap font-bold text-slate-900 group-hover:text-[#1E60F3] transition-colors">
+                            {driver.name}
+                          </span>
+                          {/* 소속 기사만 '소속' 뱃지 표시 (프리랜서는 다수이므로 미표시하여 시각적 소음 제거) */}
+                          {driver.affiliationType === 'employed' && (
+                            <span className="shrink-0 whitespace-nowrap px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#EEF3FF] text-[#31598F] border border-blue-200/80">
+                              소속
                             </span>
-                            {/* 소속 기사만 '소속' 뱃지 표시 (프리랜서는 다수이므로 미표시하여 시각적 소음 제거) */}
-                            {driver.affiliationType === 'employed' && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#EEF3FF] text-[#31598F] border border-blue-200/80">
-                                소속
-                              </span>
-                            )}
-                            {isNew && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#EEF3FF] text-[#31598F] border border-emerald-200/80">
-                                신규
-                              </span>
-                            )}
-                          </div>
+                          )}
+                          {isNew && (
+                            <span className="shrink-0 whitespace-nowrap px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#EEF3FF] text-[#31598F] border border-emerald-200/80">
+                              신규
+                            </span>
+                          )}
                         </div>
                       </div>
                     </td>

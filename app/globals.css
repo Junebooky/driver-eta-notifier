@@ -568,6 +568,10 @@ dialog::backdrop {
   .hq-driver-detail-a :is(input:not([type="checkbox"]), select,textarea) {
     font-size: 16px;
   }
+  .hq-drivers-a input.hq-drivers-search:not(:focus):placeholder-shown,
+  .hq-drivers-a input.hq-drivers-search::placeholder {
+    font-size: 11px;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .hq-drivers-a :is(button,input,select,textarea),
@@ -590,14 +594,33 @@ dialog::backdrop {
   padding: 11px 14px;
   font-size: 14px;
 }
+.hq-email-a input[type="text"].hq-place-search-input {
+  background-color: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
 .hq-email-a input[type="text"]:focus-visible,
 .hq-email-compose-a :is(input:not([type="checkbox"]),textarea):focus-visible {
   border-color: rgba(30,96,243,.18);
   box-shadow: 0 4px 14px rgba(35,49,78,.045), 0 0 0 2px rgba(30,96,243,.12);
 }
+.hq-email-a input[type="text"].hq-place-search-input:focus-visible {
+  border-color: transparent;
+  box-shadow: none;
+}
 @media (max-width:767px) {
   .hq-email-a :is(input[type="text"],input[type="search"]),
   .hq-email-compose-a :is(input:not([type="checkbox"]),textarea) { font-size: 16px; }
+  .hq-email-a :is(input[type="text"],input[type="search"])::placeholder,
+  .hq-email-compose-a :is(input:not([type="checkbox"]),textarea)::placeholder,
+  input.hq-place-search-input::placeholder {
+    font-size: 11px;
+  }
+  .hq-email-a :is(input.hq-place-search-input, input.hq-compact-input):not(:focus):placeholder-shown,
+  input.hq-place-search-input:not(:focus):placeholder-shown {
+    font-size: 11px;
+  }
 }
 
 

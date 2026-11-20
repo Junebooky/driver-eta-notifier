@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { HqDriverSummary } from '@/types/driverHq';
 
 export interface CreateDriverResult {
@@ -90,19 +90,18 @@ function writeCache(
   memoryCountsCache = counts;
   lastFetchedAt = Date.now();
   if (typeof window !== 'undefined') {
+    const detail = { drivers, counts, timestamp: lastFetchedAt };
     try {
-      sessionStorage.setItem(
-        DRIVERS_CACHE_KEY,
-        JSON.stringify({ drivers, counts, timestamp: lastFetchedAt })
-      );
-      window.dispatchEvent(
-        new CustomEvent(SYNC_EVENT_NAME, {
-          detail: { drivers, counts, timestamp: lastFetchedAt },
-        })
-      );
+      sessionStorage.setItem(DRIVERS_CACHE_KEY, JSON.stringify(detail));
     } catch (e) {
       // Ignore quota errors
     }
+    // Defer cross-instance state sync so React never updates sibling hook consumers
+    // synchronously inside another component's render or state-updater phase.
+    queueMicrotask(() => {
+      if (typeof window === 'undefined') return;
+      window.dispatchEvent(new CustomEvent(SYNC_EVENT_NAME, { detail }));
+    });
   }
 }
 
@@ -115,6 +114,10 @@ export function useHqDrivers(): UseHqDriversResult {
     freelance: 0,
     englishCount: 0,
   });
+  const driversRef = useRef<HqDriverSummary[]>(drivers);
+  const countsRef = useRef(counts);
+  driversRef.current = drivers;
+  countsRef.current = counts;
   // If cache is present, never block the UI with a spinner; show cached data immediately!
   const [isLoading, setIsLoading] = useState<boolean>(() => !initialData);
   const [error, setError] = useState<string | null>(null);
@@ -200,12 +203,14 @@ export function useHqDrivers(): UseHqDriversResult {
           throw new Error(data.error || '기사 정보 수정에 실패했습니다.');
         }
 
-        // Optimistically update in local state and memory cache
-        setDrivers((prev) => {
-          const next = prev.map((d) => (d.id === id ? { ...d, ...data.driver } : d));
-          writeCache(next, counts);
-          return next;
-        });
+        // Optimistically update in local state and memory cache outside state updaters
+        const nextDrivers = driversRef.current.map((d) =>
+          d.id === id ? { ...d, ...data.driver } : d
+        );
+        const nextCounts = countsRef.current;
+        driversRef.current = nextDrivers;
+        setDrivers(nextDrivers);
+        writeCache(nextDrivers, nextCounts);
 
         // Re-fetch in background to update KPI counts (employed/freelance counts)
         fetchDrivers(true).catch(() => {});
@@ -215,7 +220,7 @@ export function useHqDrivers(): UseHqDriversResult {
         return false;
       }
     },
-    [counts, fetchDrivers]
+    [fetchDrivers]
   );
 
   const deleteDriver = useCallback(
@@ -230,17 +235,18 @@ export function useHqDrivers(): UseHqDriversResult {
           throw new Error(data.error || '기사 삭제에 실패했습니다.');
         }
 
-        // Optimistically remove from local state and update cache
-        setDrivers((prev) => {
-          const next = prev.filter((d) => d.id !== id);
-          const nextCounts = {
-            ...counts,
-            total: Math.max(0, counts.total - 1),
-          };
-          setCounts(nextCounts);
-          writeCache(next, nextCounts);
-          return next;
-        });
+        // Optimistically remove from local state and update cache outside state updaters
+        const nextDrivers = driversRef.current.filter((d) => d.id !== id);
+        const curCounts = countsRef.current;
+        const nextCounts = {
+          ...curCounts,
+          total: Math.max(0, curCounts.total - 1),
+        };
+        driversRef.current = nextDrivers;
+        countsRef.current = nextCounts;
+        setDrivers(nextDrivers);
+        setCounts(nextCounts);
+        writeCache(nextDrivers, nextCounts);
 
         fetchDrivers(true).catch(() => {});
         return true;
@@ -249,7 +255,7 @@ export function useHqDrivers(): UseHqDriversResult {
         return false;
       }
     },
-    [counts, fetchDrivers]
+    [fetchDrivers]
   );
 
   const createDriver = useCallback(
@@ -274,19 +280,23 @@ export function useHqDrivers(): UseHqDriversResult {
         }
 
         const newDriver = data.driver;
-        setDrivers((prev) => {
-          const next = [newDriver, ...prev.filter((d) => d.id !== newDriver.id)];
-          const nextCounts = {
-            ...counts,
-            total: counts.total + 1,
-            employed: newDriver.affiliationType === 'employed' ? counts.employed + 1 : counts.employed,
-            freelance: newDriver.affiliationType === 'freelance' ? counts.freelance + 1 : counts.freelance,
-            englishCount: newDriver.englishAvailable ? counts.englishCount + 1 : counts.englishCount,
-          };
-          setCounts(nextCounts);
-          writeCache(next, nextCounts);
-          return next;
-        });
+        const nextDrivers = [
+          newDriver,
+          ...driversRef.current.filter((d) => d.id !== newDriver.id),
+        ];
+        const curCounts = countsRef.current;
+        const nextCounts = {
+          ...curCounts,
+          total: curCounts.total + 1,
+          employed: newDriver.affiliationType === 'employed' ? curCounts.employed + 1 : curCounts.employed,
+          freelance: newDriver.affiliationType === 'freelance' ? curCounts.freelance + 1 : curCounts.freelance,
+          englishCount: newDriver.englishAvailable ? curCounts.englishCount + 1 : curCounts.englishCount,
+        };
+        driversRef.current = nextDrivers;
+        countsRef.current = nextCounts;
+        setDrivers(nextDrivers);
+        setCounts(nextCounts);
+        writeCache(nextDrivers, nextCounts);
 
         // Background refetch to ensure server-synced ordering and DB triggers
         fetchDrivers(true).catch(() => {});
@@ -300,7 +310,7 @@ export function useHqDrivers(): UseHqDriversResult {
         };
       }
     },
-    [counts, fetchDrivers]
+    [fetchDrivers]
   );
 
   return {
