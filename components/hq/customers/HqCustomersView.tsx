@@ -1111,7 +1111,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
               </div>
               <p className="text-[12px] text-[#60728A]">
                 {deleteTargetCustomer.primaryContactName
-                  ? `대표 담당자 · ${deleteTargetCustomer.primaryContactName}${deleteTargetCustomer.contacts.length > 1 ? ` 외 ${deleteTargetCustomer.contacts.length - 1}명` : ''}`
+                  ? `주 담당자 · ${deleteTargetCustomer.primaryContactName}${deleteTargetCustomer.contacts.length > 1 ? ` 외 ${deleteTargetCustomer.contacts.length - 1}명` : ''}`
                   : `등록된 담당자 ${deleteTargetCustomer.contacts.length}명`}
               </p>
             </HqCard>
