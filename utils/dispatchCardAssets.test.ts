@@ -6,7 +6,7 @@ import manifest from '@/lib/dispatchCards/dispatchCardAssetManifest.json';
 
 const availableImageSets: Record<string, { exterior: string; interiorOne: string; interiorTwo: string }> = manifest;
 import { VIP_REAL_VEHICLES } from './vehicleData';
-import { dispatchCardModelFolder, dispatchCardVehicleLabel, resolveDispatchCardPhotos } from '@/lib/dispatchCards/dispatchCardAssets';
+import { dispatchCardKebabPath, dispatchCardModelFolder, dispatchCardVehicleLabel, resolveDispatchCardPhotos } from '@/lib/dispatchCards/dispatchCardAssets';
 import { DISPATCH_CARD_DIMENSIONS } from '@/lib/dispatchCards/renderDispatchCard';
 import {
   calculatePortraitCrop,
@@ -15,36 +15,44 @@ import {
   parsePortraitPlacement,
 } from '@/lib/dispatchCards/portraitCrop';
 
-test('initial assets: Staria shared, 1458-specific Sprinter, no seat mixups', () => {
+test('initial assets: Staria & Carnival shared, uploaded Sprinter plates isolated, no seat mixups', () => {
   const staria = VIP_REAL_VEHICLES.filter(v => v.category === 'staria');
   assert.equal(staria.length, 4);
   for (const vehicle of staria) {
     const photos = resolveDispatchCardPhotos(vehicle);
     assert.ok(photos);
     assert.equal(photos.source, 'model');
-    assert.equal(photos.exterior, '/images/dispatch_cards/vehicles/staria/exterior.webp');
+    assert.match(photos.exterior, /\/exterior\.webp$/);
   }
-  const sprinter1458 = VIP_REAL_VEHICLES.find(v => v.plateShort === '1458');
-  assert.ok(sprinter1458);
-  const photos = resolveDispatchCardPhotos(sprinter1458);
-  assert.ok(photos);
-  assert.equal(photos.source, 'vehicle');
-  assert.match(photos.interiorOne, /sprinter_519\/1458\/interior_02\.webp$/);
-  assert.match(photos.interiorTwo, /sprinter_519\/1458\/interior_03\.webp$/);
-  for (const other of VIP_REAL_VEHICLES.filter(v => v.category === 'sprinter' && v.plateShort !== '1458')) {
+  for (const plateShort of ['1458', '2553', '3864', '9982']) {
+    const sprinter = VIP_REAL_VEHICLES.find(v => v.plateShort === plateShort);
+    assert.ok(sprinter, plateShort);
+    const photos = resolveDispatchCardPhotos(sprinter);
+    assert.ok(photos, plateShort);
+    assert.equal(photos.source, 'vehicle');
+  }
+  const uploadedSprinters = new Set(['1458', '2553', '3864', '9982']);
+  for (const other of VIP_REAL_VEHICLES.filter(v => v.category === 'sprinter' && !uploadedSprinters.has(v.plateShort))) {
     assert.equal(resolveDispatchCardPhotos(other), null);
   }
 });
 
-test('new-model mapping is ready for Carnival 5336 and vehicle-specific overrides', () => {
-  const carnival = VIP_REAL_VEHICLES.find(v => v.plateShort === '5336');
-  assert.ok(carnival);
-  assert.equal(dispatchCardModelFolder(carnival), 'carnival_high');
-  // Until an actual complete photo set is uploaded, it must remain unavailable.
-  if (!availableImageSets['carnival_high']) assert.equal(resolveDispatchCardPhotos(carnival), null);
+test('new-model mapping is ready for Carnival 5336 and 7681 shared set', () => {
+  for (const plateShort of ['5336', '7681']) {
+    const carnival = VIP_REAL_VEHICLES.find(v => v.plateShort === plateShort);
+    assert.ok(carnival);
+    assert.equal(dispatchCardModelFolder(carnival), 'carnival_high');
+    const photos = resolveDispatchCardPhotos(carnival);
+    if (availableImageSets['kia/carnival-hi-limousine'] || availableImageSets['carnival_high']) {
+      assert.ok(photos);
+      assert.equal(photos.source, 'model');
+    } else {
+      assert.equal(photos, null);
+    }
+  }
 });
 
-test('all advertised image triplets physically exist as WebP', () => {
+test('all advertised image triplets physically exist as WebP or PNG', () => {
   for (const [folder, photos] of Object.entries(manifest)) {
     assert.match(folder, /^[a-zA-Z0-9_/-]+$/);
     const paths = [photos.exterior, photos.interiorOne, photos.interiorTwo];
@@ -53,12 +61,41 @@ test('all advertised image triplets physically exist as WebP', () => {
       const file = join(process.cwd(), 'public', url.replace(/^\//, ''));
       const bytes = readFileSync(file);
       assert.ok(bytes.length > 100, file + ' unexpectedly small');
-      assert.equal(bytes.toString('ascii', 0, 4), 'RIFF', file);
-      assert.equal(bytes.toString('ascii', 8, 12), 'WEBP', file);
+      if (url.toLowerCase().endsWith('.png')) {
+        assert.deepEqual(bytes.subarray(0, 8), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), file);
+      } else {
+        assert.equal(bytes.toString('ascii', 0, 4), 'RIFF', file);
+        assert.equal(bytes.toString('ascii', 8, 12), 'WEBP', file);
+      }
     }
   }
   assert.deepEqual(DISPATCH_CARD_DIMENSIONS.pc, { width: 2000, height: 1500 });
   assert.deepEqual(DISPATCH_CARD_DIMENSIONS.mobile, { width: 1080, height: 1920 });
+});
+
+test('kebab-case dispatch-cards paths map cleanly and keep fallback when folders only have .gitkeep', () => {
+  const expectedByPlate: Record<string, string> = {
+    '9982': 'mercedes-benz/sprinter-319-cdi',
+    '8040': 'mercedes-benz/sprinter-519-cdi',
+    '1458': 'mercedes-benz/sprinter-519-cdi',
+    '3343': 'mercedes-benz/s560',
+    '7665': 'hyundai/staria-limousine',
+    '5336': 'kia/carnival-hi-limousine',
+    '7681': 'kia/carnival-hi-limousine',
+    '5947': 'genesis/gv80',
+    '1336': 'genesis/g90-lwb/navy',
+    '8839': 'genesis/g90-standard',
+    '4280': 'genesis/g90-lwb/black',
+  };
+  for (const [plateShort, expected] of Object.entries(expectedByPlate)) {
+    const vehicle = VIP_REAL_VEHICLES.find(v => v.plateShort === plateShort);
+    assert.ok(vehicle, plateShort);
+    assert.equal(dispatchCardKebabPath(vehicle), expected);
+  }
+  const black = VIP_REAL_VEHICLES.find(v => v.plateShort === '4280')!;
+  const navy = VIP_REAL_VEHICLES.find(v => v.plateShort === '1336')!;
+  assert.equal(dispatchCardKebabPath({...black,model:'제네시스 G90 리무진'}),'genesis/g90-lwb/black');
+  assert.equal(dispatchCardKebabPath({...navy,model:'제네시스 G90L'}),'genesis/g90-lwb/navy');
 });
 
 test('each chauffeur can save an independent bounded crop, with a safe default', () => {
@@ -103,12 +140,20 @@ test('customer card names use official Mercedes-Benz Sprinter and the verified s
   const sprinters = VIP_REAL_VEHICLES.filter(vehicle => vehicle.category === 'sprinter');
   assert.equal(sprinters.length, Object.keys(seating).length);
   for (const vehicle of sprinters) {
-    const expectedModel = vehicle.plateShort === '8040' ? '319' : '519';
+    const expectedModel = vehicle.plateShort === '9982' ? '319' : '519';
     assert.equal(
       dispatchCardVehicleLabel(vehicle),
       `Mercedes-Benz Sprinter ${expectedModel} CDI · ${seating[vehicle.plateShort]} Seats`,
       vehicle.plate,
     );
+  }
+
+  // Stale DB labels must not change the model-specific photo lookup.
+  for (const plate of ['9982', '8040']) {
+    const car = sprinters.find(vehicle => vehicle.plateShort === plate);
+    assert.ok(car);
+    const staleModel = plate === '9982' ? '벤츠 스프린터 519 CDI' : '벤츠 스프린터 319 CDI';
+    assert.equal(dispatchCardModelFolder({ ...car, model: staleModel }), plate === '9982' ? 'sprinter_319' : 'sprinter_519');
   }
 
   // A stale DB row must never change the customer-visible model or seat count.

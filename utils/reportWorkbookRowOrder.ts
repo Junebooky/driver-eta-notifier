@@ -2,6 +2,7 @@ import {unzipSync,zipSync,strFromU8,strToU8} from 'fflate';
 import {DOMParser} from '@xmldom/xmldom';
 import {workbookFromFile} from './kakaoExcelWorkbook';
 import {routeColumnWidth,widenReportColumns} from './reportExcelCellFormatting';
+import {parseWorkbookMonthSheet} from './reportWorkbookMonth';
 
 type Location={sheet:string;row:number};
 export type ReportManifest=Record<string,Location>;
@@ -9,7 +10,6 @@ export type ReorderedMonth={bytes:Uint8Array;rowNumber:number;moves:Record<strin
 type DatedRow={row:number;date:string;id?:string};
 const ROW=/<row\b[^>]*?(?:\/>|>[\s\S]*?<\/row>)/g;
 const CELL=/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g;
-const MONTH=/^(?:[1-9]|1[0-2])월$/;
 const MAX_ROWS=1000;
 
 function sheetPath(entries:Record<string,Uint8Array>,month:string){
@@ -61,7 +61,7 @@ function moveRow(xml:string,to:number):string|null{
  */
 export function organizeManagedMonth(bytes:Uint8Array,month:string,year:number,manifest:ReportManifest,
  incoming?:{row:number;date:string}):ReorderedMonth{
- if(!MONTH.test(month)||!Number.isInteger(year))throw Error('정렬할 월별 시트를 확인해 주세요.');
+ if(!Number.isInteger(year)||!parseWorkbookMonthSheet(month,year))throw Error('정렬할 월별 시트를 확인해 주세요.');
  const wb=workbookFromFile(bytes),sheet=wb.Sheets[month];
  if(!sheet)throw Error('정렬할 월별 시트가 없습니다.');
  const unchanged=(reason:string):ReorderedMonth=>({bytes,rowNumber:incoming?.row??0,moves:{},changed:false,reason});
@@ -112,7 +112,7 @@ export function organizeManagedMonth(bytes:Uint8Array,month:string,year:number,m
   active.get(row)!.add(m[1]);
  }
  const records:DatedRow[]=[];
- const yearMonth=Number(month.slice(0,-1));
+ const yearMonth=parseWorkbookMonthSheet(month,year)!.month;
  for(const row of new Set([...active.keys(),...ids.keys()])){
   const columns=active.get(row)||new Set<string>();
   const managed=ids.get(row);

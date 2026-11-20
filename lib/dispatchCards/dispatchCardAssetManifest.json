@@ -1,4 +1,34 @@
 {
+  "hyundai/staria-limousine": {
+    "exterior": "/images/dispatch-cards/hyundai/staria-limousine/exterior.webp",
+    "interiorOne": "/images/dispatch-cards/hyundai/staria-limousine/interior-01.webp",
+    "interiorTwo": "/images/dispatch-cards/hyundai/staria-limousine/interior-02.webp"
+  },
+  "kia/carnival-hi-limousine": {
+    "exterior": "/images/dispatch-cards/kia/carnival-hi-limousine/exterior.webp",
+    "interiorOne": "/images/dispatch-cards/kia/carnival-hi-limousine/interior-01.webp",
+    "interiorTwo": "/images/dispatch-cards/kia/carnival-hi-limousine/interior-02.webp"
+  },
+  "mercedes-benz/sprinter-319-cdi/9982": {
+    "exterior": "/images/dispatch-cards/mercedes-benz/sprinter-319-cdi/9982/exterior.webp",
+    "interiorOne": "/images/dispatch-cards/mercedes-benz/sprinter-319-cdi/9982/interior-01.webp",
+    "interiorTwo": "/images/dispatch-cards/mercedes-benz/sprinter-319-cdi/9982/interior-02.webp"
+  },
+  "mercedes-benz/sprinter-519-cdi/1458": {
+    "exterior": "/images/dispatch-cards/mercedes-benz/sprinter-519-cdi/1458/exterior.webp",
+    "interiorOne": "/images/dispatch-cards/mercedes-benz/sprinter-519-cdi/1458/interior-01.webp",
+    "interiorTwo": "/images/dispatch-cards/mercedes-benz/sprinter-519-cdi/1458/interior-02.webp"
+  },
+  "mercedes-benz/sprinter-519-cdi/2553": {
+    "exterior": "/images/dispatch-cards/mercedes-benz/sprinter-519-cdi/2553/exterior.webp",
+    "interiorOne": "/images/dispatch-cards/mercedes-benz/sprinter-519-cdi/2553/interior-01.webp",
+    "interiorTwo": "/images/dispatch-cards/mercedes-benz/sprinter-519-cdi/2553/interior-02.webp"
+  },
+  "mercedes-benz/sprinter-519-cdi/3864": {
+    "exterior": "/images/dispatch-cards/mercedes-benz/sprinter-519-cdi/3864/exterior.webp",
+    "interiorOne": "/images/dispatch-cards/mercedes-benz/sprinter-519-cdi/3864/interior-01.webp",
+    "interiorTwo": "/images/dispatch-cards/mercedes-benz/sprinter-519-cdi/3864/interior-02.webp"
+  },
   "sprinter_519/1458": {
     "exterior": "/images/dispatch_cards/vehicles/sprinter_519/1458/exterior.webp",
     "interiorOne": "/images/dispatch_cards/vehicles/sprinter_519/1458/interior_02.webp",

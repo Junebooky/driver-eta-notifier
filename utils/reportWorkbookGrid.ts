@@ -3,6 +3,7 @@ import {DOMParser} from '@xmldom/xmldom';
 import {workbookFromFile} from './kakaoExcelWorkbook';
 import {widenReportColumns,routeColumnWidth} from './reportExcelCellFormatting';
 import {visibleWorkbookColumns,MANUAL_ROW_HEIGHT} from './reportWorkbookStructure';
+import {parseWorkbookMonthSheet,workbookMonthSheetNames} from './reportWorkbookMonth';
 
 const MAX_VALUE=2400;
 const COLS='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -33,7 +34,7 @@ export type WorkbookGridQuery={
  sortDirection?:'asc'|'desc';
 };
 export function readWorkbookGrid(bytes:Uint8Array,month:string,limit=300,offset=0,focusRow?:number,query:WorkbookGridQuery={}){
- if(!/^(?:[1-9]|1[0-2])월$/.test(month))throw new Error('월별 시트를 선택해 주세요.');
+ if(!parseWorkbookMonthSheet(month))throw new Error('월별 시트를 선택해 주세요.');
  const book=workbookFromFile(bytes),sheet=book.Sheets[month];
  if(!sheet)throw new Error('선택한 월 시트가 없습니다.');
  const entries=unzipSync(bytes),path=sheetEntry(entries,month),source=strFromU8(entries[path]);
@@ -96,7 +97,7 @@ export function readWorkbookGrid(bytes:Uint8Array,month:string,limit=300,offset=
   row,cells:columns.map(col=>{const value=sheet.cells[col+row]?.v;if(col==='A'&&typeof value==='number'&&value>20000&&value<100000){return new Date((book.date1904?Date.UTC(1904,0,1):Date.UTC(1899,11,30))+value*86400000).toISOString().slice(0,10);}return String(value??'');}),
   locked:columns.filter(col=>formulas.has(col+row))
  }));
- return {months:book.SheetNames.filter(m=>/^(?:[1-9]|1[0-2])월$/.test(m)),month,rows,total:visible.length,unfilteredTotal:live.length,filterOptions,rowGap,manualRows:addedRows,offset,limit,columns,headers:columns.map((col,i)=>i<12?DEFAULT_HEADERS[i]:String(sheet.cells[col+'1']?.v??col+'열'))};
+ return {months:workbookMonthSheetNames(book.SheetNames),month,rows,total:visible.length,unfilteredTotal:live.length,filterOptions,rowGap,manualRows:addedRows,offset,limit,columns,headers:columns.map((col,i)=>i<12?DEFAULT_HEADERS[i]:String(sheet.cells[col+'1']?.v??col+'열'))};
 }
 /**
  * Add native Excel dropdown filter/sort arrows to a DOWNLOAD COPY only.
@@ -106,7 +107,7 @@ export function readWorkbookGrid(bytes:Uint8Array,month:string,limit=300,offset=
 export function addWorkbookDownloadAutoFilters(bytes:Uint8Array):Uint8Array{
  const book=workbookFromFile(bytes),entries=unzipSync(bytes);
  let changed=false;
- for(const month of book.SheetNames.filter(name=>/^(?:[1-9]|1[0-2])월$/.test(name))){
+ for(const month of workbookMonthSheetNames(book.SheetNames)){
   const path=sheetEntry(entries,month),source=strFromU8(entries[path]);
   if(/<(?:autoFilter|tableParts|sheetProtection|sheetCalcPr)\b/i.test(source))continue;
   if(!source.includes('</sheetData>'))continue;
@@ -131,7 +132,7 @@ export function addWorkbookDownloadAutoFilters(bytes:Uint8Array):Uint8Array{
  return output;
 }
 export function patchWorkbookCell(bytes:Uint8Array,month:string,row:number,col:string,value:string){
- if(!/^(?:[1-9]|1[0-2])월$/.test(month)||!excelCellColumn(col)||!Number.isInteger(row)||row<2||row>25000)throw new Error('편집할 셀 위치를 확인해 주세요.');
+ if(!parseWorkbookMonthSheet(month)||!excelCellColumn(col)||!Number.isInteger(row)||row<2||row>25000)throw new Error('편집할 셀 위치를 확인해 주세요.');
  if(typeof value!=='string'||value.length>MAX_VALUE||/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(value))throw new Error('셀 값을 확인해 주세요.');
  const trimmed=value.trim();
  if(/^([=@+]|-($|[^0-9]))/.test(trimmed))throw new Error('Excel 수식이나 명령은 직접 입력할 수 없습니다.');
@@ -141,7 +142,7 @@ export function patchWorkbookCell(bytes:Uint8Array,month:string,row:number,col:s
  if(!visibleWorkbookColumns(book.Sheets[month].cells).includes(col))throw new Error('추가되지 않은 열은 수정할 수 없습니다.');
  if(col==='A'){
   const d=new Date(trimmed+'T00:00:00Z');
-  if(Number.isNaN(d.getTime())||d.toISOString().slice(0,10)!==trimmed||Number(trimmed.slice(5,7))!==Number(month.replace('월','')))throw new Error('동일한 월의 올바른 날짜만 입력할 수 있습니다.');
+  if(Number.isNaN(d.getTime())||d.toISOString().slice(0,10)!==trimmed||Number(trimmed.slice(5,7))!==parseWorkbookMonthSheet(month)?.month)throw new Error('동일한 월의 올바른 날짜만 입력할 수 있습니다.');
  }
  if(['J','L'].includes(col)&&trimmed!==''&&!/^\d+(?:\.\d{1,2})?$/.test(trimmed.replace(/,/g,'')))throw new Error('금액은 숫자로 입력해 주세요.');
  const entries=unzipSync(bytes),path=sheetEntry(entries,month),source=strFromU8(entries[path]);

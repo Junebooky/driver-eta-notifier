@@ -1,4 +1,5 @@
 import {reportWorkbookYear} from '@/utils/reportWorkbookYear';
+import {findWorkbookMonthSheetName,workbookMonthSheetNames} from '@/utils/reportWorkbookMonth';
 import {createHash} from 'node:crypto';
 import {supabaseAdmin as db} from '@/lib/supabase/server';
 import {appendKakaoExcelReport,workbookFromFile} from '@/utils/kakaoExcelWorkbook';
@@ -38,7 +39,7 @@ export async function processReport(org:string,id:string,actor:string,lease?:str
    if(!target||target.year!==targetYear)throw new Error('해당 연도 장부를 HQ에서 등록해 주세요.');
    let bytes=target.bytes;
    const month=Number(s.parsed.draft.date.slice(5,7));
-   if(!workbookFromFile(bytes).Sheets[month+'월']){
+   if(!findWorkbookMonthSheetName(workbookFromFile(bytes).SheetNames,month,targetYear)){
     // Use an HQ-approved source when it exists; otherwise clone the most recent
     // earlier monthly sheet as an EMPTY template (e.g. 10월 -> 11월).
     // The cloned month and the new record commit atomically with the CAS version.
@@ -110,7 +111,7 @@ export async function replaceWorkbook(
  const year=reportWorkbookYear(bytes,filename);
  if(year===null||year!==expectedYear)
   throw new Error('교체할 Excel의 연도와 현재 장부의 연도가 같아야 합니다. 파일명과 날짜를 확인해 주세요.');
- if(!book.SheetNames.some(name=>/^(?:[1-9]|1[0-2])월$/.test(name)))
+ if(!workbookMonthSheetNames(book.SheetNames,year).length)
   throw new Error('월별 시트가 없는 Excel은 운행보고를 누적할 수 없습니다.');
  const current=await currentWorkbook(session.org,year);
  if(!current||current.id!==expectedVersion)

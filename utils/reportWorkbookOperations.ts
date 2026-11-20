@@ -3,6 +3,7 @@ import {DOMParser} from '@xmldom/xmldom';
 import {appendKakaoExcelReport,workbookFromFile} from './kakaoExcelWorkbook';
 import {EXCEL_COLUMN_LABELS,type KakaoExcelDraft} from './kakaoExcelImport';
 import {widenReportColumns,routeColumnWidth} from './reportExcelCellFormatting';
+import {findWorkbookMonthSheetName,parseWorkbookMonthSheet,workbookMonthSheetNames} from './reportWorkbookMonth';
 const xml=(v:string)=>v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
 function doc(v:string){if(/<!DOCTYPE|<!ENTITY/i.test(v))throw new Error('지원하지 않는 XML');return new DOMParser({onError:()=>{throw new Error('손상된 XML');}}).parseFromString(v,'application/xml');}
 function pathFor(entries:Record<string,Uint8Array>,sheet:string){
@@ -35,7 +36,7 @@ export function amendReportRow(bytes:Uint8Array,sheet:string,row:number,draft:Ka
 /** HQ approves a blank template derived from an existing company month, not its records. */
 export function addApprovedMonth(bytes:Uint8Array,sourceMonth:string,targetMonth:number){
  const wb=workbookFromFile(bytes),name=targetMonth+'월';if(targetMonth<1||targetMonth>12||!Number.isInteger(targetMonth))throw new Error('월을 확인해 주세요.');
- if(wb.Sheets[name])return bytes;
+ if(findWorkbookMonthSheetName(wb.SheetNames,targetMonth))return bytes;
  const entries=unzipSync(bytes),sourcePath=pathFor(entries,sourceMonth);let sheet=strFromU8(entries[sourcePath]);
  // Drawings/comments contain old report data and are not portable template content.
  sheet=sheet.replace(/<(?:legacyDrawing|drawing|hyperlinks|extLst)\b[^>]*?(?:\/>|>[\s\S]*?<\/(?:legacyDrawing|drawing|hyperlinks|extLst)>)/g,'');
@@ -84,11 +85,11 @@ export function addApprovedMonth(bytes:Uint8Array,sourceMonth:string,targetMonth
  */
 export function ensureReportMonth(bytes:Uint8Array,targetMonth:number,approvedSourceMonth?:string){
  if(!Number.isInteger(targetMonth)||targetMonth<1||targetMonth>12)throw new Error('운행보고의 월을 확인해 주세요.');
- const wb=workbookFromFile(bytes),month=targetMonth+'월';
- if(wb.Sheets[month])return {bytes,created:false,sourceMonth:null as string|null};
+ const wb=workbookFromFile(bytes);
+ if(findWorkbookMonthSheetName(wb.SheetNames,targetMonth))return {bytes,created:false,sourceMonth:null as string|null};
  const months=wb.SheetNames.map(name=>{
-  const m=name.match(/^(1[0-2]|[1-9])월$/);
-  return m?{name,number:Number(m[1])}:null;
+  const parsed=parseWorkbookMonthSheet(name);
+  return parsed?{name,number:parsed.month}:null;
  }).filter((x):x is {name:string;number:number}=>x!==null).sort((a,b)=>a.number-b.number);
  if(!months.length)throw new Error('월별 시트가 없는 Excel 원본입니다. HQ에서 월별 양식을 먼저 등록해 주세요.');
  const source=approvedSourceMonth??([...months].reverse().find(m=>m.number<targetMonth)??months.find(m=>m.number>targetMonth))?.name;
@@ -104,7 +105,7 @@ export function ensureReportMonth(bytes:Uint8Array,targetMonth:number,approvedSo
 export function refitWorkbookRouteColumns(bytes:Uint8Array){
  const book=workbookFromFile(bytes);
  const entries=unzipSync(bytes);let modified=false;
- for(const month of book.SheetNames.filter(name=>/^(?:[1-9]|1[0-2])월$/.test(name))){
+ for(const month of workbookMonthSheetNames(book.SheetNames)){
   const path=pathFor(entries,month),source=strFromU8(entries[path]);
   const routes=Object.entries(book.Sheets[month].cells).filter(([address])=>/^G[1-9]\d*$/.test(address)).map(([,cell])=>String(cell.v??''));
   const fitted=widenReportColumns(source,routeColumnWidth(routes));
