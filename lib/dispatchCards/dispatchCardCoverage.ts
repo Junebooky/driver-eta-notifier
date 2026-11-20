@@ -1,5 +1,6 @@
 import { resolveDispatchCardPhotos } from './dispatchCardAssets';
 import { validateDispatchCardProfile } from './chauffeurIdentity';
+import { resolveDispatchCardEnglishName } from '@/utils/koreanNameRomanization';
 import type { VipRealVehicle } from '@/utils/vehicleData';
 
 type DbDriver = { id: string; driver_name: string | null; phone: string | null; driver_meta: unknown };
@@ -57,13 +58,18 @@ export function buildDispatchCardCoverage(
     .map(card => [card.driver_id,card.vehicle_id,card.variant].join(':')));
   const coverage = drivers.map(driver => {
     const meta = record(driver.driver_meta), cardIdentity = record(meta.dispatch_card_identity);
+    const koreanName = typeof cardIdentity.koreanName === 'string' && cardIdentity.koreanName.trim()
+      ? cardIdentity.koreanName : driver.driver_name || '';
+    const englishName = resolveDispatchCardEnglishName(
+      koreanName, typeof cardIdentity.englishName === 'string' ? cardIdentity.englishName : '',
+    );
     const approved = validateDispatchCardProfile({
-      koreanName: cardIdentity.koreanName ?? driver.driver_name ?? '',
-      englishName: cardIdentity.englishName ?? '',
+      koreanName,
+      englishName,
       positionCode: cardIdentity.positionCode ?? '',
       phone: cardIdentity.phone ?? driver.phone ?? '',
     });
-    const englishNameReady = typeof cardIdentity.englishName === 'string' && !!cardIdentity.englishName.trim();
+    const englishNameReady = !!englishName;
     const positionReady = cardIdentity.positionCode === 'chauffeur' || cardIdentity.positionCode === 'senior_chauffeur';
     const portraitReady = photoDrivers.has(driver.id);
     const slots = vehicles.map(vehicle => ({
