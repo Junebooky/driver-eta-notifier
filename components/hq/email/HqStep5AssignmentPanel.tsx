@@ -11,6 +11,7 @@ import { driverSupportsEnglish } from './HqDriverSelectModal';
 import { emailFlightAssignmentIssues } from '@/utils/emailDispatchPlan';
 import { HqFlightAssignmentSection } from './HqFlightAssignmentSection';
 import { getVerifiedVehiclePhoto, HqVehicleSelectModal } from './HqVehicleSelectModal';
+import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
 import type { VehicleSlotAssignment } from './HqStep2BookingDetailView';
 
 interface HqStep5AssignmentPanelProps {
@@ -20,6 +21,7 @@ interface HqStep5AssignmentPanelProps {
   vehicles?: AvailableVehicleItem[];
   loading: boolean;
   fleetError?: string;
+  fleetNotice?: string;
   language: 'any' | 'english';
   onLanguageChange: (value: 'any' | 'english') => void;
   onUpdateSlots?: (slots: VehicleSlotAssignment[]) => void;
@@ -33,7 +35,7 @@ const findVehicle = (plate?: string) =>
   VIP_REAL_VEHICLES.find((item) => item.plate.replace(/\s/g, '') === plate?.replace(/\s/g, ''));
 
 export const HqStep5AssignmentPanel: React.FC<HqStep5AssignmentPanelProps> = ({
-  slots, draft, onUpdateDraft, vehicles, loading, fleetError, language, onLanguageChange, onUpdateSlots,
+  slots, draft, onUpdateDraft, vehicles, loading, fleetError, fleetNotice, language, onLanguageChange, onUpdateSlots,
   onSelectDriver, onRequestHelp, onConfirm, isDispatching,
 }) => {
   const [vehiclePickerIndex, setVehiclePickerIndex] = useState<number | null>(null);
@@ -195,6 +197,7 @@ export const HqStep5AssignmentPanel: React.FC<HqStep5AssignmentPanelProps> = ({
         </button>
       </div>
 
+      {!fleetError && fleetNotice && <HqInlineFeedback message={fleetNotice} tone="info" />}
       {fleetError && <p role="alert" className="px-1 text-xs text-rose-600 font-bold">차량 가용성 확인 실패: {fleetError}</p>}
       {loading && <p className="flex items-center gap-2 px-1 text-xs text-slate-500 font-medium">
         <Loader2 className="h-4 w-4 animate-spin text-slate-400" /> 차량 가용성 확인 중
@@ -218,6 +221,7 @@ export const HqStep5AssignmentPanel: React.FC<HqStep5AssignmentPanelProps> = ({
         vehicles={vehicles}
         loading={loading}
         error={fleetError}
+        notice={!fleetError ? fleetNotice : undefined}
         slotNumber={(vehiclePickerIndex ?? 0) + 1}
         selectedPlate={vehiclePickerIndex !== null ? slots[vehiclePickerIndex]?.vehiclePlate : undefined}
         excludedPlates={slots.filter((_, i) => i !== vehiclePickerIndex).map((slot) => slot.vehiclePlate).filter((plate): plate is string => Boolean(plate))}

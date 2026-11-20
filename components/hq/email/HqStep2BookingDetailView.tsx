@@ -31,6 +31,7 @@ import { useFleetAvailabilityWindows } from '@/hooks/useFleetAvailability';
 import { VEHICLE_STATUS_LABELS } from '@/utils/fleetVehicleStatus';
 import { haptics } from '@/utils/haptics';
 import { HqPlaceSearchInput, PoiResult } from '@/components/hq/HqPlaceSearchInput';
+import { HqBadge } from '@/components/hq/ui';
 import { saveContactToCrm } from '@/utils/crmCustomerSync';
 import { HqStep5AssignmentPanel } from './HqStep5AssignmentPanel';
 
@@ -91,9 +92,12 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
   batchReview,
 }) => {
   let availabilityWindows: Array<{ startDate: string; startTime: string; endDate: string; endTime: string }> = [];
+  let availabilityPlanError: string | undefined;
   try {
     if (extractedDraft) availabilityWindows = emailDispatchDays(extractedDraft).map(day => ({ startDate: day.date, startTime: day.start.time || '', endDate: day.date, endTime: day.endTime }));
-  } catch { /* The date editor below shows the validation error. */ }
+  } catch (err) {
+    availabilityPlanError = err instanceof Error ? err.message : '일정 날짜를 확인해 주세요.';
+  }
   // A revised reservation must not conflict with its own vehicle and driver.
   // All *other* bookings remain part of the server-side availability check.
   const fleet = useFleetAvailabilityWindows(availabilityWindows, extractedDraft?.revisionMatchedScheduleId);
@@ -342,7 +346,8 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
         onUpdateDraft={onUpdateDraft}
         vehicles={fleet.data?.vehicles}
         loading={fleet.loading}
-        fleetError={fleet.error}
+        fleetError={availabilityPlanError || fleet.error}
+        fleetNotice={!availabilityPlanError ? fleet.notice : undefined}
         language={selectedLanguage}
         onLanguageChange={changeDriverLanguage}
         onUpdateSlots={onUpdateVehicleSlots}
@@ -426,7 +431,7 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
                     </div>
 
                     {/* 실제 종료 시간 */}
-                    <div className="flex items-center gap-3 pt-2">
+                    <div className="flex flex-wrap items-center gap-3 pt-2">
                       <span className="text-xs sm:text-sm font-bold text-slate-500 shrink-0">
                         실제 종료 시간
                       </span>
@@ -448,6 +453,9 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
                           className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                         />
                       </div>
+                      {(!normalizeTimeHHmm(day.endTime) || (normalizeTimeHHmm(day.start.time) && normalizeTimeHHmm(day.endTime) <= normalizeTimeHHmm(day.start.time))) && (
+                        <HqBadge tone="warning">종료 시간 확인 필요</HqBadge>
+                      )}
                     </div>
                   </div>
                 ));

@@ -39,6 +39,7 @@ import { HqEmailSummary, HqEmailDetail, HqEmailExtractedDraft, RouteWaypointItem
 import { haptics } from '@/utils/haptics';
 import { HqBadge, HqButton, HqCard, HqSegmentedTabs } from '@/components/hq/ui';
 import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
+import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 import { HqSourceText } from '@/components/hq/ui/HqSourceText';
 import { findEmailSourceRanges } from '@/utils/emailWorkflowReview';
 import { HqPlaceSearchInput, PoiResult } from '@/components/hq/HqPlaceSearchInput';
@@ -66,6 +67,7 @@ interface HqStep1ExtractViewProps {
   batchReviewRows?: EmailBatchReviewRow[];
   batchReviewCandidates?: ExistingEmailBookingCandidate[];
   onChooseBatchTarget?: (rowKey: string, selection: string) => void;
+  onResetBatchToAllNew?: () => void;
 }
 
 type WaypointEditDraft = {
@@ -91,6 +93,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   batchReviewRows,
   batchReviewCandidates = [],
   onChooseBatchTarget,
+  onResetBatchToAllNew,
 }) => {
   const subject = emailDetail?.subject || emailSummary.subject;
   const fromName = emailDetail?.from?.name || emailSummary.from.name;
@@ -198,8 +201,11 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
     }));
   };
 
+  const [isBatchLinkExpanded, setIsBatchLinkExpanded] = useState(false);
+
   useEffect(() => {
     setExpandedExcelSources({});
+    setIsBatchLinkExpanded(false);
   }, [extractedDraft?.id, selectedScheduleTab]);
 
   const activeExcelSchedule = hasMultipleExcelSchedules
@@ -1133,35 +1139,90 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                 </div>
               )}
 
-              {Boolean(batchReviewRows?.length) && (
-                <div role="group" aria-label="기존 예약 연결" className="space-y-2">
-                  <p className="text-[11px] leading-relaxed text-[#73839D]">
-                    변경될 기존 예약이 있다면 아래에서 연결해 주세요. 기존 예약을 임의로 덮어쓰거나 취소하지 않습니다.
-                  </p>
-                  {batchReviewRows!.map(row => (
-                    <label key={row.key} className="flex flex-wrap items-center gap-2 rounded-[14px] bg-[#F7F9FC] px-3 py-2.5">
-                      <span className="min-w-[125px] text-[12px] font-semibold tabular-nums text-[#52647A]">
-                        {row.date} · {row.index + 1}호차
-                      </span>
-                      <select
-                        value={row.selection}
-                        onChange={event => onChooseBatchTarget?.(row.key, event.target.value)}
-                        aria-label={`${row.date} ${row.index + 1}호차 기존 예약 연결`}
-                        className="min-h-10 min-w-0 flex-1 rounded-[12px] bg-white px-3 text-[12px] font-medium text-[#17233B] shadow-[0_2px_7px_rgba(35,49,78,0.04)] outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25"
-                      >
-                        <option value="">등록 방법 선택</option>
-                        <option value="new">신규 예약 등록</option>
-                        <option value="skip">해당 날짜 운행 없음</option>
-                        {batchReviewCandidates.map(candidate => (
-                          <option key={candidate.scheduleId} value={candidate.scheduleId}>
-                            {candidate.pickupDate} {candidate.pickupTime} · {candidate.vehiclePlate || '미배정'} · {candidate.pickupLocation}
-                          </option>
+              {Boolean(batchReviewRows?.length && batchReviewCandidates.length > 0) && (() => {
+                const linkedCount = batchReviewRows!.filter(
+                  (row) => row.selection && row.selection !== 'new' && row.selection !== 'skip'
+                ).length;
+                const skippedCount = batchReviewRows!.filter((row) => row.selection === 'skip').length;
+                const linkOptions = [
+                  { value: 'new', label: '신규 예약 등록', subtitle: '기존 배차와 별도로 새로 등록' },
+                  { value: 'skip', label: '해당 날짜 운행 없음', subtitle: '이 날짜·차량 일정 제외' },
+                  ...batchReviewCandidates.map((candidate) => ({
+                    value: candidate.scheduleId,
+                    label: `${candidate.pickupDate} ${candidate.pickupTime} · ${candidate.vehiclePlate || '미배정'}`,
+                    subtitle: `${candidate.customerName} · ${candidate.pickupLocation}`,
+                  })),
+                ];
+
+                return (
+                  <HqCard tone="muted" className="p-3.5 space-y-3" role="group" aria-label="기존 예약 연결">
+                    <div className="flex flex-wrap items-start justify-between gap-2.5">
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <HqBadge tone={linkedCount > 0 ? 'selected' : 'warning'}>
+                            기존 예약 {batchReviewCandidates.length}건 확인됨
+                          </HqBadge>
+                          <span className="text-[12px] font-bold text-[#17233B]">
+                            {linkedCount > 0
+                              ? `기존 예약 ${linkedCount}건 연결됨${skippedCount > 0 ? ` · 제외 ${skippedCount}건` : ''}`
+                              : '현재 모두 신규 예약 등록 기준'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] leading-relaxed text-[#73839D]">
+                          이미 등록된 배차를 수정하는 메일이라면 날짜·호차별로 기존 예약을 연결해 주세요. 새 예약이면 그대로 진행하면 됩니다.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                        {(linkedCount > 0 || skippedCount > 0) && onResetBatchToAllNew && (
+                          <HqButton variant="secondary" size="sm" onClick={onResetBatchToAllNew}>
+                            모두 신규로 적용
+                          </HqButton>
+                        )}
+                        <HqButton
+                          variant="ghost"
+                          size="sm"
+                          aria-expanded={isBatchLinkExpanded}
+                          onClick={() => setIsBatchLinkExpanded((prev) => !prev)}
+                        >
+                          <span>{isBatchLinkExpanded ? '연결 목록 닫기' : '기존 예약 연결하기'}</span>
+                          {isBatchLinkExpanded ? (
+                            <ChevronUp className="h-3.5 w-3.5" />
+                          ) : (
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          )}
+                        </HqButton>
+                      </div>
+                    </div>
+
+                    {isBatchLinkExpanded && (
+                      <div className="space-y-2 pt-1">
+                        {batchReviewRows!.map((row) => (
+                          <div
+                            key={row.key}
+                            className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-[14px] bg-white px-3 py-2.5 shadow-[0_2px_7px_rgba(35,49,78,0.04)]"
+                          >
+                            <span className="min-w-[130px] shrink-0 text-[12px] font-semibold tabular-nums text-[#52647A]">
+                              {row.date} · {row.index + 1}호차
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <HqSearchSelect
+                                label={`${row.date} ${row.index + 1}호차 기존 예약 연결`}
+                                size="sm"
+                                placeholder="등록 방법 선택"
+                                value={row.selection}
+                                searchable={batchReviewCandidates.length > 3}
+                                onChange={(next) => onChooseBatchTarget?.(row.key, next)}
+                                options={linkOptions}
+                              />
+                            </div>
+                          </div>
                         ))}
-                      </select>
-                    </label>
-                  ))}
-                </div>
-              )}
+                      </div>
+                    )}
+                  </HqCard>
+                );
+              })()}
 
               {/* Multi-destination Timeline Accordion */}
               {hasMultipleWaypoints ? (
@@ -1360,6 +1421,13 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                         const parsedNote = parseExcelWaypointNotes(wp.notes);
                                         const excelSource = parsedNote.excelSource;
                                         const isSourceExpanded = Boolean(excelSource && expandedExcelSources[wp.id]);
+                                        const isMissingClientAddress = !wp.clientAddress && !wp.address;
+                                        const isUnverifiedRouteStop = !isVerifiedEmailRouteStop({
+                                          ...wp,
+                                          date: wp.date || pickupDate,
+                                          time: wp.time || '',
+                                          isPoiConfirmed: Boolean(wp.isPoiConfirmed),
+                                        });
                                         return (
                                           <>
                                             <div
@@ -1385,15 +1453,21 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                                     </HqBadge>
                                                   )}
                                                 </div>
-                                                <div className="pl-14 mt-1 space-y-1">
-                                                  {wp.address && <p className="break-words text-[11px] text-slate-500">{wp.address}</p>}
-                                                  {!wp.clientAddress && !wp.address && (
-                                                    <HqBadge tone="neutral" wrap>클라이언트측 주소 미지정</HqBadge>
-                                                  )}
-                                                  {!isVerifiedEmailRouteStop({ ...wp, date: wp.date || pickupDate, time: wp.time || '', isPoiConfirmed: Boolean(wp.isPoiConfirmed) }) && (
-                                                    <HqBadge tone="warning" wrap>TMAP 위치 미확정 · 눌러서 검색 결과 선택</HqBadge>
-                                                  )}
-                                                </div>
+                                                {wp.address && (
+                                                  <p className="mt-1 pl-14 break-words text-[11px] text-slate-500">{wp.address}</p>
+                                                )}
+                                                {(isMissingClientAddress || isUnverifiedRouteStop) && (
+                                                  <div className="mt-1 pl-14 flex flex-wrap items-center gap-1.5">
+                                                    {isMissingClientAddress && (
+                                                      <HqBadge tone="neutral">클라이언트측 주소 미지정</HqBadge>
+                                                    )}
+                                                    {isUnverifiedRouteStop && (
+                                                      <HqBadge tone="warning" title="행을 눌러 TMAP 검색 결과를 선택해 주세요">
+                                                        TMAP 위치 미확정
+                                                      </HqBadge>
+                                                    )}
+                                                  </div>
+                                                )}
                                                 {parsedNote.plainNotes && (
                                                   <p className="pl-14 mt-0.5 text-[11px] text-slate-400 break-words">{parsedNote.plainNotes}</p>
                                                 )}

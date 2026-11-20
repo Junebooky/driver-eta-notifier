@@ -67,6 +67,8 @@ test('three dates × three independent vehicles render exactly nine distinct rev
   assert.equal(rows[3].stops[2].time,'15:00');
   assert.equal(rows[0].stops[2].time,'14:00');
   assert.ok(emailBatchNeedsReview(draft(),3,9));
+  assert.equal(emailBatchNeedsReview(draft(),3,0),false,'no batch dropdowns when DB has zero existing candidates');
+  assert.equal(emailBatchNeedsReview(draft({tripType:'single',waypoints:stops(dates[0])}),1,2),false,'single day and single car uses single match panel');
 });
 
 test('explicit row mappings prepare nine atomic in-place updates without duplicating schedule IDs',()=>{

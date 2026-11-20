@@ -23,6 +23,11 @@ test('CRM uses white A-plan cards and soft active selections',()=>{
   assert.match(view,/<HqButton/);
   assert.match(view,/<HqIconButton/);
   assert.match(view,/고객사 삭제/);
+  assert.match(view,/고객사를 삭제할까요\?/);
+  assert.match(view,/삭제된 고객사와 담당자 정보는 복구할 수 없어요\./);
+  assert.match(view,/기존 배차, 운행일지, 경비 기록은 삭제되지 않고 남아요\./);
+  assert.match(view,/대표 담당자 · /);
+  assert.match(view,/삭제하기/);
   assert.doesNotMatch(view,/window\.confirm\(|\balert\(/);
 });
 

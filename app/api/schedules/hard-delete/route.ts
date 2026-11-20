@@ -7,6 +7,21 @@ const IS_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 type DeleteScope = 'booking' | 'event' | 'customer';
 type DeleteMode = 'schedule_only' | 'include_drafts';
 
+function extractCustomerName(row: {
+  customer_name?: string | null;
+  schedule_meta?: Record<string, unknown> | null;
+}): string | null {
+  if (isNamedOperationalCustomer(row.customer_name)) return row.customer_name ?? null;
+  const metaName = row.schedule_meta?.customerName;
+  if (typeof metaName === 'string' && metaName.trim()) return metaName;
+  return typeof row.customer_name === 'string' && row.customer_name.trim() ? row.customer_name : null;
+}
+
+function extractCustomerId(row: { schedule_meta?: Record<string, unknown> | null }): string {
+  const metaId = row.schedule_meta?.customerId;
+  return typeof metaId === 'string' ? metaId.trim() : '';
+}
+
 function failure(error: string, status: number) {
   return { ids: null, response: NextResponse.json({ ok: false, error }, { status }) };
 }
@@ -20,7 +35,7 @@ async function resolveIds(payload: Record<string, unknown> | null) {
   }
 
   const { data: anchor, error: anchorError } = await supabaseAdmin.from('schedules')
-    .select('id, group_id, event_id, status, customer_name')
+    .select('id, group_id, event_id, status, customer_name, schedule_meta')
     .eq('id', id).maybeSingle();
   if (anchorError) throw anchorError;
   if (!anchor || anchor.status === 'deleted') {
@@ -35,26 +50,51 @@ async function resolveIds(payload: Record<string, unknown> | null) {
       return failure('고객사 배차 목록이 올바르지 않습니다.', 400);
     }
     ids = [...new Set(supplied as string[])];
-    if (!ids.includes(id) || !isNamedOperationalCustomer(anchor.customer_name)) {
+    const anchorCustomerName = extractCustomerName(anchor);
+    const anchorCustomerId = extractCustomerId(anchor);
+    if (!ids.includes(id) || !isNamedOperationalCustomer(anchorCustomerName)) {
       return failure('고객사 연결 정보를 확인해 주세요.', 409);
     }
     const { data: targets, error } = await supabaseAdmin.from('schedules')
-      .select('id, customer_name, dispatch_status, status').in('id', ids);
+      .select('id, customer_name, dispatch_status, status, schedule_meta').in('id', ids);
     if (error) throw error;
-    const normalized = normalizeOperationalCustomerName(anchor.customer_name);
+    const normalized = normalizeOperationalCustomerName(anchorCustomerName);
     if (!targets || targets.length !== ids.length || !targets.every(item =>
-      normalizeOperationalCustomerName(item.customer_name) === normalized &&
+      (normalizeOperationalCustomerName(item.customer_name) === normalized ||
+        normalizeOperationalCustomerName(extractCustomerName(item)) === normalized ||
+        (Boolean(anchorCustomerId) && extractCustomerId(item) === anchorCustomerId)) &&
       item.dispatch_status === 'published' && item.status !== 'deleted')) {
       return failure('삭제 대상의 고객사 또는 배차 상태가 달라졌습니다. 새로고침 후 다시 확인해 주세요.', 409);
     }
   } else {
-    let query = supabaseAdmin.from('schedules').select('id, status');
-    if (scope === 'event' && anchor.group_id) query = query.eq('group_id', anchor.group_id);
-    else if (scope === 'event' && anchor.event_id) query = query.eq('event_id', anchor.event_id);
-    else query = query.eq('id', id);
-    const { data: targets, error } = await query;
-    if (error) throw error;
-    ids = [...new Set((targets || []).filter(item => item.status !== 'deleted').map(item => item.id))];
+    const supplied = payload?.scheduleIds;
+    if (scope === 'event' && !anchor.group_id && !anchor.event_id && Array.isArray(supplied)) {
+      if (supplied.length < 1 || supplied.length > 100 ||
+          !supplied.every(value => typeof value === 'string' && IS_UUID.test(value))) {
+        return failure('행사 배차 목록이 올바르지 않습니다.', 400);
+      }
+      const candidateIds = [...new Set(supplied as string[])];
+      if (!candidateIds.includes(id)) {
+        return failure('행사 연결 정보를 확인해 주세요.', 409);
+      }
+      const { data: targets, error } = await supabaseAdmin.from('schedules')
+        .select('id, customer_name, dispatch_status, status, schedule_meta').in('id', candidateIds);
+      if (error) throw error;
+      if (!targets || targets.length !== candidateIds.length || !targets.every(item =>
+        !isNamedOperationalCustomer(extractCustomerName(item)) &&
+        item.dispatch_status === 'published' && item.status !== 'deleted')) {
+        return failure('삭제 대상의 행사 또는 배차 상태가 달라졌습니다. 새로고침 후 다시 확인해 주세요.', 409);
+      }
+      ids = candidateIds;
+    } else {
+      let query = supabaseAdmin.from('schedules').select('id, status');
+      if (scope === 'event' && anchor.group_id) query = query.eq('group_id', anchor.group_id);
+      else if (scope === 'event' && anchor.event_id) query = query.eq('event_id', anchor.event_id);
+      else query = query.eq('id', id);
+      const { data: targets, error } = await query;
+      if (error) throw error;
+      ids = [...new Set((targets || []).filter(item => item.status !== 'deleted').map(item => item.id))];
+    }
   }
 
   if (!ids.length || ids.length > 100) {

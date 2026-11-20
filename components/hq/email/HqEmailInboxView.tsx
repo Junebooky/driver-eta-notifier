@@ -53,7 +53,7 @@ import { useHqDrivers } from '@/utils/useHqDrivers';
 import type { AvailableDriverItem as FleetAvailableDriverItem } from '@/utils/availabilityEngine';
 import { HqComposeEmailModal } from './HqComposeEmailModal';
 import { HqEmailWorkflowStepper, WorkflowStepId } from './HqEmailWorkflowStepper';
-import { parseVehicleSlotsFromRequestedClass } from '@/utils/vehicleSlotParser';
+import { resolveVehicleSlotsForDraft } from '@/utils/vehicleSlotParser';
 import { mapScheduleItemToHqBooking, getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
 import {
   saveEmailDraft,
@@ -237,7 +237,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   const [vehicleSlots, setVehicleSlots] = useState<VehicleSlotAssignment[]>(() => {
     // Check initial draft if demo or existing
     if (urlDemo && REFERENCE_EMAILS[0]?.extractedDraft?.requestedVehicleClass) {
-      return parseVehicleSlotsFromRequestedClass(REFERENCE_EMAILS[0].extractedDraft.requestedVehicleClass);
+      return resolveVehicleSlotsForDraft(REFERENCE_EMAILS[0].extractedDraft);
     }
     // Strictly NO dummy fallback ([319 CDI, G90 LWB])!
     // Initialize empty/unassigned default slot
@@ -511,10 +511,10 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
 
   // Sync vehicle slots whenever email changes or workflow moves to step2 if slots are uninitialized
   useEffect(() => {
-    if (workflowStep === 'step2_booking_detail' && vehicleSlots.length === 1 && vehicleSlots[0].vehicleModel === '차량 미지정' && currentDraft?.requestedVehicleClass) {
-      setVehicleSlots(parseVehicleSlotsFromRequestedClass(currentDraft.requestedVehicleClass));
+    if (workflowStep === 'step2_booking_detail' && vehicleSlots.length === 1 && vehicleSlots[0].vehicleModel === '차량 미지정' && (currentDraft?.requestedVehicleClass || currentDraft?.excelVehicleSchedules?.length)) {
+      setVehicleSlots(resolveVehicleSlotsForDraft(currentDraft));
     }
-  }, [workflowStep, currentDraft?.requestedVehicleClass]);
+  }, [workflowStep, currentDraft?.requestedVehicleClass, currentDraft?.activeVehicleScheduleId]);
 
   // Derived KPI counts
   const counts = useMemo(() => {
@@ -577,8 +577,8 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
 
     // Sync vehicle slots dynamically from draft of selected email (no dummy default!)
     const targetDraft = draftsByEmailId[emailId];
-    if (targetDraft?.requestedVehicleClass) {
-      setVehicleSlots(parseVehicleSlotsFromRequestedClass(targetDraft.requestedVehicleClass));
+    if (targetDraft?.requestedVehicleClass || targetDraft?.excelVehicleSchedules?.length) {
+      setVehicleSlots(resolveVehicleSlotsForDraft(targetDraft));
     } else {
       setVehicleSlots([
         {
@@ -627,21 +627,50 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     showToast(`${driver.name} 기사님이 ${vehicleSlots[activeSlotIndex]?.vehicleModel || '차량'}에 배정되었습니다.`);
   };
 
+  const prevActiveScheduleIdRef = useRef<string | undefined>(currentDraft?.activeVehicleScheduleId);
+  useEffect(() => {
+    prevActiveScheduleIdRef.current = currentDraft?.activeVehicleScheduleId;
+  }, [currentDraft?.id, currentDraft?.activeVehicleScheduleId]);
+
   // Update draft helper
   const handleUpdateDraft = useCallback((updated: HqEmailExtractedDraft) => {
     if (!currentSummary) return;
+    const scheduleChanged = prevActiveScheduleIdRef.current !== updated.activeVehicleScheduleId;
+    prevActiveScheduleIdRef.current = updated.activeVehicleScheduleId;
     setDraftsByEmailId((prev) => ({
       ...prev,
       [currentSummary.id]: updated,
     }));
     saveEmailDraft(updated);
+    if (scheduleChanged) {
+      setVehicleSlots(resolveVehicleSlotsForDraft(updated));
+    }
   }, [currentSummary]);
+
+  const getEffectiveBatchDecisions = (
+    draft: HqEmailExtractedDraft,
+    slotsArg: VehicleSlotAssignment[],
+    candidates: ExistingEmailBookingCandidate[],
+    stored: EmailBatchDecisions = {},
+  ): EmailBatchDecisions => {
+    try {
+      const base = Object.fromEntries(
+        emailBatchRows(draft, slotsArg, candidates, {}).map((row) => [row.key, 'new'])
+      );
+      return { ...base, ...stored };
+    } catch {
+      return stored;
+    }
+  };
 
   const handleChooseBatchTarget = (rowKey: string, selection: string) => {
     if (!currentSummary || !currentDraft) return;
     const emailId = currentSummary.id;
     const candidates = matchesByEmail[emailId] || [];
-    const next = { ...(batchDecisionsByEmail[emailId] || {}), [rowKey]: selection };
+    const next = {
+      ...getEffectiveBatchDecisions(currentDraft, vehicleSlots, candidates, batchDecisionsByEmail[emailId] || {}),
+      [rowKey]: selection,
+    };
     setBatchDecisionsByEmail(prev => ({ ...prev, [emailId]: next }));
     setBatchAssignmentsByEmail(prev => ({
       ...prev, [emailId]: Object.fromEntries(Object.entries(prev[emailId] || {}).filter(([key]) => key !== rowKey)),
@@ -659,6 +688,23 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       // Do not discard the explicit choice, but require the operator to fix
       // an ambiguous partial route manually before publish.
       showToast(error instanceof Error ? error.message : '날짜별 경로를 확인해 주세요.');
+    }
+  };
+
+  const handleResetBatchToAllNew = () => {
+    if (!currentSummary || !currentDraft) return;
+    const emailId = currentSummary.id;
+    const candidates = matchesByEmail[emailId] || [];
+    const prevDecisions = batchDecisionsByEmail[emailId] || {};
+    const hadLinkedCandidate = Object.values(prevDecisions).some(
+      (val) => val && val !== 'new' && val !== 'skip'
+    );
+    const allNew = getEffectiveBatchDecisions(currentDraft, vehicleSlots, candidates, {});
+    setBatchDecisionsByEmail((prev) => ({ ...prev, [emailId]: allNew }));
+    setBatchCancelIdsByEmail((prev) => ({ ...prev, [emailId]: [] }));
+    setBatchCancelReasonsByEmail((prev) => ({ ...prev, [emailId]: {} }));
+    if (hadLinkedCandidate && originalAiDraftByEmail[emailId]) {
+      handleUpdateDraft(originalAiDraftByEmail[emailId]);
     }
   };
 
@@ -720,8 +766,9 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   const handleChooseNewBooking = () => {
     if (!currentSummary || !currentDraft) return;
     setMatchDecisionByEmail(prev => ({ ...prev, [currentSummary.id]: 'new' }));
-    handleUpdateDraft({ ...currentDraft, revisionMatchedScheduleId: undefined, revisionMatchedVersion: undefined });
-    setVehicleSlots(parseVehicleSlotsFromRequestedClass(currentDraft.requestedVehicleClass));
+    const nextDraft = { ...currentDraft, revisionMatchedScheduleId: undefined, revisionMatchedVersion: undefined };
+    handleUpdateDraft(nextDraft);
+    setVehicleSlots(resolveVehicleSlotsForDraft(nextDraft));
   };
 
   // =========================================================
@@ -805,7 +852,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       scrollMobileTo('detail');
 
       // Dynamically initialize vehicle slots based on AI extracted vehicle request (NO dummy vehicles!)
-      const newSlots = parseVehicleSlotsFromRequestedClass(extracted.requestedVehicleClass);
+      const newSlots = resolveVehicleSlotsForDraft(extracted);
       setVehicleSlots(newSlots);
 
       const metricsText = data.metrics?.totalMs ? ` (${(data.metrics.totalMs / 1000).toFixed(1)}초)` : '';
@@ -853,8 +900,14 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       const matched = candidates.find(c => c.scheduleId === decision);
       let items: Array<Record<string, unknown>>;
       if (batch) {
+        const effectiveDecisions = getEffectiveBatchDecisions(
+          currentDraft,
+          vehicleSlots,
+          candidates,
+          batchDecisionsByEmail[currentSummary.id] || {},
+        );
         const plan = buildEmailBatchRevisionApproval(
-          currentDraft, vehicleSlots, candidates, batchDecisionsByEmail[currentSummary.id] || {},
+          currentDraft, vehicleSlots, candidates, effectiveDecisions,
           // Cancellation is managed explicitly in HQ dispatch, not hidden in the email form.
           [],
           {},
@@ -918,8 +971,8 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     haptics.lightTap();
     setWorkflowStep('step1_extract');
     setDispatchError(null);
-    if (currentDraft?.requestedVehicleClass) {
-      setVehicleSlots(parseVehicleSlotsFromRequestedClass(currentDraft.requestedVehicleClass));
+    if (currentDraft?.requestedVehicleClass || currentDraft?.excelVehicleSchedules?.length) {
+      setVehicleSlots(resolveVehicleSlotsForDraft(currentDraft));
     }
   };
 
@@ -937,7 +990,14 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     }
     const batch = emailBatchNeedsReview(currentDraft, vehicleSlots.length, (matchesByEmail[currentSummary.id] || []).length);
     if (batch) {
-      const rows = emailBatchRows(currentDraft, vehicleSlots, matchesByEmail[currentSummary.id] || [], batchDecisionsByEmail[currentSummary.id] || {});
+      const batchCandidates = matchesByEmail[currentSummary.id] || [];
+      const effectiveDecisions = getEffectiveBatchDecisions(
+        currentDraft,
+        vehicleSlots,
+        batchCandidates,
+        batchDecisionsByEmail[currentSummary.id] || {},
+      );
+      const rows = emailBatchRows(currentDraft, vehicleSlots, batchCandidates, effectiveDecisions);
       if (!rows.length || rows.some(row => !row.selection) ||
         rows.filter(row => row.selection !== 'new').some(row => !row.previous) ||
         new Set(rows.map(row => row.previous?.scheduleId).filter(Boolean)).size !== rows.filter(row => Boolean(row.previous)).length) {
@@ -963,7 +1023,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     // Preserve the date×vehicle structure HQ just reviewed. Rebuilding from the
     // AI's original vehicle request here silently drops manually added slots.
     if (!batch && !confirmedDraft.revisionMatchedScheduleId) {
-      setVehicleSlots(parseVehicleSlotsFromRequestedClass(confirmedDraft.requestedVehicleClass));
+      setVehicleSlots(resolveVehicleSlotsForDraft(confirmedDraft));
     }
     setWorkflowStep('step4_booking_confirmed');
   };
@@ -1390,10 +1450,21 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                   }}
                   onUpdateDraft={handleUpdateDraft}
                   batchReviewRows={currentDraft && emailBatchNeedsReview(currentDraft, vehicleSlots.length, (matchesByEmail[currentSummary.id] || []).length)
-                    ? emailBatchRows(currentDraft, vehicleSlots, matchesByEmail[currentSummary.id] || [], batchDecisionsByEmail[currentSummary.id] || {})
+                    ? emailBatchRows(
+                        currentDraft,
+                        vehicleSlots,
+                        matchesByEmail[currentSummary.id] || [],
+                        getEffectiveBatchDecisions(
+                          currentDraft,
+                          vehicleSlots,
+                          matchesByEmail[currentSummary.id] || [],
+                          batchDecisionsByEmail[currentSummary.id] || {},
+                        ),
+                      )
                     : undefined}
                   batchReviewCandidates={matchesByEmail[currentSummary.id] || []}
                   onChooseBatchTarget={handleChooseBatchTarget}
+                  onResetBatchToAllNew={handleResetBatchToAllNew}
                 />
               )}
 

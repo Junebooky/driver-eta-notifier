@@ -41,3 +41,37 @@ test('operations keeps the updated deletion dialog copy and actions', () => {
     '>\n                취소\n',
   ]) assert.ok(file.includes(phrase), phrase);
 });
+
+test('unidentified rows on overlapping or consecutive dates collapse into one card while distant dates stay separate', () => {
+  const groups = groupOperationsByCustomer([
+    { id: 's-1', customerName: '고객사', eventName: 'VIP 의전 행사', startDate: '2026-09-20' },
+    { id: 's-2', customerName: '고객사', eventName: 'VIP 의전 행사', startDate: '2026-09-19' },
+    { id: 's-3', customerName: '고객사', eventName: 'VIP 의전 행사', startDate: '2026-09-18' },
+    { id: 's-4', customerName: '고객사', eventName: 'VIP 의전 행사', startDate: '2026-11-10' },
+  ]);
+  assert.equal(groups.length, 2);
+  assert.equal(groups[0].customerScoped, false);
+  assert.deepEqual(groups[0].schedules.map(r => r.id), ['s-1', 's-2', 's-3']);
+  assert.equal(groups[1].customerScoped, false);
+  assert.deepEqual(groups[1].schedules.map(r => r.id), ['s-4']);
+});
+
+test('unidentified rows with 고객사 미확정 and same specific eventName merge across distinct eventIds', () => {
+  const groups = groupOperationsByCustomer([
+    { id: 'q-1', customerName: '고객사 미확정', eventName: '[QA 원본 확인] 11/9 Car 1', eventId: 'ev-1' },
+    { id: 'q-2', customerName: '고객사 미확정', eventName: '[QA 원본 확인] 11/9 Car 1', eventId: 'ev-2' },
+  ]);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].customerScoped, false);
+  assert.deepEqual(groups[0].schedules.map(r => r.id), ['q-1', 'q-2']);
+});
+
+test('named customers sharing customerId merge across English and Korean alias names', () => {
+  const groups = groupOperationsByCustomer([
+    { id: 'c-1', customerId: 'cust-cpb', customerName: 'Central Pacific Bank', driverName: '기사 1' },
+    { id: 'c-2', customerId: 'cust-cpb', customerName: '센트럴 퍼시픽 뱅크', driverName: '기사 2' },
+  ]);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].customerScoped, true);
+  assert.deepEqual(groups[0].schedules.map(r => r.driverName), ['기사 1', '기사 2']);
+});

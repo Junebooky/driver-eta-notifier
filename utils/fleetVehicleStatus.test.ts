@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveVehicleCurrentStatus, combineFleetAvailability } from './fleetVehicleStatus';
+import { resolveFleetAvailabilityWindows } from './fleetAvailabilityWindow';
 import { checkFleetAvailability } from './availabilityEngine';
 import { parseKstDateTimeToMs } from './dispatchConflictDetector';
 import { VIP_REAL_VEHICLES } from './vehicleData';
@@ -65,4 +66,43 @@ test('multi-day vehicle choices require availability on every day while preservi
   const blocked = await checkFleetAvailability({ ...query, startDate: '2026-11-07', endDate: '2026-11-07' }, options);
   assert.equal(combineFleetAvailability([first, blocked]).vehicles.find(row => row.uuid === car.uuid)?.isAvailable, false);
   assert.equal(combineFleetAvailability([first, { ...last, vehicles: [] }]).vehicles.find(row => row.uuid === car.uuid)?.isAvailable, false);
+});
+
+test('single-stop days or missing end times conservatively probe until end-of-day without inventing saved end times', () => {
+  const sameTime = resolveFleetAvailabilityWindows([
+    { startDate: '2026-11-08', startTime: '22:00', endDate: '2026-11-08', endTime: '22:00' },
+  ]);
+  assert.equal(sameTime.valid, true);
+  assert.deepEqual(sameTime.provisionalDates, ['2026-11-08']);
+  assert.deepEqual(sameTime.windows, [
+    { startDate: '2026-11-08', startTime: '22:00', endDate: '2026-11-08', endTime: '23:59' },
+  ]);
+  assert.ok(sameTime.notice?.includes('2026-11-08'));
+
+  const emptyEnd = resolveFleetAvailabilityWindows([
+    { startDate: '2026-11-09', startTime: '09:00', endDate: '2026-11-09', endTime: '' },
+  ]);
+  assert.equal(emptyEnd.valid, true);
+  assert.deepEqual(emptyEnd.windows, [
+    { startDate: '2026-11-09', startTime: '09:00', endDate: '2026-11-09', endTime: '23:59' },
+  ]);
+
+  const edge2359 = resolveFleetAvailabilityWindows([
+    { startDate: '2026-11-08', startTime: '23:59', endDate: '2026-11-08', endTime: '23:59' },
+  ]);
+  assert.equal(edge2359.valid, true);
+  assert.deepEqual(edge2359.windows, [
+    { startDate: '2026-11-08', startTime: '23:59', endDate: '2026-11-09', endTime: '00:59' },
+  ]);
+
+  const invertedTime = resolveFleetAvailabilityWindows([
+    { startDate: '2026-11-08', startTime: '15:00', endDate: '2026-11-08', endTime: '12:00' },
+  ]);
+  assert.equal(invertedTime.valid, false);
+  assert.ok(invertedTime.error?.includes('빠릅니다'));
+
+  const invertedDate = resolveFleetAvailabilityWindows([
+    { startDate: '2026-11-10', startTime: '09:00', endDate: '2026-11-09', endTime: '18:00' },
+  ]);
+  assert.equal(invertedDate.valid, false);
 });

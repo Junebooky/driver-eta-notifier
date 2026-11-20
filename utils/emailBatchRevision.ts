@@ -95,9 +95,10 @@ export function emailBatchNeedsReview(
   slotCount: number,
   candidateCount: number,
 ): boolean {
+  if (candidateCount <= 0) return false;
   let dayCount = 0;
   try { dayCount = emailDispatchDays(draft).length; } catch { return draft.tripType === 'modification'; }
-  return (dayCount > 1 || slotCount > 1) && (draft.tripType === 'modification' || candidateCount > 0);
+  return dayCount > 1 || slotCount > 1;
 }
 
 /**

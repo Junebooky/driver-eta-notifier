@@ -26,6 +26,7 @@ export interface HqVehicleSelectModalProps {
   vehicles?: AvailableVehicleItem[];
   loading: boolean;
   error?: string;
+  notice?: string;
   slotNumber: number;
   selectedPlate?: string;
   excludedPlates?: string[];
@@ -33,7 +34,7 @@ export interface HqVehicleSelectModalProps {
 }
 
 const VehiclePickerContent: React.FC<HqVehicleSelectModalProps> = ({
-  isOpen, onClose, vehicles, loading, error, slotNumber, selectedPlate, excludedPlates = [], onSelect,
+  isOpen, onClose, vehicles, loading, error, notice, slotNumber, selectedPlate, excludedPlates = [], onSelect,
 }) => {
   const registry = useHqFleetRegistry(isOpen);
   const [query, setQuery] = useState('');
@@ -69,7 +70,7 @@ const VehiclePickerContent: React.FC<HqVehicleSelectModalProps> = ({
         <label className="flex min-h-10 items-center gap-2"><input type="checkbox" checked={availableOnly} onChange={event => setAvailableOnly(event.target.checked)}/>예약 가능한 차량만</label>
         <span aria-live="polite">{filtered.length}대</span>
       </div>
-      <HqInlineFeedback message={registry.error || error || (!vehicles && !loading ? pendingReason : null)} tone={registry.error || error ? 'error' : 'info'}/>
+      <HqInlineFeedback message={registry.error || error || notice || (!vehicles && !loading ? pendingReason : null)} tone={registry.error || error ? 'error' : 'info'}/>
       {registry.loading && <p role="status" className="text-xs text-[#73839D]">차량 등록부를 불러오고 있습니다.</p>}
       <div className="space-y-2" aria-label="차량 목록">
         {filtered.map(vehicle => {

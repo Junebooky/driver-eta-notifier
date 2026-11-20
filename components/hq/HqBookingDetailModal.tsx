@@ -26,6 +26,7 @@ import { haptics } from '@/utils/haptics';
 import { getVehicleImage, stripManufacturerName } from '@/utils/vehicleData';
 import { HqDispatchTimeField } from './ui/HqDispatchTimeField';
 import { HqSearchSelect } from './ui/HqSearchSelect';
+import { HqInlineFeedback } from './ui/HqInlineFeedback';
 import { parseFlexibleTimeInput, formatTimeKoreanAmPm, getDriverProfileImage } from './HqQuickDispatch';
 import { HqDriverVehicleInfoModal } from './bookings/HqDriverVehicleInfoModal';
 import { HqDriverAssetManagerModal } from './drivers/HqDriverAssetManagerModal';
@@ -635,6 +636,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
               {saveMutation.hasPending && <button type="button" className="rounded-xl border border-blue-200 p-3 text-sm text-blue-700" disabled={isSaving} onClick={async()=>{setIsSaving(true);try{const response=await saveMutation.retry();const data=await response.json();if(!response.ok)throw new Error(data.error || '저장 결과 확인 실패');window.location.reload();}catch(error){setErrorMsg(error instanceof Error?error.message:'확인 실패');}finally{setIsSaving(false);}}}>이전 저장 결과 확인</button>}
               {!endTime && <button type="button" onClick={()=>setMobileSection('details')} className="min-h-11 w-full rounded-xl bg-amber-50 p-3 text-left text-sm text-amber-900 md:hidden">예약 정보에서 실제 종료 시간을 먼저 입력해 주세요.</button>}
               {fleet.error && <p role="alert" className="text-sm text-rose-700">{fleet.error}</p>}
+              {!fleet.error && fleet.notice && <HqInlineFeedback message={fleet.notice} tone="info" />}
               {/* Driver Assignment & Ack Card */}
               <div className="p-4 rounded-2xl border-2 border-blue-200/80 bg-blue-50/20 space-y-3.5">
                 <div className="flex items-center justify-between gap-2 flex-wrap">

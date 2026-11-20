@@ -32,7 +32,12 @@ test('AI source viewer keeps the actual attachment count, every candidate and AI
   assert.match(step,/displayedWaypoints\.length > 2 \|\| hasMultipleDates/);
   assert.match(step,/parseExcelWaypointNotes\(wp\.notes\)/);
   assert.match(step,/원본 \{excelSource\.cell\}/);
+  assert.match(step,/mt-1 pl-14 flex flex-wrap items-center gap-1\.5/);
+  assert.doesNotMatch(step,/TMAP 위치 미확정 · 눌러서 검색 결과 선택/);
   assert.doesNotMatch(step,/\{wp\.notes\}/);
+  assert.match(step,/batchReviewCandidates\.length > 0/);
+  assert.match(step,/<HqSearchSelect/);
+  assert.doesNotMatch(step,/<select\b/);
 });
 
 test('compose email preserves explicit real-send safety and To/Cc recipient flow',()=>{

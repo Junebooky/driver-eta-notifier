@@ -1,18 +1,14 @@
 'use client';
 import { useEffect, useState } from 'react';
 import type { FleetAvailabilityResult } from '@/utils/availabilityEngine';
-import { parseKstDateTimeToMs } from '@/utils/dispatchConflictDetector';
 import { combineFleetAvailability } from '@/utils/fleetVehicleStatus';
+import { resolveFleetAvailabilityWindows, type FleetWindow } from '@/utils/fleetAvailabilityWindow';
 
-export interface FleetWindow { startDate: string; startTime: string; endDate: string; endTime: string }
+export type { FleetWindow };
 
 export function useFleetAvailabilityWindows(windows: FleetWindow[], excludeScheduleId?: string) {
-  const valid = windows.length > 0 && windows.every(window => {
-    const start = parseKstDateTimeToMs(window.startDate, window.startTime);
-    const end = parseKstDateTimeToMs(window.endDate, window.endTime);
-    return Number.isFinite(start) && Number.isFinite(end) && end > start;
-  });
-  const key = JSON.stringify(valid ? windows.map(window => new URLSearchParams({ ...window, ...(excludeScheduleId ? { excludeScheduleId } : {}) }).toString()) : []);
+  const resolved = resolveFleetAvailabilityWindows(windows);
+  const key = JSON.stringify(resolved.valid ? resolved.windows.map(window => new URLSearchParams({ ...window, ...(excludeScheduleId ? { excludeScheduleId } : {}) }).toString()) : []);
   const [result, setResult] = useState<{ key: string; data?: ReturnType<typeof combineFleetAvailability>; error?: string } | null>(null);
   useEffect(() => {
     const queries: string[] = JSON.parse(key);
@@ -51,7 +47,12 @@ export function useFleetAvailabilityWindows(windows: FleetWindow[], excludeSched
     };
   }, [key]);
   const current = result?.key === key ? result : null;
-  return { data: valid ? current?.data : undefined, error: valid ? current?.error : '실제 시작·종료 날짜와 시간을 확인해 주세요.', loading: valid && !current };
+  return {
+    data: resolved.valid ? current?.data : undefined,
+    error: resolved.valid ? current?.error : resolved.error || '실제 시작·종료 날짜와 시간을 확인해 주세요.',
+    notice: resolved.valid && !current?.error ? resolved.notice : undefined,
+    loading: resolved.valid && !current,
+  };
 }
 
 export function useFleetAvailability(startDate: string, startTime: string, endDate: string, endTime: string, excludeScheduleId?: string) {

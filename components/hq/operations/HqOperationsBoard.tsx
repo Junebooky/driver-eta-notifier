@@ -42,6 +42,7 @@ export interface ScheduleOperationItem {
   id: string;
   eventId?: string;
   eventName: string;
+  customerId?: string;
   customerName: string;
   driverName?: string;
   driverPhone?: string;
@@ -497,10 +498,11 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
 
       if (data.ok && Array.isArray(data.schedules)) {
         // Map server schedules to ScheduleOperationItem
-        const serverMapped: ScheduleOperationItem[] = data.schedules.map((s: any, idx: number) => ({
+        const serverMapped: ScheduleOperationItem[] = data.schedules.map((s: any) => ({
           id: s.id,
           eventId: s.event_id || s.eventId || undefined,
           eventName: s.event_name || s.eventName || 'VIP 의전 행사',
+          customerId: s.customer_id || s.customerId || undefined,
           customerName: s.customer_name || s.customerName || '고객사',
           driverName: s.driver_name || s.driverName || '미지정',
           driverPhone: s.driver_phone || s.driverPhone || '',
@@ -519,7 +521,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
           groupId: s.group_id || s.groupId,
           groupName: s.group_name || s.groupName,
           groupTotalVehicles: s.group_total_vehicles || s.groupTotalVehicles || 1,
-          groupVehicleIndex: s.group_vehicle_index || s.groupVehicleIndex || idx + 1,
+          groupVehicleIndex: s.group_vehicle_index || s.groupVehicleIndex || undefined,
         }));
 
         // One customer = one main event card. Keep each driver's row unchanged,
@@ -584,6 +586,19 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
       progressRate,
     };
   }, [eventGroups, allSchedules]);
+
+  const { runningEventsCount, closedEventsCount } = useMemo(() => {
+    let running = 0;
+    let closed = 0;
+    for (const grp of eventGroups) {
+      const hasRunning = grp.schedules.some(
+        (s) => s.operationStatus === 'in_transit' || s.operationStatus === 'ready' || s.operationStatus === 'boarded'
+      );
+      if (hasRunning) running += 1;
+      else closed += 1;
+    }
+    return { runningEventsCount: running, closedEventsCount: closed };
+  }, [eventGroups]);
 
   // Filtered event groups
   const filteredGroups = useMemo(() => {
@@ -905,7 +920,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
           >
             <span>운영 중</span>
             <span className={`px-1.5 py-0.2 rounded-md text-[11px] ${activeTab === 'running' ? 'bg-white/75 text-[#1E60F3]' : 'bg-[#F7F9FC] text-[#73839D]'}`}>
-              {eventGroups.length}
+              {runningEventsCount}
             </span>
           </button>
 
@@ -922,7 +937,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
           >
             <span>대기·종료</span>
             <span className={`px-1.5 py-0.2 rounded-md text-[11px] ${activeTab === 'closed' ? 'bg-white/75 text-[#1E60F3]' : 'bg-[#F7F9FC] text-[#73839D]'}`}>
-              0
+              {closedEventsCount}
             </span>
           </button>
         </div>
@@ -962,7 +977,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
 
       {/* 4. Event Cards (우리만의 프리미엄 아코디언 카드) */}
       <div className="hq-operations-a space-y-5 sm:space-y-6">
-        {!isLoading && filteredGroups.length === 0 && (
+        {!isLoading && eventGroups.length === 0 && (
           <div className="rounded-[24px] bg-white px-6 py-14 text-center shadow-[0_6px_20px_rgba(35,49,78,0.055)]">
             <p className="text-[14px] font-semibold text-[#17233B]">등록된 행사가 없습니다.</p>
             <p className="mt-1 text-[12px] text-[#8492A4]">새 배차가 등록되면 이곳에 표시됩니다.</p>
@@ -972,6 +987,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
           const isExpanded = expandedEvents[group.id] !== false;
           const isShowingAll = showAllVehicles[group.id] === true;
           const totalVehiclesCount = group.schedules.length;
+          const isMultiDateGroup = new Set(group.schedules.map((s) => s.startDate)).size > 1;
 
           // Status counts for this event
           const inTransitCount = group.schedules.filter((s) => s.operationStatus === 'in_transit').length;
@@ -1172,35 +1188,42 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
 
                               {/* 3. 이동 경로 (우리만의 출발지/목적지 아이콘) */}
                               <td className="py-3.5 px-5 whitespace-nowrap">
-                                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-slate-50 group-hover:bg-white  shadow-2xs transition-colors">
-                                  {/* 출발지 */}
-                                  <div className="flex items-center gap-1.5">
-                                    <div className="w-5.5 h-5.5 rounded-full bg-[#F7F9FC] flex items-center justify-center shrink-0">
-                                      <img
-                                        src="/images/icons/driver_ui/icon_origin.png"
-                                        alt="출발지"
-                                        className="w-3.5 h-3.5 object-contain select-none pointer-events-none"
-                                      />
+                                <div className="space-y-1">
+                                  {isMultiDateGroup && (
+                                    <div className="pl-1 text-[11px] font-semibold text-[#73839D]">
+                                      {item.startDate.slice(5)} · {item.startTime}
                                     </div>
-                                    <span className="font-black text-slate-900 whitespace-nowrap">
-                                      {item.pickupLocation}
-                                    </span>
-                                  </div>
-
-                                  <span className="text-slate-300 font-bold px-0.5 select-none">➔</span>
-
-                                  {/* 목적지 */}
-                                  <div className="flex items-center gap-1.5">
-                                    <div className="w-5.5 h-5.5 rounded-full bg-red-50 border border-red-100/80 flex items-center justify-center shrink-0">
-                                      <img
-                                        src="/images/icons/driver_ui/icon_destination.png"
-                                        alt="목적지"
-                                        className="w-3.5 h-3.5 object-contain select-none pointer-events-none"
-                                      />
+                                  )}
+                                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-slate-50 group-hover:bg-white  shadow-2xs transition-colors">
+                                    {/* 출발지 */}
+                                    <div className="flex items-center gap-1.5">
+                                      <div className="w-5.5 h-5.5 rounded-full bg-[#F7F9FC] flex items-center justify-center shrink-0">
+                                        <img
+                                          src="/images/icons/driver_ui/icon_origin.png"
+                                          alt="출발지"
+                                          className="w-3.5 h-3.5 object-contain select-none pointer-events-none"
+                                        />
+                                      </div>
+                                      <span className="font-black text-slate-900 whitespace-nowrap">
+                                        {item.pickupLocation}
+                                      </span>
                                     </div>
-                                    <span className="font-bold text-slate-700 whitespace-nowrap">
-                                      {item.dropoffLocation}
-                                    </span>
+
+                                    <span className="text-slate-300 font-bold px-0.5 select-none">➔</span>
+
+                                    {/* 목적지 */}
+                                    <div className="flex items-center gap-1.5">
+                                      <div className="w-5.5 h-5.5 rounded-full bg-red-50 border border-red-100/80 flex items-center justify-center shrink-0">
+                                        <img
+                                          src="/images/icons/driver_ui/icon_destination.png"
+                                          alt="목적지"
+                                          className="w-3.5 h-3.5 object-contain select-none pointer-events-none"
+                                        />
+                                      </div>
+                                      <span className="font-bold text-slate-700 whitespace-nowrap">
+                                        {item.dropoffLocation}
+                                      </span>
+                                    </div>
                                   </div>
                                 </div>
                               </td>
@@ -1296,6 +1319,11 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
 
                           {/* Row 2: Route box */}
                           <div className="p-2.5 rounded-2xl bg-slate-50  space-y-1.5 text-xs">
+                            {isMultiDateGroup && (
+                              <div className="text-[11px] font-semibold text-[#73839D]">
+                                {item.startDate.slice(5)} · {item.startTime}
+                              </div>
+                            )}
                             <div className="flex items-center gap-2">
                               <div className="w-5 h-5 rounded-full bg-[#F7F9FC] flex items-center justify-center shrink-0">
                                 <img
@@ -1376,7 +1404,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
           );
         })}
 
-        {filteredGroups.length === 0 && (
+        {!isLoading && eventGroups.length > 0 && filteredGroups.length === 0 && (
           <div className="p-12 text-center bg-white  rounded-[28px] shadow-[0_6px_24px_rgba(15,23,42,0.05)] text-slate-400 space-y-3">
             <div className="w-14 h-14 rounded-2xl bg-[#EEF3FF] text-[#1E60F3] flex items-center justify-center mx-auto shadow-2xs">
               <Activity className="w-7 h-7" />

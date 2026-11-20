@@ -97,9 +97,13 @@ const BOOKING_RESPONSE_SCHEMA = {
           sourceId: { type: Type.STRING },
           reviewedSheets: { type: Type.ARRAY, items: { type: Type.STRING } },
           scheduleDates: { type: Type.ARRAY, items: { type: Type.STRING } },
-          pdfEvidence: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: {
-            pageNumber: { type: Type.INTEGER }, originalText: { type: Type.STRING },
-          }, required: ['pageNumber', 'originalText'] } },
+          pdfEvidence: {
+            type: Type.ARRAY, items: {
+              type: Type.OBJECT, properties: {
+                pageNumber: { type: Type.INTEGER }, originalText: { type: Type.STRING },
+              }, required: ['pageNumber', 'originalText']
+            }
+          },
         },
         required: ['sourceId', 'reviewedSheets', 'scheduleDates'],
       },
@@ -123,16 +127,20 @@ const BOOKING_RESPONSE_SCHEMA = {
     dropoffProvidedAddress: { type: Type.STRING },
     dropoffDetailNotes: { type: Type.STRING },
     flightNumber: { type: Type.STRING },
-    flights: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: {
-      flightNumber: { type: Type.STRING },
-      date: { type: Type.STRING },
-      originAirport: { type: Type.STRING },
-      destinationAirport: { type: Type.STRING },
-      scheduledDeparture: { type: Type.STRING },
-      scheduledArrival: { type: Type.STRING },
-      passengers: { type: Type.ARRAY, items: { type: Type.STRING } },
-      role: { type: Type.STRING, enum: ['arrival', 'departure', 'connection', 'unknown'] },
-    } } },
+    flights: {
+      type: Type.ARRAY, items: {
+        type: Type.OBJECT, properties: {
+          flightNumber: { type: Type.STRING },
+          date: { type: Type.STRING },
+          originAirport: { type: Type.STRING },
+          destinationAirport: { type: Type.STRING },
+          scheduledDeparture: { type: Type.STRING },
+          scheduledArrival: { type: Type.STRING },
+          passengers: { type: Type.ARRAY, items: { type: Type.STRING } },
+          role: { type: Type.STRING, enum: ['arrival', 'departure', 'connection', 'unknown'] },
+        }
+      }
+    },
     requestedVehicleClass: { type: Type.STRING },
     specialRequests: { type: Type.STRING },
     tripType: { type: Type.STRING, enum: ['single', 'group', 'modification', 'cancellation'] },
@@ -305,7 +313,7 @@ export async function extractBookingFromEmail(
     .map((item) => item.text || '')
     .join('\n\n');
   const pdfFiles = attachments.filter((item) => item.kind === 'pdf');
-  const manifest = attachmentManifest(attachments, Number(todayKst.slice(0,4)));
+  const manifest = attachmentManifest(attachments, Number(todayKst.slice(0, 4)));
 
   const prompt = `You are an expert AI reservation assistant for VIP LIMOUSINE KOREA.
 Extract structured VIP limousine reservation booking details from the incoming client email.
@@ -375,7 +383,7 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
    - "flightNumber": BACKWARD COMPATIBILITY ONLY: first leg code.
    - "flights": MUST list EVERY flight leg with number, departure date, IATA origin and destination, local departure and arrival HH:mm if shown, associated passengers, role ("arrival"/"departure"/"connection"). Two arrival flights KE2104 and NH867 are separate records even when they share one vehicle. Record onward connecting AS34 separately, NOT as a ground pickup. Never drop extra flights because flightNumber already has a value.
    - SHARED-AIRPORT MEET & GREET: If two separate flights arrive at the SAME airport on the same date and the client asks for a single vehicle / same driver, model TWO ARRIVAL PASSENGER GROUPS linked to their flight and guests, but ONE chauffeur booking. Example: KE2104 at 22:25 with Lou/Ed and NH867 at 22:30 with Nik = two groups met separately and traveling together after everyone arrives. Do NOT invent a second vehicle, groupTrips, or a "pickup earlier than later flight" conflict just because the first arriving group's time is 5 minutes before the second. Use role="arrival" and preserve the separate flight arrival times. Actual joint airport departure is unknown unless explicitly supplied.
-   - "requestedVehicleClass": Vehicle model and quantity if mentioned (e.g. "스타리아 리무진 1대", "카니발 2대", "스프린터 1대, G90 1대"). If unspecified or unclear, return "".
+   - "requestedVehicleClass": Simultaneous fleet models and quantities ONLY (e.g. "스타리아 리무진 1대", "카니발 2대", "스프린터 1대, G90 1대"). NEVER append date-specific replacement notes or parenthetical annotations (such as "(11/9 스타리아 대체)"); put those details in "specialRequests" instead. If unspecified or unclear, return "".
    - "specialRequests": Preserve ALL specific requirements, including same driver on every date, driver information deadline, Meet & Greet, standby, language, signage, and client handover instructions. Do not create luggage field.
 6. REVISIONS AND DOCUMENTS:
    - Infer tripType=modification when the sender requests changes to an earlier reservation, regardless of whether sender differs.
@@ -415,10 +423,12 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
     const response = await ai.models.generateContent({
       model: modelName,
       contents: pdfFiles.length
-        ? [{ role: 'user', parts: [
+        ? [{
+          role: 'user', parts: [
             { text: prompt },
             ...pdfFiles.map((file) => ({ inlineData: { mimeType: 'application/pdf', data: file.pdfBase64! } })),
-          ] }]
+          ]
+        }]
         : [prompt],
       config: genConfig,
     });
@@ -494,41 +504,41 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
       // A partial modification can legitimately mention only one changed stop.
       waypoints: Array.isArray(parsed.waypoints) && parsed.waypoints.length > (parsed.tripType === 'modification' ? 0 : 1)
         ? (() => {
-            let lastDate = String(parsed.pickupDate || '');
-            return parsed.waypoints.map((wp: any, idx: number) => {
-              let wpDate = wp.date ? String(wp.date).trim() : '';
-              if (wpDate) {
-                const mdMatch = wpDate.match(/^(\d{1,2})[/-](\d{1,2})$/);
-                if (mdMatch) {
-                  const year = lastDate ? lastDate.slice(0, 4) : todayKst.slice(0, 4);
-                  wpDate = `${year}-${mdMatch[1].padStart(2, '0')}-${mdMatch[2].padStart(2, '0')}`;
-                }
-                lastDate = wpDate;
-              } else if (lastDate) {
-                wpDate = lastDate;
+          let lastDate = String(parsed.pickupDate || '');
+          return parsed.waypoints.map((wp: any, idx: number) => {
+            let wpDate = wp.date ? String(wp.date).trim() : '';
+            if (wpDate) {
+              const mdMatch = wpDate.match(/^(\d{1,2})[/-](\d{1,2})$/);
+              if (mdMatch) {
+                const year = lastDate ? lastDate.slice(0, 4) : todayKst.slice(0, 4);
+                wpDate = `${year}-${mdMatch[1].padStart(2, '0')}-${mdMatch[2].padStart(2, '0')}`;
               }
-              return {
-                id: `wp-${idx + 1}`,
-                order: idx + 1,
-                date: wpDate || undefined,
-                time: String(wp.time || ''),
-                location: String(wp.location || ''),
-                notes: wp.notes ? String(wp.notes) : undefined,
-                clientAddress: wp.clientAddress ? String(wp.clientAddress) : undefined,
-              };
-            });
-          })()
+              lastDate = wpDate;
+            } else if (lastDate) {
+              wpDate = lastDate;
+            }
+            return {
+              id: `wp-${idx + 1}`,
+              order: idx + 1,
+              date: wpDate || undefined,
+              time: String(wp.time || ''),
+              location: String(wp.location || ''),
+              notes: wp.notes ? String(wp.notes) : undefined,
+              clientAddress: wp.clientAddress ? String(wp.clientAddress) : undefined,
+            };
+          });
+        })()
         : undefined,
       groupTrips: Array.isArray(parsed.groupTrips) && parsed.groupTrips.length > 0
         ? parsed.groupTrips.map((gt: any, idx: number) => ({
-            id: String(gt.id || `gt-${idx + 1}`),
-            passengerName: String(gt.passengerName || ''),
-            pickupLocation: String(gt.pickupLocation || ''),
-            dropoffLocation: String(gt.dropoffLocation || ''),
-            pickupTime: String(gt.pickupTime || ''),
-            vehicleClass: gt.vehicleClass ? cleanVehicleClass(gt.vehicleClass) : undefined,
-            notes: gt.notes ? String(gt.notes) : undefined,
-          }))
+          id: String(gt.id || `gt-${idx + 1}`),
+          passengerName: String(gt.passengerName || ''),
+          pickupLocation: String(gt.pickupLocation || ''),
+          dropoffLocation: String(gt.dropoffLocation || ''),
+          pickupTime: String(gt.pickupTime || ''),
+          vehicleClass: gt.vehicleClass ? cleanVehicleClass(gt.vehicleClass) : undefined,
+          notes: gt.notes ? String(gt.notes) : undefined,
+        }))
         : undefined,
       confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0.85,
       warnings: Array.isArray(parsed.warnings) ? parsed.warnings.map(String) : [],
@@ -541,16 +551,16 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
 
     const parsedFlights: EmailFlightLeg[] = Array.isArray(parsed.flights)
       ? parsed.flights.filter((flight: any) => typeof flight?.flightNumber === 'string' && /^[A-Z0-9]{2}\s?\d{2,4}$/i.test(flight.flightNumber)).map((flight: any) => ({
-          flightNumber: String(flight.flightNumber).replace(/\s/g, '').toUpperCase(),
-          date: String(flight.date || draft.pickupDate),
-          originAirport: String(flight.originAirport || '').toUpperCase(),
-          destinationAirport: String(flight.destinationAirport || '').toUpperCase(),
-          scheduledDeparture: String(flight.scheduledDeparture || ''),
-          scheduledArrival: String(flight.scheduledArrival || ''),
-          passengers: Array.isArray(flight.passengers) ? flight.passengers.map(String) : [],
-          role: ['arrival', 'departure', 'connection', 'unknown'].includes(String(flight.role))
-            ? flight.role : 'unknown',
-        }))
+        flightNumber: String(flight.flightNumber).replace(/\s/g, '').toUpperCase(),
+        date: String(flight.date || draft.pickupDate),
+        originAirport: String(flight.originAirport || '').toUpperCase(),
+        destinationAirport: String(flight.destinationAirport || '').toUpperCase(),
+        scheduledDeparture: String(flight.scheduledDeparture || ''),
+        scheduledArrival: String(flight.scheduledArrival || ''),
+        passengers: Array.isArray(flight.passengers) ? flight.passengers.map(String) : [],
+        role: ['arrival', 'departure', 'connection', 'unknown'].includes(String(flight.role))
+          ? flight.role : 'unknown',
+      }))
       : [];
     // Repair model omissions using only evidence explicitly present in the email.
     // Document-based drafts already reconcile the conversation and current
@@ -569,12 +579,12 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
       !isExplicitBaselineExcelEmail(cleanBody, calendarBlocks);
     const completeDraft = isPartialModificationOnly
       ? {
-          ...evidenceDraft,
-          warnings: calendarBlocks.length
-            ? [...(evidenceDraft.warnings || []),
-                '부분 수정 요청: 엑셀 원본은 대조용으로 표시하며 변경 전 일정을 자동 복원하지 않았습니다.']
-            : evidenceDraft.warnings,
-        }
+        ...evidenceDraft,
+        warnings: calendarBlocks.length
+          ? [...(evidenceDraft.warnings || []),
+            '부분 수정 요청: 엑셀 원본은 대조용으로 표시하며 변경 전 일정을 자동 복원하지 않았습니다.']
+          : evidenceDraft.warnings,
+      }
       : reconcileSingleExcelCalendar(evidenceDraft, calendarBlocks);
     if (calendarBlocks.length > 0) {
       const excelVehicleSchedules = buildExcelVehicleSchedules(calendarBlocks, evidenceDraft.waypoints);
@@ -586,7 +596,7 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
       }
     }
     const coverage = verifyAttachmentCoverage(
-      attachments, parsed.documentCoverage, completeDraft, Number(todayKst.slice(0,4))
+      attachments, parsed.documentCoverage, completeDraft, Number(todayKst.slice(0, 4))
     );
     completeDraft.documentAnalysis = manifest.map(source => ({
       filename: source.filename, kind: source.kind,

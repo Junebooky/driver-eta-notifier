@@ -1626,8 +1626,8 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
       {/* 3-A. Modal: 고객사 영구 삭제 확인 */}
       <HqModal
         isOpen={Boolean(deleteTargetCustomer)}
-        title="고객사 삭제"
-        subtitle={deleteTargetCustomer ? `${deleteTargetCustomer.name} 고객사를 목록에서 영구 삭제합니다.` : undefined}
+        title="고객사를 삭제할까요?"
+        subtitle="삭제된 고객사와 담당자 정보는 복구할 수 없어요."
         icon={
           <img
             src="/images/icons/clients/icon_clients.png"
@@ -1647,7 +1647,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
               loading={isDeletingCustomer}
               onClick={() => void handleConfirmDeleteCustomer()}
             >
-              {isDeletingCustomer ? '삭제 중...' : '고객사 삭제'}
+              {isDeletingCustomer ? '삭제 중...' : '삭제하기'}
             </HqButton>
           </>
         }
@@ -1663,14 +1663,13 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
               </div>
               <p className="text-[12px] text-[#60728A]">
                 {deleteTargetCustomer.primaryContactName
-                  ? `대표 담당자: ${deleteTargetCustomer.primaryContactName}${deleteTargetCustomer.contacts.length > 1 ? ` 외 ${deleteTargetCustomer.contacts.length - 1}명` : ''}`
+                  ? `대표 담당자 · ${deleteTargetCustomer.primaryContactName}${deleteTargetCustomer.contacts.length > 1 ? ` 외 ${deleteTargetCustomer.contacts.length - 1}명` : ''}`
                   : `등록된 담당자 ${deleteTargetCustomer.contacts.length}명`}
               </p>
             </HqCard>
 
             <p className="text-[12px] leading-relaxed text-[#60728A]">
-              삭제 시 고객사 프로필과 등록된 담당자 정보가 DB에서 영구 삭제되며 되돌릴 수 없습니다.
-              기존 배차·운행일지·경비 내역은 삭제되지 않고 유지됩니다.
+              기존 배차, 운행일지, 경비 기록은 삭제되지 않고 남아요.
             </p>
 
             <HqInlineFeedback message={deleteError} onDismiss={() => setDeleteError(null)} />

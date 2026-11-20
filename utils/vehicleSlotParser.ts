@@ -4,7 +4,7 @@
  * Strictly prevents hardcoding dummy vehicles (e.g. Sprinter 319 CDI + G90 LWB).
  */
 
-import type { VehicleSlotAssignment } from '@/types/emailHq';
+import type { HqEmailExtractedDraft, VehicleSlotAssignment } from '@/types/emailHq';
 import { VIP_REAL_VEHICLES, getVehicleImage } from '@/utils/vehicleData';
 
 export const STANDARD_FLEET_MODELS = [
@@ -96,6 +96,75 @@ export function getVehicleImageForModel(modelName: string): string {
  * - "스프린터 1대, G90 1대" -> 2 slots: "스프린터 319 CDI", "G90 LWB"
  * - "차종 미정" / "" -> 1 slot: "차량 미지정"
  */
+const COMMENTARY_PAREN_RE = /대체|변경|교체|예정|기준|참고|픽업|센딩|일정|기사|운행|만(?:\b|$)|\d{1,2}\s*[/월]\s*\d{1,2}|\d{1,2}\s*~\s*\d{1,2}/i;
+
+/**
+ * Splits a requested-vehicle summary at top-level separators only.
+ * Never splits inside parentheses (e.g. "(11/9 스타리아 라운지 대체)") or date slashes (e.g. "11/9").
+ */
+function splitTopLevelVehicleParts(raw: string): string[] {
+  const parts: string[] = [];
+  let buf = '';
+  let depth = 0;
+
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (ch === '(' || ch === '（' || ch === '[') {
+      depth++;
+      buf += ch;
+      continue;
+    }
+    if (ch === ')' || ch === '）' || ch === ']') {
+      depth = Math.max(0, depth - 1);
+      buf += ch;
+      continue;
+    }
+
+    if (depth === 0) {
+      if (ch === ',' || ch === '+' || ch === '&') {
+        if (buf.trim()) parts.push(buf.trim());
+        buf = '';
+        continue;
+      }
+      if (ch === '/') {
+        const prev = i > 0 ? raw[i - 1] : '';
+        const next = i + 1 < raw.length ? raw[i + 1] : '';
+        if (!(/\d/.test(prev) && /\d/.test(next))) {
+          if (buf.trim()) parts.push(buf.trim());
+          buf = '';
+          continue;
+        }
+      }
+      if (/[\s]/.test(ch)) {
+        const rest = raw.slice(i);
+        const wordMatch = rest.match(/^\s+(및|and)(?=\s+|$)/i);
+        if (wordMatch) {
+          if (buf.trim()) parts.push(buf.trim());
+          buf = '';
+          i += wordMatch[0].length - 1;
+          continue;
+        }
+      }
+    }
+
+    buf += ch;
+  }
+
+  if (buf.trim()) parts.push(buf.trim());
+  return parts;
+}
+
+function stripVehicleCommentaryParens(part: string): string {
+  return part
+    .replace(/\(([^()]*)\)|（([^（）]*)）/g, (full, inner1, inner2) => {
+      const inner = String(inner1 ?? inner2 ?? '');
+      return COMMENTARY_PAREN_RE.test(inner) ? '' : full;
+    })
+    .replace(/\b\d{1,2}\/\d{1,2}(?:\s*~\s*(?:\d{1,2}\/)?\d{1,2})?/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function parseVehicleSlotsFromRequestedClass(
   requestedVehicleClass?: string | null
 ): VehicleSlotAssignment[] {
@@ -113,53 +182,70 @@ export function parseVehicleSlotsFromRequestedClass(
     ];
   }
 
-  // 1. Check for multi-type delimited strings (e.g. "스프린터 1대, G90 1대" or "스프린터 / G90")
-  const delimiters = /[,/+/&]|\b및\b|\band\b/i;
-  if (delimiters.test(raw)) {
-    const parts = raw
-      .split(delimiters)
-      .map((p) => p.trim())
-      .filter(Boolean);
+  const parts = splitTopLevelVehicleParts(raw);
+  const resultSlots: VehicleSlotAssignment[] = [];
+  let currentIndex = 0;
 
-    const resultSlots: VehicleSlotAssignment[] = [];
-    let currentIndex = 0;
+  for (const part of parts) {
+    const cleanedPart = stripVehicleCommentaryParens(part);
+    if (!cleanedPart || /^[^\p{L}\p{N}]+$/u.test(cleanedPart)) continue;
 
-    for (const part of parts) {
-      // Check count in this part, e.g. "스프린터 2대"
-      const countMatch = part.match(/(\d+)\s*대/);
-      const count = countMatch ? Math.max(1, parseInt(countMatch[1], 10)) : 1;
-      const model = normalizeVehicleModelName(part.replace(/\d+\s*대/, '').trim());
+    const countMatch = cleanedPart.match(/(\d+)\s*대/);
+    const count = countMatch ? Math.max(1, Math.min(20, parseInt(countMatch[1], 10))) : 1;
+    const cleanModelText = cleanedPart.replace(/\d+\s*대/, '').trim();
+    if (!cleanModelText && !countMatch) continue;
+    const normalizedModel = normalizeVehicleModelName(cleanModelText);
 
-      for (let i = 0; i < count; i++) {
-        resultSlots.push({
-          slotIndex: currentIndex++,
-          vehicleModel: count > 1 ? `${model} (${i + 1}호차)` : model,
-          driver: null,
-          status: 'unassigned',
-        });
-      }
-    }
-
-    if (resultSlots.length > 0) {
-      return resultSlots;
+    for (let i = 0; i < count; i++) {
+      resultSlots.push({
+        slotIndex: currentIndex++,
+        vehicleModel: count > 1 ? `${normalizedModel} (${i + 1}호차)` : normalizedModel,
+        driver: null,
+        status: 'unassigned',
+      });
     }
   }
 
-  // 2. Check for single vehicle type with multiple count (e.g. "카니발 2대", "스타리아 리무진 3대")
-  const countMatch = raw.match(/(\d+)\s*대/);
-  const count = countMatch ? Math.max(1, parseInt(countMatch[1], 10)) : 1;
-  const cleanModelText = raw.replace(/\d+\s*대/, '').trim();
-  const normalizedModel = normalizeVehicleModelName(cleanModelText);
+  if (resultSlots.length > 0) {
+    return resultSlots;
+  }
 
-  const slots: VehicleSlotAssignment[] = [];
-  for (let i = 0; i < count; i++) {
-    slots.push({
-      slotIndex: i,
-      vehicleModel: count > 1 ? `${normalizedModel} (${i + 1}호차)` : normalizedModel,
+  return [
+    {
+      slotIndex: 0,
+      vehicleModel: '차량 미지정',
       driver: null,
       status: 'unassigned',
-    });
-  }
+    },
+  ];
+}
 
-  return slots;
+/**
+ * Resolves vehicle assignment slots for an extracted email draft.
+ * When a multi-vehicle Excel workbook is scoped to a single active vehicle schedule tab,
+ * returns only that single vehicle's slot so the operator isn't asked to assign other vehicles.
+ */
+export function resolveVehicleSlotsForDraft(
+  draft?: HqEmailExtractedDraft | null
+): VehicleSlotAssignment[] {
+  const allSlots = parseVehicleSlotsFromRequestedClass(draft?.requestedVehicleClass);
+  const schedules = draft?.excelVehicleSchedules;
+  if (schedules && schedules.length >= 2 && draft?.activeVehicleScheduleId) {
+    const idx = schedules.findIndex((s) => s.id === draft.activeVehicleScheduleId);
+    if (idx >= 0) {
+      const matched = allSlots[idx] || allSlots[0] || {
+        slotIndex: 0,
+        vehicleModel: '차량 미지정',
+        driver: null,
+        status: 'unassigned' as const,
+      };
+      return [{
+        ...matched,
+        slotIndex: 0,
+        driver: null,
+        status: 'unassigned',
+      }];
+    }
+  }
+  return allSlots;
 }
