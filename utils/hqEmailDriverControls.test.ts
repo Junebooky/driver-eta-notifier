@@ -45,21 +45,17 @@ test('driver form and table filters share A-plan search select', () => {
   assert.doesNotMatch(table, /window\.confirm\(|alert\('등록 해제에 실패/);
 });
 
-test('driver image manager uses active fleet and captured-target confirmation', () => {
-  const view = source('components/hq/drivers/HqDriverAssetManagerModal.tsx');
-  assert.match(view, /useHqFleetRegistry\(isOpen\)/);
-  assert.match(view, /fleet\.vehicles\.filter/);
-  assert.match(view, /fleet\.vehicles\.length/);
-  assert.match(view, /assetVehicleReady/);
-  assert.match(view, /role="alertdialog"/);
-  assert.match(view, /driverId: activeDriver\.id/);
-  assert.match(view, /vehiclePlate: activeVehicle\.plate/);
-  assert.match(view, /driverId: pendingDelete\.driverId/);
-  assert.match(view, /vehiclePlate: pendingDelete\.vehiclePlate/);
-  assert.match(view, /bundleRequestSequence/);
-  assert.match(view, /requestId !== bundleRequestSequence\.current/);
-  assert.doesNotMatch(view, /VIP_REAL_VEHICLES|<select\b/);
-  assert.doesNotMatch(view, /if \(!confirm\(|alert\(json\./);
+test('driver image manager uses registered fleet, shared builder and no legacy upload or delete UI', () => {
+  const view=source('components/hq/drivers/HqDriverAssetManagerModal.tsx');
+  assert.match(view,/useHqFleetRegistry\(isOpen\)/);
+  assert.match(view,/fleet\.vehicles\.filter/);
+  assert.match(view,/resolveDispatchCardPhotos\(vehicle\)/);
+  assert.match(view,/HqSearchSelect/);
+  assert.match(view,/<HqModal/);
+  assert.match(view,/<HqDispatchCardBuilderModal/);
+  assert.match(view,/initialVehicleId=\{selectedVehicle\?\.uuid\}/);
+  assert.match(view,/type:'bundle'/);
+  assert.doesNotMatch(view,/isManualUploadOpen|handleFileUpload|handleDeleteAsset|onDrop=\{|VIP_REAL_VEHICLES|<select\b/);
 });
 
 test('asset upload/view/delete/dispatch resolve from real cockpit vehicles UUID', () => {

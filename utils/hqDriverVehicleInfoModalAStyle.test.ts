@@ -12,8 +12,11 @@ test('dispatch card A-plan modal keeps a white accessible dialog and both previe
   assert.match(component, /aria-labelledby="hq-driver-card-title"/);
   assert.match(component, /bg-white/);
   assert.match(component, /bg-\[#FAFBFD\]/);
-  assert.match(component, /aria-pressed=\{activeTab === 'pc'\}/);
-  assert.match(component, /aria-pressed=\{activeTab === 'mobile'\}/);
+  assert.match(component, /<HqSegmentedTabs aria-label="배차카드 미리보기 규격"/);
+  assert.match(component, /id:'pc'/);
+  assert.match(component, /id:'mobile'/);
+  assert.match(component, /navigator\.share/);
+  assert.match(component, /누락 카드 만들기/);
   assert.match(component, /currentAsset\.signedUrl/);
   assert.match(component, /handleDownload/);
   assert.match(component, /aria-label="안내자료 원본 새 창에서 보기"/);
@@ -62,13 +65,13 @@ test('the three requested brand icon paths are used without replacing original v
 
 test('customer-card copy uses simple and warm Korean throughout the visible workflow', () => {
   const labels = [
-    '고객 안내 카드', '이미지 저장', '어떻게 전달하셨나요?',
+    '배차카드', '이미지 저장', '어떻게 전달하셨나요?',
     '고객에게 직접 전달한 방법을 기록으로 남겨둘 수 있어요.',
     '받는 분', '전달 방법', '문자·카카오톡으로 보냈어요',
     '이메일로 보냈어요', '이미지만 저장해둘게요',
     '자동으로 발송되지 않아요. 직접 전달한 뒤 기록을 남겨주세요.',
     '안내 카드를 직접 전달했어요', '기록 저장하기',
-    '안전하게 보호되는 보안 링크예요',
+    '현재 기사·차량의 최신 배차카드만 표시합니다',
   ];
   for (const label of labels) assert.ok(component.includes(label), label);
   assert.ok(!component.includes('기사·차량 Info 고객 안내자료'));

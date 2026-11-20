@@ -94,10 +94,10 @@ test('Driver & Vehicle Info Assets Suite', async (t) => {
       driverName,
       vehicleId: vehG90.uuid,
       variant: 'pc',
-      filePath: getDriverVehicleInfoStoragePath(driverId, vehG90.uuid, 'pc', 'png'),
-      fileName: 'yoon_g90_pc.png',
+      filePath: getDriverVehicleInfoStoragePath(driverId, vehG90.uuid, 'pc', 'webp'),
+      fileName: 'dispatch_1336_pc.webp',
       fileSize: 250000,
-      mimeType: 'image/png',
+      mimeType: 'image/webp',
       version: 1,
       status: 'active',
       uploadedBy: '본사 관리자',
@@ -108,10 +108,10 @@ test('Driver & Vehicle Info Assets Suite', async (t) => {
       driverName,
       vehicleId: vehG90.uuid,
       variant: 'mobile',
-      filePath: getDriverVehicleInfoStoragePath(driverId, vehG90.uuid, 'mobile', 'png'),
-      fileName: 'yoon_g90_mobile.png',
+      filePath: getDriverVehicleInfoStoragePath(driverId, vehG90.uuid, 'mobile', 'webp'),
+      fileName: 'dispatch_1336_mobile.webp',
       fileSize: 180000,
-      mimeType: 'image/png',
+      mimeType: 'image/webp',
       version: 1,
       status: 'active',
       uploadedBy: '본사 관리자',
@@ -124,10 +124,10 @@ test('Driver & Vehicle Info Assets Suite', async (t) => {
       driverName,
       vehicleId: vehSprinter.uuid,
       variant: 'pc',
-      filePath: getDriverVehicleInfoStoragePath(driverId, vehSprinter.uuid, 'pc', 'png'),
-      fileName: 'yoon_sprinter_pc.png',
+      filePath: getDriverVehicleInfoStoragePath(driverId, vehSprinter.uuid, 'pc', 'webp'),
+      fileName: 'dispatch_2658_pc.webp',
       fileSize: 310000,
-      mimeType: 'image/png',
+      mimeType: 'image/webp',
       version: 1,
       status: 'active',
       uploadedBy: '본사 관리자',
@@ -136,14 +136,14 @@ test('Driver & Vehicle Info Assets Suite', async (t) => {
     // Fetch bundle for G90
     const bundleG90 = await getDriverVehicleBundle(driverId, '116허 1336');
     assert.equal(bundleG90.profile?.fileName, 'yoon_profile.png');
-    assert.equal(bundleG90.pcInfo?.fileName, 'yoon_g90_pc.png');
-    assert.equal(bundleG90.mobileInfo?.fileName, 'yoon_g90_mobile.png');
+    assert.equal(bundleG90.pcInfo?.fileName, 'dispatch_1336_pc.webp');
+    assert.equal(bundleG90.mobileInfo?.fileName, 'dispatch_1336_mobile.webp');
     assert.equal(bundleG90.isFullyComplete, true);
 
     // Fetch bundle for Sprinter
     const bundleSprinter = await getDriverVehicleBundle(driverId, '703서 2658');
     assert.equal(bundleSprinter.profile?.fileName, 'yoon_profile.png');
-    assert.equal(bundleSprinter.pcInfo?.fileName, 'yoon_sprinter_pc.png');
+    assert.equal(bundleSprinter.pcInfo?.fileName, 'dispatch_2658_pc.webp');
     assert.equal(bundleSprinter.mobileInfo, null, 'Sprinter mobile is not yet uploaded');
     assert.equal(bundleSprinter.isReadyForCustomerDispatch, true);
     assert.equal(bundleSprinter.isFullyComplete, false);
@@ -235,10 +235,10 @@ test('Driver & Vehicle Info Assets Suite', async (t) => {
       driverId,
       vehicleId: veh.uuid,
       variant: 'pc',
-      filePath: getDriverVehicleInfoStoragePath(driverId, veh.uuid, 'pc', 'png'),
-      fileName: 'jeong_2658_pc.png',
+      filePath: getDriverVehicleInfoStoragePath(driverId, veh.uuid, 'pc', 'webp'),
+      fileName: 'dispatch_2658_pc.webp',
       fileSize: 190000,
-      mimeType: 'image/png',
+      mimeType: 'image/webp',
       version: 1,
       status: 'active',
       uploadedBy: '본사 관리자',
