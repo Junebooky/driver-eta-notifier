@@ -1,4 +1,5 @@
 import type { DispatchCardCoverageDriver, DispatchCardCoverageSlot } from '@/lib/dispatchCards/dispatchCardCoverage';
+import {mapVehicleToUiCategory, type VipRealVehicle} from '@/utils/vehicleData';
 
 export type DriverCardSummary = Record<
   string,
@@ -151,4 +152,59 @@ export function summarizeDriverCardCoverage(entry?: DispatchCardCoverageDriver):
     tone,
     label,
   };
+}
+
+
+/**
+ * Compact category view for a single driver's dispatch cards.
+ * Full PC/mobile status is conveyed once in the legend, not repeated on
+ * every vehicle plate. The source of truth remains the coverage API.
+ */
+export const DRIVER_CARD_CATEGORY_ORDER = ['sprinter','van','sedan','suv','other'] as const;
+export type DriverCardGroupKey = typeof DRIVER_CARD_CATEGORY_ORDER[number];
+export type DriverCardSlotStatus = 'complete' | 'partial' | 'missing';
+export interface DriverCardVehicleEntry {
+  slot:DispatchCardCoverageSlot;
+  vehicle:VipRealVehicle|null;
+  status:DriverCardSlotStatus;
+  modelLabel:string;
+}
+export interface DriverCardVehicleGroup {
+  key:DriverCardGroupKey;
+  label:string;
+  entries:DriverCardVehicleEntry[];
+  complete:number;
+  partial:number;
+  missing:number;
+}
+const GROUP_LABELS:Record<DriverCardGroupKey,string>={
+  sprinter:'스프린터',van:'밴',sedan:'세단',suv:'SUV',other:'기타 차량',
+};
+export function groupDriverCardVehicles(
+  slots:readonly DispatchCardCoverageSlot[],
+  vehicles:readonly VipRealVehicle[],
+):DriverCardVehicleGroup[]{
+  const byId=new Map(vehicles.map(vehicle=>[vehicle.uuid,vehicle]));
+  const groups=new Map<DriverCardGroupKey,DriverCardVehicleGroup>();
+  for(const slot of slots){
+    const vehicle=byId.get(slot.vehicleId)||null;
+    const key:DriverCardGroupKey=vehicle?mapVehicleToUiCategory(vehicle):'other';
+    let group=groups.get(key);
+    if(!group){
+      group={key,label:GROUP_LABELS[key],entries:[],complete:0,partial:0,missing:0};
+      groups.set(key,group);
+    }
+    const status:DriverCardSlotStatus=slot.pc&&slot.mobile?'complete':
+      slot.pc||slot.mobile?'partial':'missing';
+    group[status]++;
+    group.entries.push({slot,vehicle,status,modelLabel:vehicle?.modelShort||'차종 미확인'});
+  }
+  // Registered variants first, but keep source order within each status.
+  const order:Record<DriverCardSlotStatus,number>={complete:0,partial:1,missing:2};
+  return DRIVER_CARD_CATEGORY_ORDER.flatMap(key=>{
+    const group=groups.get(key);
+    if(!group)return [];
+    group.entries.sort((a,b)=>order[a.status]-order[b.status]);
+    return [group];
+  });
 }

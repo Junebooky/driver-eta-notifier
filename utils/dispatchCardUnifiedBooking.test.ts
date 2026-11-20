@@ -8,7 +8,9 @@ import {
   pickDefaultDispatchCardVehicle,
   sanitizeInitialDispatchCardPlate,
   summarizeDriverCardCoverage,
+  groupDriverCardVehicles,
 } from '@/utils/driverDispatchCardVehicles';
+import {VIP_REAL_VEHICLES} from '@/utils/vehicleData';
 
 const source=(path:string)=>readFileSync(join(process.cwd(),path),'utf8');
 
@@ -47,16 +49,17 @@ test('booking dispatch card uses the same live driver x vehicle bundle and creat
   assert.match(manager,/HqSearchSelect/);
 });
 
-test('article-wide card coverage is embedded inside the existing driver management card on demand',()=>{
+test('driver cards live in the per-driver table column; no redundant management button',()=>{
   const view=source('components/hq/drivers/HqDriversView.tsx');
   const table=source('components/hq/drivers/HqDriversTableView.tsx');
   const status=source('components/hq/drivers/HqDispatchCardCoveragePanel.tsx');
   assert.doesNotMatch(view,/<HqDispatchCardCoveragePanel/);
-  assert.match(table,/배차카드 관리/);
-  assert.match(table,/\{cardToolsOpen && <HqDispatchCardCoveragePanel/);
-  assert.match(table,/embedded \/>/);
-  assert.match(status,/embedded=false/);
-  assert.doesNotMatch(status,/기사별 배차카드 제작 현황/);
+  assert.doesNotMatch(table,/<span>배차카드 관리<\/span>/);
+  assert.doesNotMatch(table,/cardToolsOpen|<HqDispatchCardCoveragePanel/);
+  assert.match(table,/<th className="py-3\.5 px-5 font-medium">배차카드<\/th>/);
+  assert.match(table,/<HqDriverCardVehicleGroups/);
+  // Bulk generation stays in its own module for reuse, but is no longer
+  // shown as an additional competing card in the driver management view.
   assert.match(status,/미생성 카드 일괄 생성/);
   assert.match(status,/HqDispatchCardBuilderModal/);
 });
@@ -163,14 +166,49 @@ test('driver table surfaces inline per-driver dispatch card coverage with regist
   assert.deepEqual(needsInfo.missingIdentityLabels,['프로필 사진','직책']);
 
   const table=source('components/hq/drivers/HqDriversTableView.tsx');
-  assert.match(table,/<span>배차카드 관리<\/span>\s*<ChevronDown/);
-  assert.doesNotMatch(table,/<RefreshCw[^>]*\/>\s*배차카드 관리/);
+  assert.doesNotMatch(table,/<span>배차카드 관리<\/span>/);
+  assert.match(table,/<HqDriverCardVehicleGroups/);
   assert.match(table,/<th className="py-3\.5 px-5 font-medium">배차카드<\/th>/);
-  assert.match(table,/등록된 차량 \(/);
-  assert.match(table,/미등록 차량 \(/);
+  const groups=source('components/hq/drivers/HqDriverCardVehicleGroups.tsx');
+  assert.match(groups,/groupDriverCardVehicles\(slots,vehicles\)/);
+  assert.match(groups,/PC·모바일 모두/);
+  assert.match(groups,/group\.label/);
+  assert.match(groups,/onCreate\(slot\)/);
+  assert.match(groups,/onView\(slot\)/);
+  assert.doesNotMatch(groups,/PC·모바일<\/HqBadge>/);
   assert.match(table,/<HqBadge/);
   assert.match(table,/<HqCard/);
   assert.match(table,/<HqButton/);
   assert.match(table,/<HqDriverAssetManagerModal/);
   assert.match(table,/<HqDispatchCardBuilderModal/);
+});
+
+
+test('dispatch-card coverage is grouped by real vehicle categories without repeating card variants',()=>{
+  const sprinters=VIP_REAL_VEHICLES.filter(v=>v.category==='sprinter');
+  const van=VIP_REAL_VEHICLES.find(v=>v.category==='staria')!;
+  const sedan=VIP_REAL_VEHICLES.find(v=>v.category==='genesis'&&!v.model.includes('GV80'))!;
+  const suv=VIP_REAL_VEHICLES.find(v=>v.model.includes('GV80'))!;
+  assert.ok(sprinters.length>=2&&van&&sedan&&suv);
+  const vehicles=[sprinters[0],sprinters[1],van,sedan,suv];
+  const slots=[
+    {vehicleId:van.uuid,plate:van.plate,pc:false,mobile:false},
+    {vehicleId:sprinters[0].uuid,plate:sprinters[0].plate,pc:true,mobile:true},
+    {vehicleId:sedan.uuid,plate:sedan.plate,pc:true,mobile:true},
+    {vehicleId:suv.uuid,plate:suv.plate,pc:false,mobile:false},
+    {vehicleId:sprinters[1].uuid,plate:sprinters[1].plate,pc:false,mobile:true},
+  ];
+  const groups=groupDriverCardVehicles(slots,vehicles);
+  assert.deepEqual(groups.map(group=>group.key),['sprinter','van','sedan','suv']);
+  assert.equal(groups[0].label,'스프린터');
+  assert.deepEqual(groups[0].entries.map(e=>e.status),['complete','partial']);
+  assert.deepEqual([groups[0].complete,groups[0].partial,groups[0].missing],[1,1,0]);
+  assert.equal(groups[1].entries[0].modelLabel,van.modelShort);
+  assert.equal(groups[2].complete,1);
+  assert.equal(groups[3].missing,1);
+  assert.equal(groups.flatMap(g=>g.entries).length,slots.length);
+  // Missing DB vehicle metadata must be clearly labeled, never misclassified.
+  const unknown=groupDriverCardVehicles([{vehicleId:'missing-uuid',plate:'unknown',pc:false,mobile:false}],vehicles);
+  assert.deepEqual(unknown.map(g=>g.key),['other']);
+  assert.equal(unknown[0].entries[0].modelLabel,'차종 미확인');
 });
