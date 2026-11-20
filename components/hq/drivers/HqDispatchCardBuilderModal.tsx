@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CheckCircle2, Download, ImagePlus, Loader2,
-  UserRound, ChevronDown,
+  UserRound, ChevronDown, Columns2,
 } from 'lucide-react';
 import type { HqDriverSummary } from '@/types/driverHq';
 import type { VipRealVehicle } from '@/utils/vehicleData';
@@ -30,6 +30,7 @@ import {
 import { HqButton, HqCard, HqInput, HqSegmentedTabs } from '@/components/hq/ui';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 import { HqModal } from '@/components/hq/ui/HqModal';
+import { HqDispatchCardCompareModal } from './HqDispatchCardCompareModal';
 import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
 import { CHAUFFEUR_POSITION_OPTIONS, formatBilingualChauffeurName, getEnglishPosition, validateDispatchCardProfile, type ChauffeurPositionCode } from '@/lib/dispatchCards/chauffeurIdentity';
 import { formatKoreanMobileInternationalInput, KOREA_MOBILE_PREFIX } from '@/utils/koreanInternationalPhone';
@@ -114,6 +115,12 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoLoading, setPhotoLoading] = useState(false);
   const [orientation, setOrientation] = useState<CardOrientation>('pc');
+  // Comparison is an optional fullscreen view; keep the default preview large.
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [compareInputs, setCompareInputs] = useState<{
+    pc: DispatchCardRenderInput;
+    mobile: DispatchCardRenderInput;
+  } | null>(null);
   const [photoKind, setPhotoKind] = useState<CardPhotoKind>('exterior');
   const [perVehiclePlacements, setPerVehiclePlacements] = useState<Record<string, CardPhotoPlacements>>({});
   const [previewUrl, setPreviewUrl] = useState('');
@@ -129,6 +136,13 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   const closeModal = React.useCallback(() => onCloseRef.current(), []);
+  const closeComparison = React.useCallback(() => {
+    setCompareOpen(false);
+    setCompareInputs(null);
+  }, []);
+  useEffect(() => {
+    if (!isOpen) closeComparison();
+  }, [isOpen, closeComparison]);
 
   const vehicle = useMemo(
     () => availableVehicles.find(v => v.uuid === selectedVehicleId) || availableVehicles[0] || null,
@@ -364,8 +378,19 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     };
   };
 
+  const openComparison = () => {
+    if (!isOpen || !isComplete || !vehicle || busy || portraitSaving || photoUploading) return;
+    // Snapshot both variants at the moment of opening. The builder is hidden
+    // during comparison, so editing cannot unexpectedly change the image pair.
+    setCompareInputs({
+      pc: buildInput(vehicle, 'pc'),
+      mobile: buildInput(vehicle, 'mobile'),
+    });
+    setCompareOpen(true);
+  };
+
   useEffect(() => {
-    if (!isOpen || !isComplete || !vehicle) {
+    if (!isOpen || compareOpen || !isComplete || !vehicle) {
       setPreviewUrl('');
       setPreviewLoading(false);
       return;
@@ -399,7 +424,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
     };
     // Only values used by rendering, including position adjustments, trigger preview updates.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, isComplete, vehicle?.uuid, orientation, name, englishName, positionCode, phone, photoUrl, portraitPlacement, perVehiclePlacements]);
+  }, [isOpen, compareOpen, isComplete, vehicle?.uuid, orientation, name, englishName, positionCode, phone, photoUrl, portraitPlacement, perVehiclePlacements]);
 
   const updatePlacement = (key: keyof CardPlacement, value: number) => {
     if (!vehicle) return;
@@ -553,8 +578,9 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   };
 
   return (
+    <>
     <HqModal
-      isOpen={isOpen}
+      isOpen={isOpen && !compareOpen}
       title="배차카드 만들기"
       subtitle="기사 정보 한 번으로 모든 차량 카드 완성"
       icon={<img src="/images/icons/drivers/icon_profile_card.png" alt="" aria-hidden="true" draggable={false} className="size-10 shrink-0 object-contain" />}
@@ -592,12 +618,21 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
                   <h3 className="text-[14px] font-semibold text-[#21344D]">완성 카드 미리보기</h3>
                   <p className="mt-1 text-[11px] text-[#8492A4]">차량을 선택하면 카드가 바로 바뀌어요.</p>
                 </div>
-                <HqSegmentedTabs aria-label="배차카드 미리보기 규격" value={orientation}
-                  onValueChange={value => setOrientation(value as CardOrientation)}
-                  tabs={[
-                    { id: 'pc', label: 'PC' },
-                    { id: 'mobile', label: '모바일' },
-                  ]} />
+                <div className="flex flex-wrap items-center gap-2">
+                  <HqSegmentedTabs aria-label="배차카드 미리보기 규격" value={orientation}
+                    onValueChange={value => setOrientation(value as CardOrientation)}
+                    tabs={[
+                      { id: 'pc', label: 'PC' },
+                      { id: 'mobile', label: '모바일' },
+                    ]} />
+                  <div className="hidden lg:block">
+                    <HqButton variant="secondary" size="sm"
+                      disabled={!isComplete || busy || portraitSaving || photoUploading}
+                      onClick={openComparison}>
+                      <Columns2 className="size-4" /> 동시 비교
+                    </HqButton>
+                  </div>
+                </div>
               </div>
               <div className="space-y-2 rounded-[14px] bg-[#F7F9FC] p-3 sm:p-4">
                 <div className="flex items-center justify-between gap-2">
@@ -904,5 +939,15 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
 
       </div>
     </HqModal>
+    {compareInputs && vehicle && (
+      <HqDispatchCardCompareModal
+        isOpen={isOpen && compareOpen}
+        onClose={closeComparison}
+        vehiclePlate={vehicle.plate}
+        vehicleModel={dispatchCardVehicleLabel(vehicle)}
+        inputs={compareInputs}
+      />
+    )}
+    </>
   );
 };
