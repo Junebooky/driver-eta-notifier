@@ -2,6 +2,8 @@
  * VIP LIMOUSINE KOREA - Field Knowledge (현장 지식) Types
  */
 
+import type { FieldKnowledgeGuide } from '@/utils/fieldKnowledgeGuide';
+
 export type FieldKnowledgeCategory =
   | '전체'
   | '공항'
@@ -22,6 +24,8 @@ export interface FieldKnowledgeItem {
   description: string; // 한 줄 설명 (e.g. '품격과 여유가 흐르는 도심 속 럭셔리 호텔')
   imageUrl: string; // 대표 이미지 URL
   photos?: string[]; // 사진 갤러리 이미지 URLs
+  /** Structured operational guide. Legacy strings remain for migration. */
+  guide?: FieldKnowledgeGuide;
   address: string; // 주소
   phone?: string; // 대표전화
   website?: string; // 공식 웹사이트
