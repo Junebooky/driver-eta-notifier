@@ -105,6 +105,8 @@ export function pickDefaultDispatchCardVehicle<T extends { uuid: string; plate: 
 export function summarizeDriverCardCoverage(entry?: DispatchCardCoverageDriver): {
   totalVehicles: number;
   completeVehicles: number;
+  /** No source photo -> cannot generate PC/mobile yet. */
+  imageMissingSlots: DispatchCardCoverageSlot[];
   registeredSlots: DispatchCardCoverageSlot[];
   unregisteredSlots: DispatchCardCoverageSlot[];
   missingIdentityLabels: string[];
@@ -117,6 +119,7 @@ export function summarizeDriverCardCoverage(entry?: DispatchCardCoverageDriver):
   const partialSlots = slots.filter((slot) => (slot.pc || slot.mobile) && !(slot.pc && slot.mobile));
   const registeredSlots = [...completeSlots, ...partialSlots];
   const unregisteredSlots = slots.filter((slot) => !slot.pc && !slot.mobile);
+  const imageMissingSlots=slots.filter(slot=>slot.imageReady===false);
   const totalVehicles = slots.length;
   const completeVehicles = completeSlots.length;
   const missingIdentityLabels = [
@@ -135,8 +138,9 @@ export function summarizeDriverCardCoverage(entry?: DispatchCardCoverageDriver):
     tone = 'selected';
     label = `${completeVehicles}/${totalVehicles}대 완료`;
   } else if (registeredSlots.length > 0) {
-    tone = 'selected';
-    label = `${registeredSlots.length}/${totalVehicles}대 등록`;
+    tone = completeVehicles > 0 ? 'selected' : 'warning';
+    // Complete means BOTH PC and mobile are saved. Do not count partials.
+    label = `${completeVehicles}/${totalVehicles}대 완료`;
   } else if (!entry.identityReady) {
     tone = 'warning';
     label = `0/${totalVehicles}대 · 정보 필요`;
@@ -145,6 +149,7 @@ export function summarizeDriverCardCoverage(entry?: DispatchCardCoverageDriver):
   return {
     totalVehicles,
     completeVehicles,
+    imageMissingSlots,
     registeredSlots,
     unregisteredSlots,
     missingIdentityLabels,
@@ -162,7 +167,7 @@ export function summarizeDriverCardCoverage(entry?: DispatchCardCoverageDriver):
  */
 export const DRIVER_CARD_CATEGORY_ORDER = ['sprinter','van','sedan','suv','other'] as const;
 export type DriverCardGroupKey = typeof DRIVER_CARD_CATEGORY_ORDER[number];
-export type DriverCardSlotStatus = 'complete' | 'partial' | 'missing';
+export type DriverCardSlotStatus = 'complete' | 'partial' | 'missing' | 'photos_missing';
 export interface DriverCardVehicleEntry {
   slot:DispatchCardCoverageSlot;
   vehicle:VipRealVehicle|null;
@@ -176,6 +181,7 @@ export interface DriverCardVehicleGroup {
   complete:number;
   partial:number;
   missing:number;
+  photos_missing:number;
 }
 const GROUP_LABELS:Record<DriverCardGroupKey,string>={
   sprinter:'스프린터',van:'밴',sedan:'세단',suv:'SUV',other:'기타 차량',
@@ -191,16 +197,17 @@ export function groupDriverCardVehicles(
     const key:DriverCardGroupKey=vehicle?mapVehicleToUiCategory(vehicle):'other';
     let group=groups.get(key);
     if(!group){
-      group={key,label:GROUP_LABELS[key],entries:[],complete:0,partial:0,missing:0};
+      group={key,label:GROUP_LABELS[key],entries:[],complete:0,partial:0,missing:0,photos_missing:0};
       groups.set(key,group);
     }
     const status:DriverCardSlotStatus=slot.pc&&slot.mobile?'complete':
-      slot.pc||slot.mobile?'partial':'missing';
+      slot.pc||slot.mobile?'partial':
+        slot.imageReady===false?'photos_missing':'missing';
     group[status]++;
     group.entries.push({slot,vehicle,status,modelLabel:vehicle?.modelShort||'차종 미확인'});
   }
   // Registered variants first, but keep source order within each status.
-  const order:Record<DriverCardSlotStatus,number>={complete:0,partial:1,missing:2};
+  const order:Record<DriverCardSlotStatus,number>={complete:0,partial:1,missing:2,photos_missing:3};
   return DRIVER_CARD_CATEGORY_ORDER.flatMap(key=>{
     const group=groups.get(key);
     if(!group)return [];

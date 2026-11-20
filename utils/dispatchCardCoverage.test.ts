@@ -45,7 +45,14 @@ test('unpictured vehicles, duplicate IDs and archived/missing-identity drivers c
   const result=buildDispatchCardCoverage([
     {id:'d1',driver_name:'테스트',phone:'',driver_meta:{}},
   ],cars,[],[{driver_id:'d1',vehicle_id:'nonexistent',variant:'pc'}]);
-  assert.equal(result.vehicles.length,13);
+  assert.equal(result.vehicles.length,20);
+  assert.equal(result.totalVehicles,20);
+  assert.equal(result.imageReadyVehicles,13);
+  assert.equal(result.imageMissingVehicles,7);
+  assert.equal(result.drivers[0].slots.length,20);
+  assert.equal(result.drivers[0].slots.filter(slot=>slot.imageReady===false).length,7);
+  assert.equal(result.requiredVariants,40);
+  assert.equal(result.missingVariants,40);
   assert.equal(result.savedVariants,0);
   assert.equal(result.drivers[0].portraitReady,false);
   assert.equal(result.drivers[0].identityReady,false);

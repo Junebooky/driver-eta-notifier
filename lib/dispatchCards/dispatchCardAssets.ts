@@ -25,7 +25,8 @@ export function dispatchCardModelFolder(vehicle: Car): string {
     if (model.includes('319')) return 'sprinter_319';
   }
   if (vehicle.category === 'carnival') {
-    return /하이|high/.test(model) ? 'carnival_high' : 'carnival';
+    const canonical = findVipVehicle(vehicle.plate);
+    return /하이|high/.test(canonical?.model||model) ? 'carnival_high' : 'carnival';
   }
   if (vehicle.category === 'genesis') {
     if (model.includes('gv80')) return 'gv80';
@@ -53,7 +54,9 @@ export function dispatchCardKebabPath(vehicle: Car): string | null {
   }
   if (vehicle.category === 's_class' && model.includes('560')) return 'mercedes-benz/s560';
   if (vehicle.category === 'carnival') {
-    return /하이|high/.test(model) ? 'kia/carnival-hi-limousine' : 'kia/carnival-limousine';
+    const canonical = findVipVehicle(vehicle.plate);
+    return /하이|high/.test(canonical?.model||model)
+      ? 'kia/carnival-hi-limousine' : 'kia/carnival-limousine';
   }
   if (vehicle.category === 'genesis') {
     if (model.includes('gv80')) return 'genesis/gv80';
