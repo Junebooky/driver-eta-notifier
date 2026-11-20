@@ -1,11 +1,11 @@
 import { resolveDispatchCardPhotos } from './dispatchCardAssets';
 import { validateDispatchCardProfile } from './chauffeurIdentity';
 import { resolveDispatchCardEnglishName } from '@/utils/koreanNameRomanization';
-import { isDispatchCardAssetStale } from './cardRevision';
+import { isDispatchCardAssetStale, isGeneratedDispatchCardFileName } from './cardRevision';
 import type { VipRealVehicle } from '@/utils/vehicleData';
 
 type DbDriver = { id: string; driver_name: string | null; phone: string | null; driver_meta: unknown };
-type ExistingCard = { driver_id: string; vehicle_id: string; variant: string; created_at?: string | null };
+type ExistingCard = { driver_id: string; vehicle_id: string; variant: string; created_at?: string | null; file_name?: string | null };
 type DriverPortrait = { driver_id: string; created_at?: string | null };
 
 export interface DispatchCardCoverageSlot {
@@ -61,6 +61,7 @@ export function buildDispatchCardCoverage(
   ]));
   const saved = new Set(cards
     .filter(card => (card.variant === 'pc' || card.variant === 'mobile') &&
+      (card.file_name == null || isGeneratedDispatchCardFileName(card.file_name)) &&
       !isDispatchCardAssetStale(revisions.get(card.driver_id), card.created_at) &&
       !isDispatchCardAssetStale(portraitsByDriver.get(card.driver_id), card.created_at))
     .map(card => [card.driver_id,card.vehicle_id,card.variant].join(':')));

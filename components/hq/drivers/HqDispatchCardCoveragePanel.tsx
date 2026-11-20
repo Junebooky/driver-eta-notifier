@@ -1,7 +1,7 @@
 'use client';
 
 import React, {useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {CheckCircle2,ChevronDown,ChevronRight,Image as ImageIcon,Loader2,RefreshCw,ShieldAlert} from 'lucide-react';
+import {CheckCircle2,ChevronDown,ChevronRight,Loader2,RefreshCw,ShieldAlert} from 'lucide-react';
 import type {HqDriverSummary} from '@/types/driverHq';
 import type {DispatchCardCoverage,DispatchCardCoverageDriver} from '@/lib/dispatchCards/dispatchCardCoverage';
 import {resolveDispatchCardPhotos,dispatchCardVehicleLabel} from '@/lib/dispatchCards/dispatchCardAssets';
@@ -13,8 +13,8 @@ import {HqDispatchCardBuilderModal} from './HqDispatchCardBuilderModal';
 
 type CoverageResponse={ok?:boolean;coverage?:DispatchCardCoverage;error?:string};
 
-export function HqDispatchCardCoveragePanel({drivers,onAssetUpdated}:{
-  drivers:HqDriverSummary[];onAssetUpdated?:()=>void;
+export function HqDispatchCardCoveragePanel({drivers,onAssetUpdated,embedded=false}:{
+  drivers:HqDriverSummary[];onAssetUpdated?:()=>void;embedded?:boolean;
 }) {
   const [coverage,setCoverage]=useState<DispatchCardCoverage|null>(null);
   const [loading,setLoading]=useState(true);
@@ -142,21 +142,15 @@ export function HqDispatchCardCoveragePanel({drivers,onAssetUpdated}:{
     } finally {setGenerating(false);setProgress('');}
   };
 
-  return <section className="rounded-[18px] bg-white p-4 shadow-[0_5px_24px_rgba(24,44,80,0.045)] sm:p-5"
-    aria-label="기사 전체 배차카드 매핑">
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div className="flex min-w-0 items-center gap-3">
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[#F6F8FB] text-[#60728C]">
-          <ImageIcon className="size-5" />
-        </span>
-        <div>
-          <h2 className="text-[15px] font-semibold text-[#243750]">기사별 배차카드 제작 현황</h2>
-          <p className="mt-1 text-[12px] text-[#73849C]">
-            {loading?'차량·기사 연결 확인 중…':coverage
-              ?'기사 '+coverage.drivers.length+'명 × 사진 준비 차량 '+coverage.vehicles.length+'대'
-              :'사진 준비된 차량과 기사 연결'}
-          </p>
-        </div>
+  return <section className={embedded
+    ? 'border-t border-[#EDF1F5] bg-white px-5 py-4 sm:px-6'
+    : 'rounded-[18px] bg-white p-4 shadow-[0_5px_24px_rgba(24,44,80,0.045)] sm:p-5'}
+    aria-label="기사 배차카드 현황·일괄 생성">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="text-[12px] leading-relaxed text-[#73839D]">
+        {loading?'차량·기사 연결 확인 중…':coverage
+          ? '사진 준비 차량 '+coverage.vehicles.length+'대 · '+coverage.drivers.length+'명 · PC·모바일 '+coverage.savedVariants+'/'+coverage.requiredVariants+'장 등록 · 미생성/갱신 '+coverage.missingVariants+'장'
+          :'차량과 기사 연결 확인'}
       </div>
       <button type="button" onClick={()=>void refresh()} disabled={loading||generating}
         aria-label="배차카드 현황 새로고침"
@@ -164,15 +158,6 @@ export function HqDispatchCardCoveragePanel({drivers,onAssetUpdated}:{
         <RefreshCw className={'size-4 '+(loading?'animate-spin':'')}/> 새로고침
       </button>
     </div>
-    {coverage&&<div className="mt-4 grid grid-cols-3 gap-2 rounded-[14px] bg-[#F7F9FC] p-3">
-      <div><p className="text-[11px] text-[#7E8DA2]">연결 조합</p><p className="mt-1 text-[19px] font-semibold tabular-nums text-[#2A3E56]">{coverage.drivers.length*coverage.vehicles.length}</p></div>
-      <div><p className="text-[11px] text-[#7E8DA2]">등록된 카드</p><p className="mt-1 text-[19px] font-semibold tabular-nums text-[#2A3E56]">{coverage.savedVariants}</p></div>
-      <div><p className="text-[11px] text-[#7E8DA2]">추가 생성 필요</p><p className="mt-1 text-[19px] font-semibold tabular-nums text-[#2A3E56]">{coverage.missingVariants}</p></div>
-    </div>}
-    {coverage&&<p className="mt-2 text-[11px] leading-relaxed text-[#8391A3]">
-      저장된 카드가 없어도 모든 활성 기사에게 이미지 준비 차량이 자동으로 매핑돼요.
-      기존 PC·모바일 카드는 재생성하지 않고, 없는 규격만 추가합니다.
-    </p>}
     <div className="mt-4 flex flex-col gap-2 sm:flex-row">
       <button type="button" disabled={loading||generating||!ready.length}
         onClick={()=>void generateAllMissing()}

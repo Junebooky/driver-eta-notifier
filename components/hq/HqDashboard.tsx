@@ -23,6 +23,7 @@ import { HqDispatchTable, HqDispatchTabKey } from '@/components/hq/HqDispatchTab
 import { HqQuickDispatch } from '@/components/hq/HqQuickDispatch';
 import { HqBookingDetailModal } from '@/components/hq/HqBookingDetailModal';
 import { HqDriverVehicleInfoModal } from '@/components/hq/bookings/HqDriverVehicleInfoModal';
+import { HqBookingCardManagerLauncher } from '@/components/hq/bookings/HqBookingCardManagerLauncher';
 import { HqDrivingLogsView } from '@/components/hq/driving-logs/HqDrivingLogsView';
 import { HqExpensesView } from '@/components/hq/expenses/HqExpensesView';
 import { HqEmailInboxView } from '@/components/hq/email/HqEmailInboxView';
@@ -145,6 +146,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
   const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(() => searchParams.get('quoteModal') === 'true');
   const [selectedQuoteVehicleCode, setSelectedQuoteVehicleCode] = useState<string | undefined>();
   const [isChauffeurCardOpen, setIsChauffeurCardOpen] = useState(false);
+  const [missingCardTarget, setMissingCardTarget] = useState<{driverId:string;vehiclePlate:string}|null>(null);
   const [isAlertDrawerOpen, setIsAlertDrawerOpen] = useState(false);
   const [customerMsgTarget, setCustomerMsgTarget] = useState<{
     booking: HqBooking;
@@ -679,11 +681,24 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
           isOpen={Boolean(infoModalBooking)}
           booking={infoModalBooking}
           onClose={() => setInfoModalBooking(null)}
+          onOpenAssetManager={(driverId,vehiclePlate)=>{
+            setInfoModalBooking(null);
+            setMissingCardTarget({driverId,vehiclePlate});
+          }}
           onDispatchRecorded={(_status, _synced) => {
             fetchSharedBookings(true);
           }}
         />
       )}
+
+      {/* Reuse the 기사관리 card maker when a booked driver/vehicle card is missing or stale. */}
+      {missingCardTarget&&<HqBookingCardManagerLauncher
+        key={missingCardTarget.driverId+':'+missingCardTarget.vehiclePlate}
+        driverId={missingCardTarget.driverId}
+        vehiclePlate={missingCardTarget.vehiclePlate}
+        onClose={()=>{setMissingCardTarget(null);fetchSharedBookings(true);}}
+        onSaved={()=>{void fetchSharedBookings(true);}}
+      />}
 
       {/* 4. Interactive Booking Detail, Assignment, Edit & Cancel Modal */}
       <HqBookingDetailModal

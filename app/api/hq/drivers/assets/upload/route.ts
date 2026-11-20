@@ -15,7 +15,7 @@ import {
   validateAssetUpload,
 } from '@/lib/assets/driverAssetServerStore';
 import { resolveRegisteredFleetVehicle } from '@/lib/fleet/resolveRegisteredVehicle';
-import { isDispatchCardAssetStale } from '@/lib/dispatchCards/cardRevision';
+import { isDispatchCardAssetStale, isGeneratedDispatchCardFileName } from '@/lib/dispatchCards/cardRevision';
 
 export const dynamic = 'force-dynamic';
 
@@ -201,7 +201,7 @@ export async function POST(req: NextRequest) {
           const currentPhoto = await getDriverProfileAsset(driverId, org);
           const stale = isDispatchCardAssetStale(meta.dispatch_card_revision_at, existing.createdAt) ||
             isDispatchCardAssetStale(currentPhoto?.createdAt, existing.createdAt);
-          if (!stale) {
+          if (!stale && isGeneratedDispatchCardFileName(existing.fileName)) {
             return NextResponse.json({ ok: true, skipped: true, asset: existing });
           }
         }
