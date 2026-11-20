@@ -10,8 +10,9 @@ test('Excel grid shows source buttons only for rows the active workbook manifest
   assert.match(api, /Object\.values\(w\.manifest\|\|\{\}\)/);
   assert.match(api, /linkedRows:view\.rows\.filter\(row=>linked\.has\(row\.row\)\)/);
   assert.match(view, /grid\.linkedRows\?\.includes\(row\.row\)/);
-  assert.match(view, /onMouseEnter=/);
-  assert.match(view, /aria-label=\{row\.row\+'행 기사 운행보고 원문 보기'\}/);
+  assert.doesNotMatch(view, /onMouseEnter=\{\(\)=>\{if\(grid\.linkedRows/);
+  assert.match(view, /aria-label=\{row\.row\+'행 기사 원문 보기'\}/);
+  assert.match(view, /onClick=\{\(\)=>openSource\(row\.row\)\}/);
   assert.match(view, /\/api\/hq\/report-row-source/);
   assert.match(view, /aria-label="연결된 기사 운행보고 원문"/);
   assert.match(view, /rawMessage/);
@@ -42,7 +43,9 @@ test('original message pane is an overlay, not a workbook column or an edited wo
   const view = source('components/hq/HqExcelWorkbookView.tsx');
   const grid = source('utils/reportWorkbookGrid.ts');
   assert.match(view, /fixed inset-x-3 bottom-3/);
-  assert.match(view, /sm:right-5 sm:top-24/);
+  assert.match(view, /sm:bottom-5 sm:right-5/);
+  assert.match(view, /sm:w-\[310px\]/);
+  assert.match(view, /sourceExpanded/);
   assert.match(view, /sourceCache/);
   assert.match(view, /controller\.abort\(\)/);
   assert.match(view, /Escape/);

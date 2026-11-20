@@ -1,4 +1,4 @@
-import type { HqEmailExtractedDraft, RouteWaypointItem } from '@/types/emailHq';
+import type { EmailExcelVehicleSchedule, HqEmailExtractedDraft, RouteWaypointItem } from '@/types/emailHq';
 import type { AnalyzedScheduleAttachment } from '@/services/emailAttachmentIntake';
 import { scheduleHeaderDate } from './emailAttachmentCoverage';
 
@@ -21,10 +21,19 @@ export interface DatedExcelCalendarBlock extends ExcelCalendarBlock {
   date: string;
 }
 
+export interface ExcelCalendarHeaderMatch {
+  headerAt: number;
+  timeColumn: number;
+  datedColumns: Array<{ index: number; label: string }>;
+}
+
 const normalText = (text: string) => text.replace(/\s+/g, ' ').trim();
-const isDateLabel = (value: string) =>
-  /^(?:(?:Sun|Mon|Tues?|Wednes|Thurs?|Fri|Satur)day,?\s+)?(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i.test(value) ||
-  /^\d{1,4}[-/.년]\s*\d{1,2}/.test(value);
+const isDateLabel = (value: string) => {
+  const trimmed = value.trim();
+  return /^(?:(?:Sun(?:day)?|Mon(?:day)?|Tue(?:s(?:day)?)?|Wed(?:nesday)?|Thu(?:r(?:s(?:day)?)?)?|Fri(?:day)?|Sat(?:urday)?)\.?,?\s+)?(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i.test(trimmed) ||
+    /^\d{1,4}[-/.년]\s*\d{1,2}/.test(trimmed) ||
+    /^\d{1,2}\s*월\s*\d{1,2}/.test(trimmed);
+};
 
 function asClock(hour: number, minute: number, period?: string): string | undefined {
   if (period) {
@@ -35,10 +44,27 @@ function asClock(hour: number, minute: number, period?: string): string | undefi
   return String(hour).padStart(2, '0') + ':' + String(minute).padStart(2, '0');
 }
 
-/** Prefer explicit appointment time; the grid's time row is the fallback. */
+/** Prefer explicit appointment time (start of range or exact clock); the grid's time row is the fallback. */
 export function excelCalendarClock(value: string): string | undefined {
   const input = value.trim();
-  const m = input.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
+  const range = input.match(/\b(\d{1,2})(?::(\d{2}))?(?::\d{2})?\s*(am|pm)?\s*[~–—-]\s*(\d{1,2})(?::(\d{2}))?(?::\d{2})?\s*(am|pm)\b/i);
+  if (range) {
+    const startH = Number(range[1]);
+    const startM = Number(range[2] || 0);
+    const startPeriod = range[3]?.toLowerCase();
+    const endH = Number(range[4]);
+    const endPeriod = range[6].toLowerCase();
+    let resolvedPeriod = startPeriod;
+    if (!resolvedPeriod) {
+      if (endPeriod === 'am') {
+        resolvedPeriod = 'am';
+      } else {
+        resolvedPeriod = startH === 12 || (endH !== 12 && startH <= endH) ? 'pm' : 'am';
+      }
+    }
+    return asClock(startH, startM, resolvedPeriod);
+  }
+  const m = input.match(/\b(\d{1,2})(?::(\d{2}))?(?::\d{2})?\s*(am|pm)\b/i);
   if (m) return asClock(Number(m[1]), Number(m[2] || 0), m[3]);
   // Client prose often writes "meeting at 14:30" without AM/PM.
   const h24 = input.match(/\b(\d{1,2}):(\d{2})\b/);
@@ -54,14 +80,58 @@ export function excelCalendarClock(value: string): string | undefined {
 function addressFromOriginal(text: string): string | undefined {
   const lines = text.split(/\r?\n/).map(line => line.trim().replace(/^\*+\s*/, '')).filter(Boolean);
   // "주소?" is NOT an address. Keep it marked as client unspecified.
-  const explicit = lines.findIndex(line => /^(?:address|주소)\s*[:：]/i.test(line) && !/[?？]$/.test(line));
+  const explicit = lines.findIndex(line => /^(?:address|adderss|주소)\s*[:：]/i.test(line) && !/[?？]$/.test(line));
   if (explicit >= 0) {
-    const remaining = lines.slice(explicit).map(line => line.replace(/^(?:address|주소)\s*[:：]\s*/i, '')).filter(Boolean);
+    const remaining = lines.slice(explicit).map(line => line.replace(/^(?:address|adderss|주소)\s*[:：]\s*/i, '')).filter(Boolean);
     const joined = remaining.join(' ').trim();
-    return joined && !/(?:주소|address)\s*[?？]/i.test(joined) ? joined : undefined;
+    return joined && !/(?:주소|address|adderss)\s*[?？]/i.test(joined) ? joined : undefined;
+  }
+  const inlineIdx = lines.findIndex(line => /(?:address|adderss|주소)\s*[:：]\s*(.+)$/i.test(line) && !/[?？]$/.test(line));
+  if (inlineIdx >= 0) {
+    const match = lines[inlineIdx].match(/(?:address|adderss|주소)\s*[:：]\s*(.+)$/i);
+    const captured = match?.[1]?.trim() || '';
+    const continuations: string[] = [];
+    for (let i = inlineIdx + 1; i < lines.length; i++) {
+      const nextLine = lines[i];
+      if (/^[*•-]/.test(nextLine) || /^(?:address|adderss|location|주소|장소)\s*[:：]/i.test(nextLine)) break;
+      if (/[?？]$/.test(nextLine)) continue;
+      continuations.push(nextLine);
+    }
+    const joined = [captured, ...continuations].filter(Boolean).join(' ').trim();
+    return joined && !/(?:주소|address|adderss)\s*[?？]/i.test(joined) ? joined : undefined;
   }
   const street = lines.findIndex(line => /[가-힣0-9]+(?:로|길)\s*\d/.test(line));
   return street >= 0 ? lines.slice(street).join(' ').trim() || undefined : undefined;
+}
+
+const isTimeOnlyLine = (line: string) =>
+  /^\(?\s*\d{1,2}(?::\d{2}){0,2}\s*(?:am|pm)?\s*(?:[~–—-]\s*\d{1,2}(?::\d{2}){0,2}\s*(?:am|pm)?)?\s*\)?[,.:]?\s*$/i.test(line);
+
+function extractTitleFromOriginal(originalText: string): string {
+  const lines = originalText.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  if (!lines.length) return originalText;
+  const titleIndex = lines.length > 1 && isTimeOnlyLine(lines[0]) ? 1 : 0;
+  let title = lines[titleIndex] || originalText;
+  if (
+    lines.length > titleIndex + 1 &&
+    /(?:with|into|at|to|for|of|from|by|&|-|,)\s*$/i.test(title) &&
+    !/^(?:[*•-]|(?:address|adderss|location|주소|장소)\s*[:：]|(?:서울|인천|강남구|종로구|중구|용산구|서초구|송파구|영등포구|마포구))/i.test(lines[titleIndex + 1])
+  ) {
+    title = `${title} ${lines[titleIndex + 1]}`;
+  }
+  return title.replace(/\s+(?:address|adderss|주소)\s*[:：].*$/i, '').trim() || title;
+}
+
+function extractPrimaryExplicitClock(originalText: string, hasGridTime: boolean): string | undefined {
+  const lines = originalText.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  for (const [index, line] of lines.entries()) {
+    if (index > 0 && hasGridTime && /\b(?:return\s+to|back\s+to|depart\s+for)\b|복귀/i.test(line)) {
+      continue;
+    }
+    const clock = excelCalendarClock(line);
+    if (clock) return clock;
+  }
+  return undefined;
 }
 
 function excelColumn(index: number) {
@@ -75,6 +145,50 @@ function excelColumn(index: number) {
   return answer;
 }
 
+export function findExcelCalendarHeader(
+  rows: ReadonlyArray<ReadonlyArray<string | number>>,
+): ExcelCalendarHeaderMatch | null {
+  const explicitAt = rows.findIndex(row => {
+    const first = row.findIndex(value => /^(date|time|날짜|일자|일시|시간)$/i.test(String(value).trim()));
+    return first >= 0 && row.filter((v, i) => i !== first && isDateLabel(String(v))).length >= 2;
+  });
+  if (explicitAt >= 0) {
+    const header = rows[explicitAt];
+    const timeColumn = header.findIndex(value => /^(date|time|날짜|일자|일시|시간)$/i.test(String(value).trim()));
+    const datedColumns = header.map((value, index) => ({ index, label: String(value).trim() }))
+      .filter(item => item.index !== timeColumn && isDateLabel(item.label));
+    return { headerAt: explicitAt, timeColumn, datedColumns };
+  }
+
+  const headerlessAt = rows.findIndex(row => row.filter(v => isDateLabel(String(v))).length >= 2);
+  if (headerlessAt < 0) return null;
+  const header = rows[headerlessAt];
+  const datedColumns = header.map((value, index) => ({ index, label: String(value).trim() }))
+    .filter(item => isDateLabel(item.label));
+  const datedIndices = new Set(datedColumns.map(item => item.index));
+  const firstDatedCol = datedColumns[0]?.index ?? 0;
+
+  let bestCol = -1;
+  let bestHits = 0;
+  const maxCol = rows.slice(headerlessAt + 1, headerlessAt + 51).reduce((m, r) => Math.max(m, r.length), header.length);
+  for (let col = 0; col < maxCol; col++) {
+    if (datedIndices.has(col)) continue;
+    let hits = 0;
+    for (let r = headerlessAt + 1; r < Math.min(rows.length, headerlessAt + 51); r++) {
+      if (excelCalendarClock(String(rows[r][col] ?? ''))) hits++;
+    }
+    if (hits > bestHits || (hits > 0 && hits === bestHits && col < firstDatedCol && bestCol >= firstDatedCol)) {
+      bestHits = hits;
+      bestCol = col;
+    }
+  }
+  return {
+    headerAt: headerlessAt,
+    timeColumn: bestHits > 0 ? bestCol : -1,
+    datedColumns,
+  };
+}
+
 /** Pure structural extraction: no Gemini, network, TMAP or invented POIs. */
 export function extractExcelCalendarBlocks(
   sheetName: string,
@@ -82,31 +196,25 @@ export function extractExcelCalendarBlocks(
   startRow = 0,
   startColumn = 0,
 ): ExcelCalendarBlock[] {
-  const headerAt = rows.findIndex(row => {
-    const first = row.findIndex(value => /^(date|날짜|일자)$/i.test(String(value).trim()));
-    return first >= 0 && row.filter((v, i) => i !== first && isDateLabel(String(v))).length >= 2;
-  });
-  if (headerAt < 0) return [];
-  const header = rows[headerAt];
-  const timeColumn = header.findIndex(value => /^(date|날짜|일자)$/i.test(String(value).trim()));
-  const datedColumns = header.map((value, index) => ({ index, label: String(value).trim() }))
-    .filter(item => item.index !== timeColumn && isDateLabel(item.label));
+  const headerMatch = findExcelCalendarHeader(rows);
+  if (!headerMatch) return [];
+  const { headerAt, timeColumn, datedColumns } = headerMatch;
   const result: ExcelCalendarBlock[] = [];
   for (let row = headerAt + 1; row < rows.length; row++) {
-    const gridTime = excelCalendarClock(String(rows[row][timeColumn] ?? ''));
+    const gridTime = timeColumn >= 0 ? excelCalendarClock(String(rows[row][timeColumn] ?? '')) : undefined;
     for (const column of datedColumns) {
       const originalText = String(rows[row][column.index] ?? '').trim();
       if (!originalText) continue;
       // One occupied cell = one event; merged cells do not create additional events.
-      const firstLine = originalText.split(/\r?\n/).map(line => line.trim()).find(Boolean) || originalText;
-      const explicitTime = excelCalendarClock(originalText);
+      const title = extractTitleFromOriginal(originalText);
+      const explicitTime = extractPrimaryExplicitClock(originalText, Boolean(gridTime));
       result.push({
         sheetName,
         cell: excelColumn(startColumn + column.index) + (startRow + row + 1),
         dateLabel: column.label,
         time: explicitTime || gridTime || '',
         clockSource: explicitTime ? 'text' : gridTime ? 'grid' : 'unknown',
-        title: firstLine,
+        title,
         originalText,
         clientAddress: addressFromOriginal(originalText),
       });
@@ -133,29 +241,13 @@ function stableCalendarKey(record: DatedExcelCalendarBlock): string {
   return [record.sourceIndex, record.sourceSha256.slice(0, 16), record.sheetName, record.cell].join(':');
 }
 
-/**
- * A single chronological calendar is a factual ledger, not an AI suggestion.
- * Every source cell must appear in the draft, even when Gemini returns one stop.
- * We retain useful AI POI labels ONLY when matched by unique date+time and
- * explicitly supported by client text; none of them become TMAP-verified.
- */
-export function reconcileSingleExcelCalendar(
-  draft: HqEmailExtractedDraft,
+export function calendarRecordsToWaypoints(
   records: DatedExcelCalendarBlock[],
-): HqEmailExtractedDraft {
-  if (!records.length) return draft;
-  const grouped = new Set(records.map(item => item.sourceIndex + '/' + item.sheetName));
-  if (grouped.size !== 1) {
-    return {
-      ...draft,
-      warnings: [...(draft.warnings || []),
-        '여러 차량/시트의 원본 일정은 서로 다른 운행일 수 있어 하나의 경로로 자동 합치지 않았습니다. 원본 일정 대조 후 차량별 경로를 나눠 주세요.'],
-    };
-  }
+  modelWaypoints: ReadonlyArray<RouteWaypointItem> = [],
+): { waypoints: RouteWaypointItem[]; ordered: DatedExcelCalendarBlock[]; consumed: Set<string> } {
   const ordered = [...records].sort((a, b) =>
     a.date.localeCompare(b.date) || a.time.localeCompare(b.time) ||
     a.cell.localeCompare(b.cell));
-  const allModel = draft.waypoints || [];
   const consumed = new Set<string>();
   const calendarCounts = new Map<string, number>();
   for (const r of ordered) {
@@ -165,7 +257,7 @@ export function reconcileSingleExcelCalendar(
 
   const fromExcel: RouteWaypointItem[] = ordered.map((entry) => {
     const timeKey = entry.date + '|' + entry.time;
-    const candidate = (calendarCounts.get(timeKey) === 1 ? allModel.find(point =>
+    const candidate = (calendarCounts.get(timeKey) === 1 ? modelWaypoints.find(point =>
       !consumed.has(point.id) && point.date === entry.date && point.time === entry.time
     ) : undefined);
     if (candidate) consumed.add(candidate.id);
@@ -194,6 +286,35 @@ export function reconcileSingleExcelCalendar(
     };
   });
 
+  const sorted = [...fromExcel]
+    .sort((a, b) => (a.date || '').localeCompare(b.date || '') ||
+      (a.time || '').localeCompare(b.time || '') || a.id.localeCompare(b.id))
+    .map((point, index) => ({ ...point, order: index + 1 }));
+  return { waypoints: sorted, ordered, consumed };
+}
+
+/**
+ * A single chronological calendar is a factual ledger, not an AI suggestion.
+ * Every source cell must appear in the draft, even when Gemini returns one stop.
+ * We retain useful AI POI labels ONLY when matched by unique date+time and
+ * explicitly supported by client text; none of them become TMAP-verified.
+ */
+export function reconcileSingleExcelCalendar(
+  draft: HqEmailExtractedDraft,
+  records: DatedExcelCalendarBlock[],
+): HqEmailExtractedDraft {
+  if (!records.length) return draft;
+  const grouped = new Set(records.map(item => item.sourceIndex + '/' + item.sheetName));
+  if (grouped.size !== 1) {
+    return {
+      ...draft,
+      warnings: [...(draft.warnings || []),
+        '여러 차량/시트의 원본 일정은 서로 다른 운행일 수 있어 하나의 경로로 자동 합치지 않았습니다. 원본 일정 대조 후 차량별 경로를 나눠 주세요.'],
+    };
+  }
+  const allModel = draft.waypoints || [];
+  const { waypoints: fromExcel, ordered, consumed } = calendarRecordsToWaypoints(records, allModel);
+
   // Preserve extra explicit model/email stops instead of quietly deleting them,
   // but don't re-add Gemini's duplicate summary of a source cell.
   const extra = allModel.filter(point => {
@@ -220,5 +341,145 @@ export function reconcileSingleExcelCalendar(
     dropoffLocation: last?.location || draft.dropoffLocation,
     dropoffProvidedAddress: last?.clientAddress || draft.dropoffProvidedAddress,
     isDropoffPoiConfirmed: false,
+  };
+}
+
+/** Build structured per-attachment/per-sheet full schedules without merging different vehicles into one route. */
+export function buildExcelVehicleSchedules(
+  records: DatedExcelCalendarBlock[],
+  modelWaypoints: ReadonlyArray<RouteWaypointItem> = [],
+): EmailExcelVehicleSchedule[] {
+  if (!records.length) return [];
+  const byGroup = new Map<string, DatedExcelCalendarBlock[]>();
+  const sheetsPerSource = new Map<number, Set<string>>();
+  for (const record of records) {
+    const key = `${record.sourceIndex}:${record.sourceSha256.slice(0, 12)}:${record.sheetName}`;
+    byGroup.set(key, [...(byGroup.get(key) || []), record]);
+    const sheetSet = sheetsPerSource.get(record.sourceIndex) || new Set<string>();
+    sheetSet.add(record.sheetName);
+    sheetsPerSource.set(record.sourceIndex, sheetSet);
+  }
+
+  return [...byGroup.entries()].map(([, groupRecords]) => {
+    const first = groupRecords[0];
+    const multiSheetFile = (sheetsPerSource.get(first.sourceIndex)?.size || 0) > 1;
+    const { waypoints } = calendarRecordsToWaypoints(groupRecords, modelWaypoints);
+    const dates = [...new Set(waypoints.map(wp => wp.date || '').filter(Boolean))].sort();
+    return {
+      id: `excel-schedule-${first.sourceIndex}-${first.sourceSha256.slice(0, 8)}-${first.sheetName}`,
+      sourceIndex: first.sourceIndex,
+      filename: first.filename,
+      sheetName: first.sheetName,
+      label: multiSheetFile ? `${first.filename} · ${first.sheetName}` : first.filename,
+      dates,
+      waypoints,
+    };
+  });
+}
+
+export function syncActiveVehicleScheduleWaypoints(
+  draft: HqEmailExtractedDraft,
+  nextWaypoints: RouteWaypointItem[],
+): HqEmailExtractedDraft {
+  if (!draft.activeVehicleScheduleId || !draft.excelVehicleSchedules?.length) return draft;
+  const dates = [...new Set(nextWaypoints.map(wp => wp.date || '').filter(Boolean))].sort();
+  return {
+    ...draft,
+    excelVehicleSchedules: draft.excelVehicleSchedules.map(schedule =>
+      schedule.id === draft.activeVehicleScheduleId
+        ? { ...schedule, waypoints: nextWaypoints, dates }
+        : schedule
+    ),
+  };
+}
+
+export function applyExcelVehicleScheduleToDraft(
+  draft: HqEmailExtractedDraft,
+  scheduleId: string,
+): HqEmailExtractedDraft {
+  if (!draft.excelVehicleSchedules?.length) return draft;
+  const synced = draft.activeVehicleScheduleId && draft.waypoints
+    ? syncActiveVehicleScheduleWaypoints(draft, draft.waypoints)
+    : draft;
+  const target = synced.excelVehicleSchedules!.find(schedule => schedule.id === scheduleId);
+  if (!target) return draft;
+
+  const waypoints = target.waypoints.map((wp, index) => ({ ...wp, order: index + 1 }));
+  const first = waypoints[0];
+  const last = waypoints[waypoints.length - 1];
+  const coveredDates = new Set(waypoints.map(wp => wp.date || '').filter(Boolean));
+  const documentAnalysis = synced.documentAnalysis?.map(doc => {
+    if (!doc.missingDates?.length) return doc;
+    const remainingMissing = doc.missingDates.filter(date => !coveredDates.has(date));
+    return {
+      ...doc,
+      missingDates: remainingMissing.length ? remainingMissing : undefined,
+      dateReviewAcknowledged: remainingMissing.length ? doc.dateReviewAcknowledged : false,
+    };
+  });
+
+  return {
+    ...synced,
+    activeVehicleScheduleId: target.id,
+    waypoints,
+    pickupDate: first?.date || synced.pickupDate,
+    pickupTime: first?.time || synced.pickupTime,
+    pickupLocation: first?.location || synced.pickupLocation,
+    pickupAddress: first?.address,
+    pickupProvidedAddress: first?.clientAddress,
+    pickupLat: first?.lat,
+    pickupLng: first?.lng,
+    isPickupPoiConfirmed: Boolean(first?.isPoiConfirmed),
+    dropoffLocation: last?.location || synced.dropoffLocation,
+    dropoffAddress: last?.address,
+    dropoffProvidedAddress: last?.clientAddress,
+    dropoffLat: last?.lat,
+    dropoffLng: last?.lng,
+    isDropoffPoiConfirmed: Boolean(last?.isPoiConfirmed),
+    documentAnalysis,
+  };
+}
+
+export interface ParsedExcelWaypointNotes {
+  excelSource?: {
+    filename: string;
+    sheetName: string;
+    cell: string;
+    isGridClock?: boolean;
+    rawText?: string;
+  };
+  plainNotes?: string;
+}
+
+const EXCEL_SOURCE_HEADER_RE = /^원본 Excel\s+(.+?)\s+\/\s+([^!]+)!([A-Za-z]+\d+(?::[A-Za-z]+\d+)?)$/;
+const EXCEL_GRID_CLOCK_NOTICE = '시간표 행 기준 · 실제 출발 시각 미확정';
+
+/**
+ * Separates structured Excel provenance lines (generated by `calendarRecordsToWaypoints`)
+ * from plain operational waypoint notes so UI components can keep rows uncluttered
+ * and show raw Excel cell context on demand.
+ */
+export function parseExcelWaypointNotes(notes?: string): ParsedExcelWaypointNotes {
+  const trimmed = notes?.trim();
+  if (!trimmed) return {};
+
+  const lines = trimmed.split(/\r?\n/);
+  const headerMatch = EXCEL_SOURCE_HEADER_RE.exec(lines[0]?.trim() || '');
+  if (!headerMatch) {
+    return { plainNotes: trimmed };
+  }
+
+  const restLines = lines.slice(1);
+  const isGridClock = restLines[0]?.trim() === EXCEL_GRID_CLOCK_NOTICE;
+  const rawText = (isGridClock ? restLines.slice(1) : restLines).join('\n').trim() || undefined;
+
+  return {
+    excelSource: {
+      filename: headerMatch[1].trim(),
+      sheetName: headerMatch[2].trim(),
+      cell: headerMatch[3].trim(),
+      ...(isGridClock ? { isGridClock: true } : {}),
+      ...(rawText ? { rawText } : {}),
+    },
   };
 }

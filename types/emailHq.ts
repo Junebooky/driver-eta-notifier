@@ -85,6 +85,16 @@ export interface HqGroupTripItem {
   notes?: string;
 }
 
+export interface EmailExcelVehicleSchedule {
+  id: string;
+  sourceIndex: number;
+  filename: string;
+  sheetName: string;
+  label: string;
+  dates: string[];
+  waypoints: RouteWaypointItem[];
+}
+
 export interface HqEmailExtractedDraft {
   id: string;
   emailId: string;
@@ -158,6 +168,9 @@ export interface HqEmailExtractedDraft {
 
   // Multiple destinations / itinerary waypoints (when schedule visits multiple locations in a day)
   waypoints?: RouteWaypointItem[];
+  /** Per-attachment / per-sheet full Excel calendar schedules when multiple vehicle workbooks exist. */
+  excelVehicleSchedules?: EmailExcelVehicleSchedule[];
+  activeVehicleScheduleId?: string;
 
   flightNumber: string; // Backward-compatible primary flight only.
   flights?: EmailFlightLeg[]; // Every leg, including multiple arrivals and onward connections.

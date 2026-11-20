@@ -2,6 +2,7 @@ import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate';
 import { DOMParser } from '@xmldom/xmldom';
 import { normalizedPlate, validateKakaoExcelDraft, type KakaoExcelDraft } from '@/utils/kakaoExcelImport';
 import {reportRowCellStyles,widenReportColumns,reportRowHeight,routeColumnWidth} from '@/utils/reportExcelCellFormatting';
+import {findWorkbookMonthSheetName} from '@/utils/reportWorkbookMonth';
 
 const MAX_BYTES = 12 * 1024 * 1024;
 export interface KakaoWorkbookResult { bytes: Uint8Array; sheetName: string; rowNumber: number; createdMonth: boolean }
@@ -83,7 +84,9 @@ function sameDate(v: unknown, date: string, date1904: boolean): boolean {
 export function appendKakaoExcelReport(bytes: Uint8Array, draft: KakaoExcelDraft): KakaoWorkbookResult {
   const errors = validateKakaoExcelDraft(draft);
   if (errors.length) throw new Error(errors.join(' '));
-  const wb = workbookFromFile(bytes), sheetName = Number(draft.date.slice(5,7))+'월';
+  const wb = workbookFromFile(bytes);
+  const monthNumber=Number(draft.date.slice(5,7));
+  const sheetName=findWorkbookMonthSheetName(wb.SheetNames,monthNumber,Number(draft.date.slice(0,4)))??monthNumber+'월';
   const sheet = wb.Sheets[sheetName];
   if (!sheet) throw new Error(sheetName+' 시트가 없습니다. Excel에서 회사가 승인한 월별 템플릿을 복제한 뒤 다시 열어 주세요. 임의 양식은 생성하지 않습니다.');
   const entries = unzipSync(bytes);
@@ -99,34 +102,54 @@ export function appendKakaoExcelReport(bytes: Uint8Array, draft: KakaoExcelDraft
   if (doc.getElementsByTagName('tableParts').length || /<\w+:sheetData/.test(source)) throw new Error('표 또는 특수 시트는 Excel에서 검토해 주세요.');
   const date1904 = wb.date1904;
   const rows = Array.from(doc.getElementsByTagName('row'));
-  let last = Math.max(1, sheet.ref.e.r+1);
-  for (const row of rows) {
-    const r = Number(row.getAttribute('r'));
-    if (!Number.isInteger(r) || r < 1) throw new Error('행 번호가 올바르지 않습니다.');
-    last = Math.max(last,r);
-    if (r === 1) continue;
-    const value = (c:string) => sheet.cells[c+r]?.v;
-    if (sameDate(value('A'),draft.date,date1904) && samePlate(value('B'),draft.plate) && clean(value('D')) === clean(draft.customer) && clean(value('E')) === clean(draft.driver)) {
-      // Nonstandard multi-plate/period/time rows need review rather than a false negative.
-      const oldTime = canonicalTime(value('F'));
-      const newTime = canonicalTime(draft.time);
-      if (oldTime === newTime || /[\/,~]/.test(String(value('A'))) || plateParts(value('B')).length > 1 || !/^\d{2}:\d{2}~\d{2}:\d{2}$/.test(oldTime)) throw new Error('중복 또는 기간·복수 차량의 기존 기록과 겹칩니다. 기존 장부를 확인해 주세요.');
+  // Keep the original duplicate/overlapping-period guard before choosing an
+  // empty slot. Compact placement must not permit duplicate chauffeur reports.
+  for(const row of rows){
+    const r=Number(row.getAttribute('r'));
+    if(!Number.isInteger(r)||r<1)throw new Error('행 번호가 올바르지 않습니다.');
+    if(r===1)continue;
+    const value=(c:string)=>sheet.cells[c+r]?.v;
+    if(sameDate(value('A'),draft.date,date1904)&&samePlate(value('B'),draft.plate)&&
+       clean(value('D'))===clean(draft.customer)&&clean(value('E'))===clean(draft.driver)){
+      const oldTime=canonicalTime(value('F')),newTime=canonicalTime(draft.time);
+      if(oldTime===newTime||/[\\/,~]/.test(String(value('A')))||
+         plateParts(value('B')).length>1||
+         !/^\d{2}:\d{2}~\d{2}:\d{2}$/.test(oldTime))
+        throw new Error('중복 또는 기간·복수 차량의 기존 기록과 겹칩니다. 기존 장부를 확인해 주세요.');
     }
   }
-  for (const merge of sheet.merges) last = Math.max(last,merge.e.r+1);
-  if (last >= 25000) throw new Error('안전하게 추가할 수 있는 행 범위를 초과했습니다.');
-  // A newly generated month is a blank styled template, possibly with footer
-  // formulas at row 113 and formatting through row 244. Fill the FIRST blank
-  // report row instead of treating those template rows as customer records.
-  const hasLiveRecord=Object.entries(sheet.cells).some(([addr,cell])=>{
-   if(!/^[A-L](?:[2-9]|[1-9]\d+)$/.test(addr)||String(cell.v??'')==='')return false;
-   const found=source.match(new RegExp('<c\\b(?=[^>]*\\br="'+addr+'")[^>]*?(?:\\/>|>[\\s\\S]*?<\\/c>)'))?.[0]||'';
-   return !/<f(?:\s|>)/.test(found);
-  });
-  const firstRow=rows.find(r=>r.getAttribute('r')==='2');
-  const firstHasFormula=firstRow&&Array.from(firstRow.getElementsByTagName('f')).length>0;
-  const firstMerged=sheet.merges.some(m=>m.s.r<=1&&m.e.r>=1);
-  const rowNumber=!hasLiveRecord&&!firstHasFormula&&!firstMerged?2:last+1;
+  // The worksheet dimension includes hundreds of preformatted empty cells,
+  // notes and footer formulas. It is NOT the last customer report row.
+  // Place each new chauffeur report in the earliest genuinely empty, safe row.
+  const occupied=new Set<number>();
+  for(const [address,cell] of Object.entries(sheet.cells)){
+    const n=Number(address.match(/\d+$/)?.[0]||0);
+    if(n>=2&&String(cell.v??'').trim())occupied.add(n);
+  }
+  const rowByNumber=new Map(rows.map(row=>[Number(row.getAttribute('r')),row]));
+  const reserved=new Set<number>();
+  for(const row of rows){
+    const n=Number(row.getAttribute('r'));
+    if(!Number.isInteger(n)||n<1)throw new Error('행 번호가 올바르지 않습니다.');
+    // Never overwrite footer formulas or explicit manually reserved blank rows.
+    if(row.getElementsByTagName('f').length ||
+       (row.getAttribute('customHeight')==='1'&&row.getAttribute('ht')==='22.17'))
+      reserved.add(n);
+  }
+  // Preserve merged ranges, including those created by the original owner.
+  for(const merge of sheet.merges)
+    for(let n=Math.max(2,merge.s.r+1);n<=merge.e.r+1;n++)reserved.add(n);
+  let rowNumber=0;
+  for(let candidate=2;candidate<=25000;candidate++){
+    if(occupied.has(candidate)||reserved.has(candidate))continue;
+    const row=rowByNumber.get(candidate);
+    // Future-proof: a row with unsupported attached XML is not an empty slot.
+    if(row&&Array.from(row.childNodes).some(node=>
+       node.nodeType===1&&node.nodeName!=='c'))continue;
+    rowNumber=candidate;
+    break;
+  }
+  if(!rowNumber)throw new Error('빈 운행보고 행이 없습니다. 원본의 수식과 병합 범위를 확인해 주세요.');
   // Existing data and formulas are never shifted/overwritten. Managed rows are
   // normalized separately with atomic manifest/DB row-number updates.
   // Reuse only explicit column styles of the last actual data row, never formulas.

@@ -1,13 +1,13 @@
 /**
  * VIP LIMOUSINE KOREA — 전체 20대 공식 차량 데이터 마스터 (Single Source of Truth)
  *
- * [벤츠 스프린터 319 CDI] 1대: 125호 8040
- * [벤츠 스프린터 519 CDI] 8대: 125호 9982, 700호 1458, 703서 2658, 70호 3864, 71두 3338, 73호 2553, 71두 3285, 711하 1058
+ * [벤츠 스프린터 319 CDI] 1대: 125호 9982
+ * [벤츠 스프린터 519 CDI] 8대: 125호 8040, 700호 1458, 703서 2658, 70호 3864, 71두 3338, 73호 2553, 71두 3285, 711하 1058
  * [현대 스타리아 리무진] 4대: 125호 7665, 125호 9037, 142호 8407, 116허 1514
  * [기아 카니발 하이리무진] 2대: 101호 7681, 193호 5336
  * [제네시스 GV80] 1대: 203호 5947
- * [제네시스 G90 리무진] 1대: 102부 4280
- * [제네시스 G90L] 1대: 116호 1336
+ * [제네시스 G90 LWB 블랙] 1대: 107부 4280
+ * [제네시스 G90 LWB 네이비] 1대: 116호 1336
  * [제네시스 G90] 1대: 125호 8839
  * [벤츠 S560] 1대: 01호 3343
  *
@@ -130,25 +130,25 @@ export function stripManufacturerName(rawModel: string | undefined | null): stri
 }
 
 export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
-  // 1. [벤츠 스프린터 519 CDI] 1대 (9982)
+  // 1. [벤츠 스프린터 319 CDI] 1대 (9982)
   {
     id: 'veh-sp-9982',
     uuid: 'e0f7c22a-0001-4c12-8800-000000009982',
     plate: '125호 9982',
     plateShort: '9982',
-    model: '벤츠 스프린터 519 CDI',
-    modelShort: '스프린터 519 CDI',
+    model: '벤츠 스프린터 319 CDI',
+    modelShort: '스프린터 319 CDI',
     brand: '벤츠',
     category: 'sprinter',
     categoryLabel: '벤츠 스프린터',
-    subType: '519 CDI',
+    subType: '319 CDI',
     capacity: '6인승',
     status: '운행 중',
     fuelType: '디젤',
-    imageUrl: '/images/vehicles/sprinter_519.webp',
+    imageUrl: '/images/vehicles/sprinter_319.webp',
   },
 
-  // 2. [벤츠 스프린터 519 CDI] 1대 (1458), [319 CDI] 1대 (8040)
+  // 2. [벤츠 스프린터 519 CDI] 2대 (1458, 8040)
   {
     id: 'veh-sp-1458',
     uuid: 'e0f7c22a-0001-4c12-8800-000000001458',
@@ -170,16 +170,16 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     uuid: 'e0f7c22a-0001-4c12-8800-000000008040',
     plate: '125호 8040',
     plateShort: '8040',
-    model: '벤츠 스프린터 319 CDI',
-    modelShort: '스프린터 319 CDI',
+    model: '벤츠 스프린터 519 CDI',
+    modelShort: '스프린터 519 CDI',
     brand: '벤츠',
     category: 'sprinter',
     categoryLabel: '벤츠 스프린터',
-    subType: '319 CDI',
+    subType: '519 CDI',
     capacity: '11인승',
     status: '차고지 대기',
     fuelType: '디젤',
-    imageUrl: '/images/vehicles/sprinter_319.webp',
+    imageUrl: '/images/vehicles/sprinter_519.webp',
   },
 
   // 3. [벤츠 스프린터 519 CDI] 6대 (2658, 3864, 3338, 2553, 3285, 1058)
@@ -411,39 +411,41 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     imageUrl: '/images/vehicles/gv80.webp',
   },
 
-  // 8. [제네시스 G90 리무진] 1대
+  // 8. [제네시스 G90 LWB 블랙] 1대
   {
     id: 'veh-gn-4280',
     uuid: 'e0f7c22a-0001-4c12-8800-000000004280',
-    plate: '102부 4280',
+    plate: '107부 4280',
     plateShort: '4280',
-    model: '제네시스 G90 리무진',
-    modelShort: 'G90 리무진',
+    model: '제네시스 G90 LWB',
+    modelShort: 'G90 LWB',
     brand: '제네시스',
     category: 'genesis',
     categoryLabel: '제네시스',
-    subType: 'G90 리무진',
+    subType: 'G90 LWB',
     capacity: '4인승',
     status: '운행 중',
     fuelType: '가솔린',
+    color: '블랙',
     imageUrl: '/images/vehicles/g90_black.webp',
   },
 
-  // 9. [제네시스 G90L] 1대
+  // 9. [제네시스 G90 LWB 네이비] 1대
   {
     id: 'veh-gn-2269',
     uuid: 'e0f7c22a-0001-4c12-8800-000000002269',
     plate: '116호 1336',
     plateShort: '1336',
-    model: '제네시스 G90L',
-    modelShort: 'G90L (롱휠베이스)',
+    model: '제네시스 G90 LWB',
+    modelShort: 'G90 LWB',
     brand: '제네시스',
     category: 'genesis',
     categoryLabel: '제네시스',
-    subType: 'G90L',
+    subType: 'G90 LWB',
     capacity: '4인승',
     status: '운행 중',
     fuelType: '가솔린',
+    color: '네이비',
     imageUrl: '/images/vehicles/g90_lwb.webp',
   },
 
@@ -492,7 +494,7 @@ export const VIP_VEHICLE_FLEET_CATEGORIES = [
     totalCount: 9,
     activeCount: 7,
     availableCount: 2,
-    details: '319 CDI 1대(8040) · 519 CDI 8대',
+    details: '319 CDI 1대(9982) · 519 CDI 8대',
     plates: ['125호 9982', '700호 1458', '125호 8040', '703서 2658', '70호 3864', '71두 3338', '73호 2553', '71두 3285', '711하 1058'],
   },
   {
@@ -519,8 +521,8 @@ export const VIP_VEHICLE_FLEET_CATEGORIES = [
     totalCount: 4,
     activeCount: 3,
     availableCount: 1,
-    details: 'GV80 1대 · G90 리무진 1대 · G90L 1대 · G90 1대',
-    plates: ['203호 5947', '102부 4280', '116호 1336', '125호 8839'],
+    details: 'GV80 1대 · G90 LWB 2대(블랙·네이비) · G90 1대',
+    plates: ['203호 5947', '107부 4280', '116호 1336', '125호 8839'],
   },
   {
     id: 's_class',
@@ -564,7 +566,9 @@ export function reconcileRegisteredVehicle(vehicle: VipRealVehicle): VipRealVehi
     capacity: canonical.capacity,
     fuelType: canonical.fuelType,
     // Existing explicit photos and operator notes must not be erased.
-    imageUrl: vehicle.imageUrl || canonical.imageUrl,
+    imageUrl: canonical.category === 'sprinter' && /^\/images\/vehicles\/sprinter_(319|519)\.webp$/.test(vehicle.imageUrl || '')
+      ? canonical.imageUrl // Correct an outdated stock thumbnail; keep explicit uploaded photos.
+      : vehicle.imageUrl || canonical.imageUrl,
     chargingSpecs: vehicle.chargingSpecs ?? canonical.chargingSpecs,
   };
 }
@@ -679,17 +683,24 @@ export function getVehicleImage(
   vehicle?: VipRealVehicle | { plate?: string; model?: string; category?: string; plateShort?: string; subType?: string; imageUrl?: string } | null
 ): string {
   if (!vehicle) return '/images/thumb_g90.jpg';
-  if ((vehicle as VipRealVehicle).imageUrl) return (vehicle as VipRealVehicle).imageUrl!;
-
   const plate = vehicle.plate || '';
   const plateShort = vehicle.plateShort || plate.split(' ').pop() || '';
+  // Saved stock thumbnails may still point to the old 9982/8040 model.
+  // Do not override an explicitly uploaded photo.
+  if ((plateShort === '9982' || plateShort === '8040') &&
+    (!vehicle.imageUrl || /^\/images\/vehicles\/sprinter_(319|519)\.webp$/.test(vehicle.imageUrl))) {
+    return plateShort === '9982'
+      ? '/images/vehicles/sprinter_319.webp'
+      : '/images/vehicles/sprinter_519.webp';
+  }
+  if (vehicle.imageUrl) return vehicle.imageUrl;
   const model = vehicle.model || '';
   const category = vehicle.category || '';
   const subType = (vehicle as any).subType || '';
 
-  // 1. Sprinter 519 CDI (8 vehicles: 9982, 1458, 2658, 3864, 3338, 2553, 3285, 1058)
+  // 1. Sprinter 519 CDI (8 vehicles: 8040, 1458, 2658, 3864, 3338, 2553, 3285, 1058)
   if (
-    plateShort === '9982' ||
+    plateShort === '8040' ||
     plateShort === '1458' ||
     plateShort === '2658' ||
     plateShort === '3864' ||
@@ -702,9 +713,9 @@ export function getVehicleImage(
     return '/images/vehicles/sprinter_519.webp';
   }
 
-  // 2. Sprinter 319 CDI (1 vehicle: 8040)
+  // 2. Sprinter 319 CDI (1 vehicle: 9982)
   if (
-    plateShort === '8040' ||
+    plateShort === '9982' ||
     (category === 'sprinter' && (model.includes('319') || subType.includes('319')))
   ) {
     return '/images/vehicles/sprinter_319.webp';
@@ -740,7 +751,7 @@ export function getVehicleImage(
     return '/images/vehicles/gv80.webp';
   }
 
-  // 6. Genesis G90 Black (2 vehicles: 102부 4280, 125호 8839)
+  // 6. Genesis G90 Black (2 vehicles: 107부 4280, 125호 8839)
   if (
     plateShort === '4280' ||
     plateShort === '8839'
@@ -748,11 +759,11 @@ export function getVehicleImage(
     return '/images/vehicles/g90_black.webp';
   }
 
-  // 7. Genesis G90L (1 vehicle: 116호 1336 / legacy 208호 2269)
+  // 7. Genesis G90 LWB navy (1 vehicle: 116호 1336 / legacy 208호 2269)
   if (
     plateShort === '1336' ||
     plateShort === '2269' ||
-    (category === 'genesis' && (model.includes('G90L') || subType.includes('G90L')))
+    (category === 'genesis' && (/G90\s*(?:LWB|L)/i.test(model) || /G90\s*(?:LWB|L)/i.test(subType)))
   ) {
     return '/images/vehicles/g90_lwb.webp';
   }

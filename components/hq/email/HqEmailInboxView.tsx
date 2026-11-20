@@ -816,13 +816,16 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       const restoredExcelCount = (extracted.waypoints || []).filter(
         (point) => point.id.startsWith('excel-')
       ).length;
-      showToast(needsDateReview
-        ? `예약 초안을 불러왔습니다${metricsText}. 첨부파일의 확인 필요 날짜를 검토해 주세요.`
-        : originalExcelCount > 0 && restoredExcelCount === originalExcelCount
-          ? `엑셀 원본 ${originalExcelCount}개 일정을 AI 스케줄 목록에 모두 반영했습니다${metricsText}. 주소와 운행 조건을 확인해 주세요.`
-          : originalExcelCount > 0
-            ? `엑셀 원본 ${originalExcelCount}개 일정을 읽었습니다${metricsText}. 차량·시트별 원본 대조가 필요합니다.`
-            : `Gemini AI가 이메일에서 예약 정보를 성공적으로 추출했습니다${metricsText}.`);
+      const excelVehicleCount = extracted.excelVehicleSchedules?.length || 0;
+      showToast(excelVehicleCount >= 2
+        ? `엑셀 원본 ${originalExcelCount}개 일정을 차량별 일정표 ${excelVehicleCount}건으로 분리해 불러왔습니다${metricsText}. 차량 탭에서 각 차량 일정을 확인해 주세요.`
+        : needsDateReview
+          ? `예약 초안을 불러왔습니다${metricsText}. 첨부파일의 확인 필요 날짜를 검토해 주세요.`
+          : originalExcelCount > 0 && restoredExcelCount === originalExcelCount
+            ? `엑셀 원본 ${originalExcelCount}개 일정을 AI 스케줄 목록에 모두 반영했습니다${metricsText}. 주소와 운행 조건을 확인해 주세요.`
+            : originalExcelCount > 0
+              ? `엑셀 원본 ${originalExcelCount}개 일정을 읽었습니다${metricsText}. 차량·시트별 원본 대조가 필요합니다.`
+              : `Gemini AI가 이메일에서 예약 정보를 성공적으로 추출했습니다${metricsText}.`);
     } catch (err: any) {
       showToast(`AI 추출 실패: ${err.message}`);
       haptics.errorAlert();

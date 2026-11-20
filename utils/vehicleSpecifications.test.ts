@@ -18,9 +18,11 @@ test('20 registered vehicles retain immutable identity and unique plates', () =>
   assert.equal(VIP_REAL_VEHICLES.length, 20);
   assert.equal(new Set(VIP_REAL_VEHICLES.map((v) => v.uuid)).size, 20);
   assert.equal(new Set(VIP_REAL_VEHICLES.map((v) => v.plate)).size, 20);
+  assert.equal(registered('4280').plate, '107부 4280');
+  assert.equal(registered('4280').uuid, 'e0f7c22a-0001-4c12-8800-000000004280');
 });
 
-test('owner-verified sprinter seating and models (all except 8040 are 519 CDI)', () => {
+test('owner-verified sprinter seating and models (only 9982 is 319 CDI)', () => {
   const seats: Record<string, string> = {
     '9982': '6인승',
     '1458': '9인승',
@@ -35,14 +37,14 @@ test('owner-verified sprinter seating and models (all except 8040 are 519 CDI)',
   const sprinters = VIP_REAL_VEHICLES.filter((v) => v.category === 'sprinter');
   assert.equal(sprinters.length, 9);
   for (const v of sprinters) {
-    const expected = v.plateShort === '8040' ? '319 CDI' : '519 CDI';
+    const expected = v.plateShort === '9982' ? '319 CDI' : '519 CDI';
     assert.equal(v.model, `벤츠 스프린터 ${expected}`, v.plate);
     assert.equal(v.subType, expected, v.plate);
     assert.ok(!/투어러|tourer/i.test(v.model + v.modelShort + v.subType), v.plate);
     assert.equal(v.fuelType, '디젤', v.plate);
   }
   const summary = VIP_VEHICLE_FLEET_CATEGORIES.find((v) => v.id === 'sprinter');
-  assert.ok(summary?.details.includes('319 CDI 1대(8040) · 519 CDI 8대'));
+  assert.ok(summary?.details.includes('319 CDI 1대(9982) · 519 CDI 8대'));
 });
 
 test('all Staria models have 9 seats, 1514 uses gasoline, the others diesel', () => {
@@ -69,6 +71,13 @@ test('all Genesis vehicles use gasoline and existing plate identities are unchan
   const genesis = VIP_REAL_VEHICLES.filter((v) => v.category === 'genesis');
   assert.equal(genesis.length, 4);
   for (const v of genesis) assert.equal(v.fuelType, '가솔린', v.plate);
+  for (const [plate, color] of [['4280','블랙'],['1336','네이비']]) {
+    const car=registered(plate);
+    assert.equal(car.model,'제네시스 G90 LWB');
+    assert.equal(car.modelShort,'G90 LWB');
+    assert.equal(car.subType,'G90 LWB');
+    assert.equal(car.color,color);
+  }
 });
 
 test('stale browser custom vehicle specs cannot override the verified fleet registry', () => {
@@ -98,6 +107,11 @@ test('stale browser custom vehicle specs cannot override the verified fleet regi
   assert.equal(corrected.adminMemo, '등록된 기존 차량 메모');
   assert.equal(corrected.imageUrl, '/user-uploads/sprinter1458.webp');
 
+  // Stale stock image paths must follow the newly verified physical model.
+  const stale9982 = { ...registered('9982'), model: '벤츠 스프린터 519 CDI', imageUrl: '/images/vehicles/sprinter_519.webp' };
+  const stale8040 = { ...registered('8040'), model: '벤츠 스프린터 319 CDI', imageUrl: '/images/vehicles/sprinter_319.webp' };
+  assert.equal(reconcileRegisteredVehicle(stale9982).imageUrl, '/images/vehicles/sprinter_319.webp');
+  assert.equal(reconcileRegisteredVehicle(stale8040).imageUrl, '/images/vehicles/sprinter_519.webp');
   // Unregistered custom cars must remain untouched.
   const unknown = { ...stale, plate: '123가 9999', plateShort: '9999' };
   assert.equal(reconcileRegisteredVehicle(unknown), unknown);

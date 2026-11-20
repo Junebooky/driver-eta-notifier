@@ -3,6 +3,7 @@ import {requireHqAdmin} from '@/lib/auth/serverAuth';
 import {supabaseAdmin as db} from '@/lib/supabase/server';
 import {check,currentWorkbook,registerWorkbook,replaceWorkbook,drainReports,approveMonth,processReport,nightEndHour} from '@/lib/driverReports/service';
 import {workbookFromFile} from '@/utils/kakaoExcelWorkbook';
+import {findWorkbookMonthSheetName,workbookMonthLabel,workbookMonthSheetNames,parseWorkbookMonthSheet} from '@/utils/reportWorkbookMonth';
 import {parseDriverReport} from '@/utils/driverReportChat';
 import {isReportServiceType} from '@/utils/reportServiceTypes';
 import {readWorkbook,storeWorkbook} from '@/lib/driverReports/storage';
@@ -22,10 +23,13 @@ export async function GET(req:NextRequest){
    if(!w||!w.year)throw new Error('등록된 Excel 장부가 없습니다.');
    const book=workbookFromFile(w.bytes);
    const requested=req.nextUrl.searchParams.get('month');
-   const months=book.SheetNames.filter(n=>/^(?:[1-9]|1[0-2])월$/.test(n));
+   const months=workbookMonthSheetNames(book.SheetNames,w.year);
    const todayMonth=new Intl.DateTimeFormat('ko-KR',{month:'numeric',timeZone:'Asia/Seoul'}).format(new Date()).replace(/[^0-9]/g,'')+'월';
-   const month=requested|| (months.includes(todayMonth)?todayMonth:months.at(-1));
-   if(!month)throw new Error('월별 Excel 시트가 없습니다.');
+   const requestedNumber=requested?.match(/^(1[0-2]|[1-9])월$/)?.[1];
+   const month=requested
+    ? (months.includes(requested)?requested:requestedNumber?findWorkbookMonthSheetName(months,Number(requestedNumber),w.year):null)
+    : (months.find(name=>workbookMonthLabel(name)===todayMonth)??months.at(-1));
+   if(!month||!months.includes(month))throw new Error('월별 Excel 시트가 없습니다.');
    const offset=Number(req.nextUrl.searchParams.get('offset')||'0');if(!Number.isInteger(offset)||offset<0||offset>25000)throw new Error('조회 위치를 확인해 주세요.');
    const focusText=req.nextUrl.searchParams.get('focusRow');
    const focusRow=focusText===null?undefined:Number(focusText);
@@ -57,7 +61,7 @@ export async function GET(req:NextRequest){
   const years=await db.from('report_ledgers').select('year,filename,active_version').eq('org_id',org).order('year',{ascending:false});check(years.error);
   const jobs=await db.from('report_jobs').select('submission_id,attempts,next_attempt_at,lease_until,last_error,last_success_at,finished_at').eq('org_id',org).order('next_attempt_at',{ascending:false}).limit(200);check(jobs.error);
   const usage=await db.rpc('report_storage_usage',{p_org:org});check(usage.error);
-  return privateJson({ok:true,workbook:w?{active_version:w.id,filename:w.filename,year:w.year}:null,versions:versions.data,ledgers:years.data,jobs:jobs.data,usage:usage.data,months:w?workbookFromFile(w.bytes).SheetNames.filter(n=>/^\d{1,2}월$/.test(n)):[]});
+  return privateJson({ok:true,workbook:w?{active_version:w.id,filename:w.filename,year:w.year}:null,versions:versions.data,ledgers:years.data,jobs:jobs.data,usage:usage.data,months:w?workbookMonthSheetNames(workbookFromFile(w.bytes).SheetNames,w.year??undefined):[]});
  }catch(e){return failure(e);}
 }
 export async function POST(req:NextRequest){
@@ -163,7 +167,7 @@ export async function POST(req:NextRequest){
    if(b.action==='activate'){
     if(!Number.isInteger(b.year)||b.year<2000||b.year>2099)throw new Error('연도를 확인해 주세요.');const r=await db.rpc('activate_report_ledger',{p_org:s.org,p_year:b.year,p_actor:s.userId});check(r.error);if(!r.data)throw new Error('장부가 없습니다.');
    }else if(b.action==='template'){
-    if(!Number.isInteger(b.year)||!Number.isInteger(b.month)||typeof b.source!=='string'||!/^\d{1,2}월$/.test(b.source))throw new Error('승인할 양식을 확인해 주세요.');await approveMonth(s,b.year,b.month,b.source);
+    if(!Number.isInteger(b.year)||!Number.isInteger(b.month)||typeof b.source!=='string'||!parseWorkbookMonthSheet(b.source,b.year))throw new Error('승인할 양식을 확인해 주세요.');await approveMonth(s,b.year,b.month,b.source);
    }else if(b.action==='restore'&&UUID.test(b.version||'')&&UUID.test(b.expected||'')){
     const r=await db.rpc('restore_report_workbook',{p_org:s.org,p_actor:s.userId,p_target:b.version,p_expected:b.expected});check(r.error);if(!r.data)return privateJson({ok:false,error:'장부가 변경되었습니다.'},409);
    }else throw new Error('요청을 확인해 주세요.');

@@ -30,6 +30,7 @@ import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
 import { HqDriverEditModal } from './HqDriverEditModal';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 import { HqModal } from '@/components/hq/ui/HqModal';
+import { HqDispatchCardCoveragePanel } from './HqDispatchCardCoveragePanel';
 
 export interface HqDriversTableViewProps {
   onSelectDriver: (driverId: string) => void;
@@ -49,6 +50,7 @@ export interface HqDriversTableViewProps {
   onOpenLogin?: () => void;
   onUpdateDriver?: (id: string, updates: Record<string, any>) => Promise<boolean>;
   onDeleteDriver?: (id: string) => Promise<boolean>;
+  onCardAssetUpdated?: () => void;
 }
 
 export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
@@ -64,6 +66,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
   onOpenLogin,
   onUpdateDriver: propOnUpdateDriver,
   onDeleteDriver: propOnDeleteDriver,
+  onCardAssetUpdated,
 }) => {
   // If not passed from parent, use the custom hook
   const hookState = useHqDrivers();
@@ -77,6 +80,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
   const onRetry = propOnRetry ?? hookState.refetch;
 
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
+  const [cardToolsOpen, setCardToolsOpen] = useState(false);
   const [affiliationFilter, setAffiliationFilter] = useState<'all' | 'employed' | 'freelance'>('all');
   const [residenceFilter, setResidenceFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'driving' | 'off' | 'active' | 'vacation'>('all');
@@ -115,19 +119,6 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
     } catch {
       return false;
     }
-  };
-
-  // Helper to build vehicle subtext
-  const getVehicleSubtext = (driver: HqDriverSummary): string => {
-    const model = driver.vehicleModel && driver.vehicleModel !== '차량 미지정' ? driver.vehicleModel : '';
-    const plate = driver.carNumber && driver.carNumber !== '차량 미등록'
-      ? driver.carNumber
-      : (driver.vehicleNo && driver.vehicleNo !== '미지정' ? driver.vehicleNo : '');
-
-    if (model && plate) return `${model} · ${plate}`;
-    if (model) return model;
-    if (plate) return plate;
-    return '차량 미지정';
   };
 
   // Filtered List (소속 기사 우선 노출)
@@ -230,6 +221,13 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
           </span>
         </div>
 
+        <div className="flex flex-wrap items-center justify-end gap-2">
+        <button type="button" aria-expanded={cardToolsOpen}
+          onClick={() => setCardToolsOpen(value=>!value)}
+          className={'inline-flex min-h-11 items-center gap-1.5 rounded-[13px] px-3.5 text-[12px] font-semibold transition-colors '+
+            (cardToolsOpen?'bg-[#EEF3FF] text-[#1E60F3]':'bg-[#F7F9FC] text-[#526680] hover:bg-[#EEF2F8]')}>
+          <RefreshCw className="size-4"/> 배차카드 관리
+        </button>
         {/* Quick Add Driver Action */}
         <button
           type="button"
@@ -239,7 +237,11 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
           <Plus className="w-3.5 h-3.5" />
           <span>기사 등록</span>
         </button>
+        </div>
       </div>
+
+      {cardToolsOpen && <HqDispatchCardCoveragePanel drivers={drivers}
+        onAssetUpdated={onCardAssetUpdated} embedded />}
 
       {/* 1. Control & Filter Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-5 text-[12px] sm:px-6">
@@ -464,7 +466,6 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
             ) : (
               paginatedDrivers.map((driver) => {
                 const opStatus = getDriverStatus(driver);
-                const vehicleSubtext = getVehicleSubtext(driver);
                 const isNew = isNewDriver(driver);
 
                 // Multi-language support check: only non-Korean languages shown as mini badge
@@ -481,7 +482,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                     onClick={() => handleRowClick(driver.id)}
                     className="hover:bg-blue-50/40 transition-colors cursor-pointer group"
                   >
-                    {/* 1열: 기사 정보 (Avatar + Name + Vehicle subtext) */}
+                    {/* 1열: 기사 정보 (Avatar + Name) */}
                     <td className="py-4 px-5">
                       <div className="flex items-center gap-3.5">
                         {driver.avatarUrl ? (
@@ -514,9 +515,6 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                                 신규
                               </span>
                             )}
-                          </div>
-                          <div className="text-[11px] text-slate-400 font-medium truncate mt-0.5">
-                            {vehicleSubtext}
                           </div>
                         </div>
                       </div>

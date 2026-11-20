@@ -7,16 +7,29 @@
 import { existsSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-const base = join(process.cwd(), 'public/images/dispatch_cards/vehicles');
+const roots = [
+  {
+    base: join(process.cwd(), 'public/images/dispatch_cards/vehicles'),
+    prefix: '/images/dispatch_cards/vehicles',
+    extPattern: /\.webp$/i,
+  },
+  {
+    base: join(process.cwd(), 'public/images/dispatch-cards'),
+    prefix: '/images/dispatch-cards',
+    extPattern: /\.(png|webp)$/i,
+  },
+];
 const output = join(process.cwd(), 'lib/dispatchCards/dispatchCardAssetManifest.json');
-const prefix = '/images/dispatch_cards/vehicles';
 const manifest = {};
 
-function scan(folder, parts) {
+function scan(folder, parts, prefix, extPattern) {
   const entries = readdirSync(folder, { withFileTypes: true });
-  const files = entries.filter(entry => entry.isFile()).map(entry => entry.name);
-  const exterior = files.find(name => /^exterior\.webp$/i.test(name));
-  const interiors = files.filter(name => /^interior[-_](\d+)\.webp$/i.test(name))
+  const files = entries
+    .filter(entry => entry.isFile() && extPattern.test(entry.name))
+    .map(entry => entry.name)
+    .sort((a, b) => a.localeCompare(b));
+  const exterior = files.find(name => /^exterior\.(png|webp)$/i.test(name));
+  const interiors = files.filter(name => /^interior[-_](\d+)\.(png|webp)$/i.test(name))
     .sort((a, b) => Number(a.match(/\d+/)[0]) - Number(b.match(/\d+/)[0]));
   if (exterior && interiors.length >= 2) {
     const path = parts.join('/');
@@ -28,16 +41,18 @@ function scan(folder, parts) {
     };
   } else if (exterior || interiors.length) {
     console.warn('[dispatch-cards] Incomplete image set ignored: ' + parts.join('/') +
-      ' (required exterior.webp and two interior_XX.webp or interior-XX.webp)');
+      ' (required exterior and two interior-01/interior-02 images)');
   }
   for (const entry of entries) {
     if (entry.isDirectory() && /^[a-zA-Z0-9_-]+$/.test(entry.name)) {
-      scan(join(folder, entry.name), [...parts, entry.name]);
+      scan(join(folder, entry.name), [...parts, entry.name], prefix, extPattern);
     }
   }
 }
 
-if (existsSync(base)) scan(base, []);
+for (const root of roots) {
+  if (existsSync(root.base)) scan(root.base, [], root.prefix, root.extPattern);
+}
 const ordered = Object.fromEntries(Object.entries(manifest).sort(([a], [b]) => a.localeCompare(b)));
 mkdirSync(dirname(output), { recursive: true });
 writeFileSync(output, JSON.stringify(ordered, null, 2) + '\n');

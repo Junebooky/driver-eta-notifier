@@ -1,6 +1,7 @@
 import {unzipSync,zipSync,strFromU8,strToU8} from 'fflate';
 import {DOMParser} from '@xmldom/xmldom';
 import {workbookFromFile} from './kakaoExcelWorkbook';
+import {parseWorkbookMonthSheet} from './reportWorkbookMonth';
 
 /**
  * The company report's A–L layout is permanently reserved for automatic
@@ -20,7 +21,7 @@ const escapeXml=(s:string)=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace
 
 const alphaIndex=(value:string)=>[...value].reduce((n,ch)=>n*26+ch.charCodeAt(0)-64,0);
 const code=(index:number)=>{let n=index,out='';while(n>0){n--;out=String.fromCharCode(65+n%26)+out;n=Math.floor(n/26);}return out;};
-const monthName=(month:string)=>/^(?:[1-9]|1[0-2])월$/.test(month);
+const monthName=(month:string)=>parseWorkbookMonthSheet(month)!==null;
 const cellColumn=(address:string)=>address.match(/^([A-Z]+)[1-9]\d*$/)?.[1]||'';
 const rowNumber=(xml:string)=>Number(xml.match(/^<row\b[^>]*\br="(\d+)"/)?.[1]||0);
 const sheetXmlPath=(entries:Record<string,Uint8Array>,month:string)=>{

@@ -2,9 +2,10 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {ChevronDown,ChevronUp,ChevronLeft,ChevronRight,Expand,Minimize2,FileSpreadsheet,Pencil,Save,X,ArrowUpDown,ZoomIn,ZoomOut,MessageSquareText,Filter,RotateCcw,Rows3,Columns3,Plus,Check,Trash2,AlertTriangle} from 'lucide-react';
 import {HqSearchSelect} from './ui/HqSearchSelect';
+import {workbookMonthLabel} from '@/utils/reportWorkbookMonth';
 export type ReportExcelFocus={year:number;sheet:string;row:number;requestId:number};
 type Row={row:number;cells:string[];locked:string[]};
-type Grid={version:string;year:number;filename:string;month:string;months:string[];total:number;unfilteredTotal:number;filterOptions:{plate:string[];driver:string[];customer:string[]};offset:number;limit:number;rows:Row[];columns:string[];headers:string[];linkedRows:number[];manualRows:number[]};
+type Grid={version:string;year:number;filename:string;month:string;months:string[];total:number;unfilteredTotal:number;filterOptions:{plate:string[];driver:string[];customer:string[]};offset:number;limit:number;rows:Row[];columns:string[];headers:string[];linkedRows:number[];manualRows:number[];rowGap:{after:number;before:number;gap:number}|null};
 type DeleteTarget={action:'delete_row';row:number}|{action:'delete_column';column:string;label:string};
 type FilterKey='plate'|'driver'|'customer';
 type SortKey=string;
@@ -33,11 +34,11 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
  const scrollRef=useRef<HTMLDivElement>(null);
  const gridRequestSequence=useRef(0);
  const [sourceLink,setSourceLink]=useState<SourceLink|null>(null);
+ const [sourceExpanded,setSourceExpanded]=useState(false);
  const [sourceText,setSourceText]=useState<OriginalSource|null>(null);
  const [sourceLoading,setSourceLoading]=useState(false);
  const [sourceError,setSourceError]=useState('');
  const sourceCache=useRef(new Map<string,OriginalSource>());
- const hoverTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
  const [zoom,setZoom]=useState(false);
  const [tableScale,setTableScale]=useState(100);
  const [scrollEdges,setScrollEdges]=useState({left:true,right:true});
@@ -45,21 +46,13 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
  useEffect(()=>{syncScroll();const node=scrollRef.current;if(!node)return;const observer=new ResizeObserver(syncScroll);observer.observe(node);return()=>observer.disconnect();},[syncScroll,grid,zoom,tableScale]);
  useEffect(()=>{if(!zoom)return;const key=(event:KeyboardEvent)=>{if(event.key==='Escape'){setZoom(false);setEdit(null);setTableScale(100);}};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[zoom]);
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[edit,setEdit]=useState<{row:number;col:string;value:string}|null>(null);
- const dismissSource=useCallback(()=>{
-  if(hoverTimer.current)clearTimeout(hoverTimer.current);
-  setSourceLink(null);
- },[]);
+ const dismissSource=useCallback(()=>setSourceLink(null),[]);
  const openSource=(row:number)=>{
   if(!grid||!grid.linkedRows?.includes(row))return;
   const candidate={year:grid.year,month:grid.month,row,version:grid.version};
-  setSourceLink(previous=>previous&&sourceLinkKey(previous)===sourceLinkKey(candidate)?previous:candidate);
+  setSourceExpanded(false);
+  setSourceLink(previous=>previous&&sourceLinkKey(previous)===sourceLinkKey(candidate)?null:candidate);
  };
- const scheduleSource=(row:number)=>{
-  if(hoverTimer.current)clearTimeout(hoverTimer.current);
-  if(typeof window==='undefined'||!window.matchMedia('(hover: hover) and (pointer: fine)').matches)return;
-  hoverTimer.current=setTimeout(()=>openSource(row),180);
- };
- useEffect(()=>()=>{if(hoverTimer.current)clearTimeout(hoverTimer.current);},[]);
  useEffect(()=>{
   if(!sourceLink){setSourceLoading(false);setSourceError('');setSourceText(null);return;}
   let cancelled=false;
@@ -135,12 +128,14 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
  },[open,month,load,navigateTo]);
  async function sortMonth(){
   if(!grid||busy)return;
-  setBusy(true);setError('');
+  setBusy(true);setError('');setSuccess('');
   try{
    const r=await fetch('/api/hq/report-workbook',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({action:'sort_month',year,month:grid.month,expectedVersion:grid.version})});
    const data=await r.json();if(!r.ok)throw Error(data.error||'날짜순 정리를 완료하지 못했습니다.');
-   if(data.unchanged)setError(data.message||'이미 날짜순으로 정리돼 있습니다.');
+   if(data.unchanged)setSuccess(data.message||'이미 날짜순으로 정리돼 있습니다.');
+   else setSuccess('날짜·행 번호 정리 완료 · 기사 보고 '+(data.moved??0)+'건 연결 위치 갱신');
+   resetFilters();
    await load(grid.month);await onCommitted();
   }catch(e){setError((e as Error).message);}finally{setBusy(false);}
  }
@@ -266,8 +261,8 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
      <div className="relative group/sort">
       <button
        type="button"
-       aria-label="날짜순 정리"
-       title="날짜순 정리"
+       aria-label="날짜·행 번호 정리"
+       title="날짜·행 번호 정리"
        disabled={!grid||busy}
        onClick={()=>void sortMonth()}
        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#DBE5F2] bg-white text-[#597294] shadow-2xs transition-all hover:bg-[#F5F8FC] hover:border-slate-300 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30 disabled:opacity-40 cursor-pointer"
@@ -276,7 +271,7 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
       </button>
       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/sort:flex flex-col items-center pointer-events-none z-[160]">
        <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
-        날짜순 정리
+        날짜·행 번호 정리
        </span>
        <div className="w-1.5 h-1.5 bg-slate-900 rotate-45 -mt-0.5 shadow-xs"/>
       </div>
@@ -331,8 +326,18 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
    </div>
    <div role="tablist" aria-label="월별 시트" className="flex max-w-full gap-1.5 overflow-x-auto pb-1">
     {grid?.months.map(name=><button type="button" role="tab" aria-selected={month===name} key={name} onClick={()=>{setEdit(null);setError('');setHighlightedRow(null);setNavigateTo(null);resetFilters();setMonth(name);}}
-     className={'shrink-0 rounded-xl px-3 py-2 text-xs font-semibold '+(month===name?'bg-[#1E60F3] text-white':'bg-[#F2F4F6] text-[#6F809A]')}>{name}</button>)}
+     className={'shrink-0 rounded-xl px-3 py-2 text-xs font-semibold '+(month===name?'bg-[#1E60F3] text-white':'bg-[#F2F4F6] text-[#6F809A]')}>{workbookMonthLabel(name)}</button>)}
    </div>
+   {grid?.rowGap&&<div role="status" className="flex flex-wrap items-center gap-2 rounded-xl bg-[#F7F9FC] px-3 py-2.5">
+    <span className="min-w-0 flex-1 text-[12px] leading-5 text-[#63768E]">
+     실제 Excel 행 번호가 <strong className="text-[#3E5574]">{grid.rowGap.after} → {grid.rowGap.before}</strong>으로 건너뛰었어.
+     기존 수식·원본은 유지하면서 기록과 연결 번호를 함께 정리할 수 있어.
+    </span>
+    <button type="button" disabled={busy} onClick={()=>void sortMonth()}
+     className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-xl bg-white px-3 text-[12px] font-semibold text-[#1E60F3] shadow-[0_2px_10px_rgba(26,47,85,.06)] hover:bg-[#EEF3FC] disabled:opacity-40">
+     <ArrowUpDown size={14}/>날짜·행 번호 맞추기
+    </button>
+   </div>}
    {grid&&<div className="flex flex-wrap items-center gap-2 rounded-xl bg-white">
     <button type="button" aria-label="Excel 새 행 추가" disabled={busy}
      onClick={()=>void addStructure('add_row')}
@@ -451,27 +456,24 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
      </tr></thead>
      <tbody>{grid.rows.map(row=><tr key={row.row+(highlightedRow===row.row?'-'+flashSequence:'')}
       data-excel-row={row.row}
-      onMouseEnter={()=>{if(grid.linkedRows?.includes(row.row))scheduleSource(row.row);}}
-      onMouseLeave={()=>{if(hoverTimer.current)clearTimeout(hoverTimer.current);}}
-      className={highlightedRow===row.row?'hq-excel-target-row':'hover:bg-[#F8FAFD]'}>
-      <td className="sticky left-0 z-[1] border-b border-r border-[#E8EDF3] bg-[#F7F9FC] px-1 py-1 text-center font-medium text-[#8B9BB1]">
-       {grid.linkedRows?.includes(row.row)
-        ?<button type="button" onClick={()=>openSource(row.row)} title="기사 운행보고 원문 보기"
-          aria-label={row.row+'행 기사 운행보고 원문 보기'}
-          className="flex min-h-9 w-full flex-col items-center justify-center gap-0.5 rounded-md text-[#1E60F3] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30">
-          <span>{row.row}</span><MessageSquareText size={12} strokeWidth={1.7}/>
-         </button>
-        :grid.manualRows?.includes(row.row)?
-         <div className="flex min-h-9 items-center justify-center gap-0.5">
-          <span className="text-[11px]">{row.row}</span>
-          <button type="button" disabled={busy} title={row.row+'행 삭제'}
-           aria-label={row.row+'행 삭제'}
-           onClick={()=>setDeleteTarget({action:'delete_row',row:row.row})}
-           className="inline-flex size-7 items-center justify-center rounded-md text-[#93A1B3] hover:bg-white hover:text-[#B76363] disabled:opacity-40">
-           <Trash2 size={12}/>
-          </button>
-         </div>
-        :<span className="block px-1 py-2">{row.row}</span>}
+      className={(highlightedRow===row.row?'hq-excel-target-row':'hover:bg-[#F8FAFD]')+' group/row'}>
+      <td className="sticky left-0 z-[1] border-b border-r border-[#E8EDF3] bg-[#F7F9FC] px-1 py-0.5 text-center font-medium text-[#8B9BB1]">
+       <div className="relative flex min-h-9 items-center justify-start px-1">
+        <span className={grid.linkedRows?.includes(row.row)?'font-semibold text-[#1E60F3]':''}>{row.row}</span>
+        {grid.linkedRows?.includes(row.row)&&
+         <button type="button" onClick={()=>openSource(row.row)} title="클릭해서 기사 운행보고 원문 보기"
+          aria-label={row.row+'행 기사 원문 보기'}
+          aria-expanded={sourceLink?.row===row.row&&sourceLink?.month===grid.month}
+          className="absolute right-0 top-1/2 inline-flex size-[21px] -translate-y-1/2 items-center justify-center rounded-md text-[#1E60F3] opacity-60 transition-opacity hover:bg-white hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30 sm:opacity-0 sm:group-hover/row:opacity-100 sm:group-focus-within/row:opacity-100">
+          <MessageSquareText size={13} strokeWidth={1.8}/>
+         </button>}
+        {!grid.linkedRows?.includes(row.row)&&grid.manualRows?.includes(row.row)&&
+         <button type="button" disabled={busy} title={row.row+'행 삭제'} aria-label={row.row+'행 삭제'}
+          onClick={()=>setDeleteTarget({action:'delete_row',row:row.row})}
+          className="absolute right-0 top-1/2 inline-flex size-[21px] -translate-y-1/2 items-center justify-center rounded-md text-[#8B9DB1] opacity-60 transition-opacity hover:bg-white hover:text-[#B76363] hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30 disabled:opacity-25 sm:opacity-0 sm:group-hover/row:opacity-100 sm:group-focus-within/row:opacity-100">
+          <Trash2 size={12}/>
+         </button>}
+       </div>
       </td>
       {row.cells.map((value,i)=>{
        const col=grid.columns[i],active=edit?.row===row.row&&edit.col===col,locked=row.locked.includes(col);
@@ -537,7 +539,7 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
   </div>}
   {sourceLink&&(
    <aside role="dialog" aria-label="연결된 기사 운행보고 원문"
-    className="fixed inset-x-3 bottom-3 z-[210] flex max-h-[73dvh] flex-col overflow-hidden rounded-[19px] bg-white p-4 shadow-[0_16px_50px_rgba(25,42,76,0.19)] ring-1 ring-[#E7ECF4] sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-24 sm:w-[375px] sm:max-h-[min(74dvh,650px)] sm:p-5">
+    className={'fixed inset-x-3 bottom-3 z-[210] flex min-w-0 flex-col overflow-hidden rounded-[17px] bg-white p-3.5 shadow-[0_14px_40px_rgba(25,42,76,0.16)] ring-1 ring-[#E7ECF4] sm:inset-x-auto sm:bottom-5 sm:right-5 sm:top-auto sm:p-4 '+(sourceExpanded?'max-h-[78dvh] sm:w-[410px]':'max-h-[43dvh] sm:w-[310px]')}>
     <div className="flex items-start justify-between gap-3">
      <div className="min-w-0">
       <p className="flex items-center gap-2 text-[13px] font-semibold text-[#17233B]">
@@ -545,10 +547,18 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
       </p>
       <p className="mt-1 text-[11px] font-medium text-[#8898AF]">{sourceLink.year}년 · {sourceLink.month} · {sourceLink.row}행</p>
      </div>
-     <button type="button" onClick={dismissSource} aria-label="원문 미리보기 닫기"
-      className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-[#F5F7FA] text-[#657B95] hover:bg-[#EDF1F6]">
-      <X size={16}/>
-     </button>
+     <div className="flex shrink-0 items-center gap-1.5">
+      <button type="button" aria-label={sourceExpanded?'기사 원문 접기':'기사 원문 전체 보기'}
+       title={sourceExpanded?'간단히 보기':'원문 전체 펼치기'}
+       onClick={()=>setSourceExpanded(v=>!v)}
+       className="inline-flex size-8 items-center justify-center rounded-[10px] bg-[#F5F7FA] text-[#657B95] hover:bg-[#EDF1F6]">
+       {sourceExpanded?<Minimize2 size={15}/>:<Expand size={15}/>}
+      </button>
+      <button type="button" onClick={dismissSource} aria-label="원문 미리보기 닫기"
+       className="flex size-8 items-center justify-center rounded-[10px] bg-[#F5F7FA] text-[#657B95] hover:bg-[#EDF1F6]">
+       <X size={16}/>
+      </button>
+     </div>
     </div>
     {sourceLoading&&<p role="status" className="mt-4 rounded-[12px] bg-[#F6F8FC] p-3 text-[12px] text-[#7789A3]">원문을 불러오는 중…</p>}
     {sourceError&&<div role="alert" className="mt-4 rounded-[12px] bg-[#FBF4F3] p-3 text-[12px] text-[#A85C54]">
@@ -560,9 +570,13 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
       <span>기사 {sourceText.driver||'미확인'}</span><span>거래처 {sourceText.customer||'미확인'}</span>
       {sourceText.plate&&<span>차량 {sourceText.plate}</span>}
      </div>
-     <div className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-[13px] bg-[#F8FAFC] px-3.5 py-3">
-      <p className="whitespace-pre-wrap break-words text-[12px] leading-[1.85] text-[#475C76]">{sourceText.rawMessage}</p>
+     <div className={'mt-2 min-h-0 rounded-[12px] bg-[#F8FAFC] px-3 py-2.5 '+(sourceExpanded?'max-h-[58dvh] overflow-y-auto overscroll-contain':'max-h-[128px] overflow-hidden')}>
+      <p className="whitespace-pre-wrap break-words text-[12px] leading-[1.8] text-[#475C76]">{sourceText.rawMessage}</p>
      </div>
+     {!sourceExpanded&&<button type="button" onClick={()=>setSourceExpanded(true)}
+      className="mt-2 inline-flex min-h-7 items-center justify-center gap-1 rounded-lg text-[12px] font-semibold text-[#1E60F3] hover:bg-[#F5F8FD]">
+      <Expand size={12}/>기사 원문 전체 보기
+     </button>}
      <p className="mt-2 text-[10px] text-[#9AA7B8]">기사 제출 당시 원문 · Excel 수정 내용과 다를 수 있습니다.</p>
     </>}
    </aside>

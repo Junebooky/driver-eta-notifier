@@ -25,6 +25,14 @@ test('AI source viewer keeps the actual attachment count, every candidate and AI
   assert.match(step,/onExtractWithAi/);
   assert.match(step,/extractedDraft/);
   assert.match(step,/shadow-\[0_6px_20px/);
+  assert.match(step,/<HqSegmentedTabs/);
+  assert.match(step,/<HqCard/);
+  assert.match(step,/<HqBadge/);
+  assert.match(step,/<HqButton/);
+  assert.match(step,/displayedWaypoints\.length > 2 \|\| hasMultipleDates/);
+  assert.match(step,/parseExcelWaypointNotes\(wp\.notes\)/);
+  assert.match(step,/원본 \{excelSource\.cell\}/);
+  assert.doesNotMatch(step,/\{wp\.notes\}/);
 });
 
 test('compose email preserves explicit real-send safety and To/Cc recipient flow',()=>{

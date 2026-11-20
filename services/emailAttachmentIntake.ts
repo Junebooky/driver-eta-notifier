@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { read, utils } from 'xlsx';
 import { unzipSync } from 'fflate';
-import { extractExcelCalendarBlocks, type ExcelCalendarBlock } from '@/utils/emailCalendarGrid';
+import { extractExcelCalendarBlocks, findExcelCalendarHeader, type ExcelCalendarBlock } from '@/utils/emailCalendarGrid';
 
 export const MAX_EMAIL_ATTACHMENT_BYTES = 8 * 1024 * 1024;
 export const MAX_EMAIL_ATTACHMENT_TOTAL_BYTES = 12 * 1024 * 1024;
@@ -122,18 +122,23 @@ export function analyzeScheduleAttachments(attachments: ScheduleAttachmentInput[
         const firstRow = sheet['!ref'] ? utils.decode_range(sheet['!ref']).s.r : 0;
         const firstCol = sheet['!ref'] ? utils.decode_range(sheet['!ref']).s.c : 0;
         calendarBlocks.push(...extractExcelCalendarBlocks(sheetName, rows, firstRow, firstCol));
+        const calendarHeader = findExcelCalendarHeader(rows);
         if (rows.length >= 1502) throw new Error('시트당 1500행을 초과합니다.');
         text += `\n[Excel ${name} / Sheet: ${sheetName}]\n`;
-        const dateLabels: string[] = [];
+        const dateLabels: string[] = calendarHeader ? calendarHeader.datedColumns.map(c => c.label) : [];
         let dateColumn = -1;
         let nonEmptyRows = 0;
         for (const [rowIndex, row] of rows.entries()) {
           if (row.length > 60) throw new Error('표가 60열을 초과합니다.');
           const headerIndex = row.findIndex(val => /^(date|날짜|일자|일시)$/i.test(String(val).trim()));
           if (headerIndex >= 0) {
-            dateColumn = headerIndex;
-            dateLabels.push(...row.filter((_, col) => col !== headerIndex).map(String));
-          } else if (dateColumn >= 0 && row[dateColumn] !== '') dateLabels.push(String(row[dateColumn] || ''));
+            if (!calendarHeader || rowIndex !== calendarHeader.headerAt) {
+              dateColumn = headerIndex;
+              dateLabels.push(...row.filter((_, col) => col !== headerIndex).map(String));
+            }
+          } else if (dateColumn >= 0 && row[dateColumn] !== '') {
+            dateLabels.push(String(row[dateColumn] || ''));
+          }
           const cells = row.map((val, col) => {
             if (val === '') return '';
             const value = String(val);

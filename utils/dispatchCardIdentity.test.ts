@@ -29,15 +29,15 @@ test('English chauffeur name and selected role must be explicitly provided', () 
   assert.equal(validateDispatchCardProfile({ ...source, phone: '+82-' }), null);
 });
 
-test('only Sprinter 8040 is 319 CDI; remaining registered Sprinters are 519 CDI', () => {
+test('only Sprinter 9982 is 319 CDI; remaining registered Sprinters are 519 CDI', () => {
   const cars = VIP_REAL_VEHICLES.filter(vehicle => vehicle.category === 'sprinter');
   assert.equal(cars.length, 9);
   for (const car of cars) {
-    const expected = car.plateShort === '8040' ? '319 CDI' : '519 CDI';
+    const expected = car.plateShort === '9982' ? '319 CDI' : '519 CDI';
     assert.ok(car.model.endsWith(expected), car.plate + ' / ' + car.model);
     assert.ok(car.modelShort.endsWith(expected), car.plate + ' / ' + car.modelShort);
     assert.equal(car.subType, expected);
     assert.ok(!/투어러|tourer/i.test(car.model + car.modelShort));
-    assert.equal(getVehicleImage(car), '/images/vehicles/sprinter_' + (car.plateShort === '8040' ? '319' : '519') + '.webp');
+    assert.equal(getVehicleImage(car), '/images/vehicles/sprinter_' + (car.plateShort === '9982' ? '319' : '519') + '.webp');
   }
 });

@@ -69,15 +69,20 @@ export async function PATCH(request: NextRequest) {
     if (readError) throw readError;
     if (!existing) return NextResponse.json({ ok: false, error: '기사를 찾을 수 없습니다.' }, { status: 404 });
     const meta = plainObject(existing.driver_meta);
+    const previousIdentity = plainObject(meta.dispatch_card_identity);
+    const previousPlacement = normalizePortraitPlacement(meta.dispatch_portrait_crop);
+    const changed = JSON.stringify(previousIdentity) !== JSON.stringify(profile) ||
+      JSON.stringify(previousPlacement) !== JSON.stringify(placement);
     const { data: saved, error: writeError } = await supabaseAdmin.from('drivers')
       .update({ driver_meta: {
         ...meta,
         dispatch_card_identity: profile,
         dispatch_portrait_crop: placement,
+        ...(changed ? { dispatch_card_revision_at: new Date().toISOString() } : {}),
       } }).eq('id', driverId).select('id').maybeSingle();
     if (writeError) throw writeError;
     if (!saved) return NextResponse.json({ ok: false, error: '정보를 저장하지 못했습니다.' }, { status: 500 });
-    return NextResponse.json({ ok: true, profile, placement });
+    return NextResponse.json({ ok: true, profile, placement, cardsNeedRefresh: changed });
   } catch (error) {
     return NextResponse.json({ ok: false,
       error: error instanceof Error ? error.message : '기사 배차카드 정보를 저장하지 못했습니다.',

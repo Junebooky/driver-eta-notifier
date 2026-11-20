@@ -20,7 +20,7 @@ test('VIP Real Vehicles - Model Image Mapping Policy (Issue #10)', async (t) => 
 
   await t.test('2. Sprinter 519 CDI (8 vehicles) all share sprinter_519.webp', () => {
     const plates519 = [
-      '125호 9982',
+      '125호 8040',
       '700호 1458',
       '703서 2658',
       '70호 3864',
@@ -37,8 +37,8 @@ test('VIP Real Vehicles - Model Image Mapping Policy (Issue #10)', async (t) => 
     }
   });
 
-  await t.test('3. Sprinter 319 CDI (8040) uses sprinter_319.webp', () => {
-    const plates319 = ['125호 8040'];
+  await t.test('3. Sprinter 319 CDI (9982) uses sprinter_319.webp', () => {
+    const plates319 = ['125호 9982'];
     for (const plate of plates319) {
       const veh = findVipVehicle(plate);
       assert.ok(veh, `Plate ${plate} must exist in VIP_REAL_VEHICLES`);
@@ -75,10 +75,11 @@ test('VIP Real Vehicles - Model Image Mapping Policy (Issue #10)', async (t) => 
     assert.equal(getVehicleImage(vehG90L), '/images/vehicles/g90_lwb.webp');
   });
 
-  await t.test('8. Genesis G90 Black (102부 4280, 125호 8839) use g90_black.webp', () => {
-    const veh4280 = findVipVehicle('102부 4280');
+  await t.test('8. Genesis G90 Black (107부 4280, 125호 8839) use g90_black.webp', () => {
+    const veh4280 = findVipVehicle('107부 4280');
     const veh8839 = findVipVehicle('125호 8839');
     assert.ok(veh4280);
+    assert.equal(veh4280.plate, '107부 4280');
     assert.ok(veh8839);
     assert.equal(getVehicleImage(veh4280), '/images/vehicles/g90_black.webp');
     assert.equal(getVehicleImage(veh8839), '/images/vehicles/g90_black.webp');
@@ -120,13 +121,15 @@ test('VIP Real Vehicles - Model Image Mapping Policy (Issue #10)', async (t) => 
     assert.equal(getVehicleImage({ model: '프리미엄 럭셔리 리무진 버스', category: 'bus' }), '/images/vehicles/bus.webp');
   });
 
-  await t.test('12. First vehicle is 125호 9982 (Benz Sprinter 519 CDI, 6 seats)', () => {
+  await t.test('12. First vehicle is 125호 9982 (Benz Sprinter 319 CDI, 6 seats)', () => {
     const firstVeh = VIP_REAL_VEHICLES[0];
     assert.equal(firstVeh.plate, '125호 9982');
-    assert.equal(firstVeh.model, '벤츠 스프린터 519 CDI');
+    assert.equal(firstVeh.model, '벤츠 스프린터 319 CDI');
     assert.equal(firstVeh.brand, '벤츠');
     assert.equal(firstVeh.capacity, '6인승');
     assert.equal(firstVeh.category, 'sprinter');
     assert.equal(firstVeh.fuelType, '디젤');
+    assert.equal(getVehicleImage({ plate: '125호 9982', model: '벤츠 스프린터 519 CDI', category: 'sprinter', imageUrl: '/images/vehicles/sprinter_519.webp' }), '/images/vehicles/sprinter_319.webp');
+    assert.equal(getVehicleImage({ plate: '125호 8040', model: '벤츠 스프린터 319 CDI', category: 'sprinter', imageUrl: '/images/vehicles/sprinter_319.webp' }), '/images/vehicles/sprinter_519.webp');
   });
 });

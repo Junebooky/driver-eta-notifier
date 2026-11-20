@@ -66,7 +66,7 @@ test('Info records require the current server assignment, explicit manual eviden
     });
   const get = (extra = '') => GET(new NextRequest('http://localhost/api/hq/drivers/assets/dispatch?bookingId=' + bookingId + extra, { headers: { authorization: 'Bearer ' + signCockpitSession({ userId: driver, role: 'hq_admin', org }) } }));
   try {
-    await saveDriverVehicleInfoAsset({ organizationId: org, driverId: driver, vehicleId: car.uuid, variant: 'pc', filePath: 'fixture/info.png', fileName: 'info.png', fileSize: 10, mimeType: 'image/png', version: 1, status: 'active', uploadedBy: 'fixture' });
+    await saveDriverVehicleInfoAsset({ organizationId: org, driverId: driver, vehicleId: car.uuid, variant: 'pc', filePath: 'fixture/dispatch_' + car.plateShort + '_pc.webp', fileName: 'dispatch_' + car.plateShort + '_pc.webp', fileSize: 10, mimeType: 'image/webp', version: 1, status: 'active', uploadedBy: 'fixture' });
     assert.equal((await POST(request({}, 'driver'))).status, 403);
     assert.equal((await POST(request({}))).status, 400, 'selecting email is not proof of delivery');
     for (const invalid of [{ expectedVersion: 2 }, { driverId: 'another-driver' }, { vehiclePlate: VIP_REAL_VEHICLES[1].plate }, { vehiclePlate: '위조' + car.plateShort }]) {

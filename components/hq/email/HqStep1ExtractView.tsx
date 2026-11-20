@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import { HqEmailSummary, HqEmailDetail, HqEmailExtractedDraft, RouteWaypointItem } from '@/types/emailHq';
 import { haptics } from '@/utils/haptics';
-import { HqBadge, HqButton } from '@/components/hq/ui';
+import { HqBadge, HqButton, HqCard, HqSegmentedTabs } from '@/components/hq/ui';
 import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
 import { HqSourceText } from '@/components/hq/ui/HqSourceText';
 import { findEmailSourceRanges } from '@/utils/emailWorkflowReview';
@@ -48,6 +48,7 @@ import type { EmailBatchReviewRow } from '@/utils/emailBatchRevision';
 import type { ExistingEmailBookingCandidate } from '@/services/emailBookingMatchService';
 import { buildAirportArrivalPickupGroups } from '@/utils/emailBookingEvidence';
 import { confirmEmailRouteStop, changeEmailRouteStopName, getUnconfirmedEmailRouteStops, isVerifiedEmailRouteStop } from '@/utils/emailRoutePlaceVerification';
+import { applyExcelVehicleScheduleToDraft, parseExcelWaypointNotes, syncActiveVehicleScheduleWaypoints } from '@/utils/emailCalendarGrid';
 
 interface HqStep1ExtractViewProps {
   emailSummary: HqEmailSummary;
@@ -173,17 +174,79 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   const requestedVehicleClass = extractedDraft?.requestedVehicleClass || '차량 미지정';
   const specialRequests = extractedDraft?.specialRequests || '';
 
+  // Per-vehicle Excel calendar schedules & Multi-destination waypoints check
+  const excelVehicleSchedules = extractedDraft?.excelVehicleSchedules || [];
+  const hasMultipleExcelSchedules = excelVehicleSchedules.length >= 2;
+  const [selectedScheduleTab, setSelectedScheduleTab] = useState<string>(
+    () => extractedDraft?.activeVehicleScheduleId || excelVehicleSchedules[0]?.id || 'merged'
+  );
+
+  useEffect(() => {
+    const schedules = extractedDraft?.excelVehicleSchedules || [];
+    if (schedules.length >= 2) {
+      setSelectedScheduleTab(extractedDraft?.activeVehicleScheduleId || schedules[0].id);
+    } else {
+      setSelectedScheduleTab('merged');
+    }
+  }, [extractedDraft?.id, extractedDraft?.activeVehicleScheduleId, extractedDraft?.excelVehicleSchedules?.length]);
+
+  const [expandedExcelSources, setExpandedExcelSources] = useState<Record<string, boolean>>({});
+  const toggleExcelSource = (waypointId: string) => {
+    setExpandedExcelSources((prev) => ({
+      ...prev,
+      [waypointId]: !prev[waypointId],
+    }));
+  };
+
+  useEffect(() => {
+    setExpandedExcelSources({});
+  }, [extractedDraft?.id, selectedScheduleTab]);
+
+  const activeExcelSchedule = hasMultipleExcelSchedules
+    ? excelVehicleSchedules.find((s) => s.id === selectedScheduleTab) || null
+    : null;
+  const displayedWaypoints: RouteWaypointItem[] = activeExcelSchedule
+    ? (extractedDraft?.activeVehicleScheduleId === activeExcelSchedule.id
+      ? (extractedDraft.waypoints || activeExcelSchedule.waypoints)
+      : activeExcelSchedule.waypoints)
+    : (extractedDraft?.waypoints || []);
+
+  const ensureEditableScheduleDraft = (): HqEmailExtractedDraft | undefined => {
+    if (!extractedDraft) return undefined;
+    if (activeExcelSchedule && extractedDraft.activeVehicleScheduleId !== activeExcelSchedule.id) {
+      return applyExcelVehicleScheduleToDraft(extractedDraft, activeExcelSchedule.id);
+    }
+    return extractedDraft;
+  };
+
+  const handleApplyVehicleSchedule = (scheduleId: string) => {
+    if (!extractedDraft) return;
+    haptics.lightTap();
+    setSelectedScheduleTab(scheduleId);
+    setWaypointEdit(null);
+    onUpdateDraft?.(applyExcelVehicleScheduleToDraft(extractedDraft, scheduleId));
+  };
+
   // Multi-destination waypoints check & Multi-day grouping
-  const waypoints: RouteWaypointItem[] = extractedDraft?.waypoints || [];
-  const hasMultipleWaypoints = waypoints.length > 2;
-  const unconfirmedPlaces = extractedDraft ? getUnconfirmedEmailRouteStops(extractedDraft).length : 0;
+  const waypoints: RouteWaypointItem[] = displayedWaypoints;
 
   // Extract unique dates for multi-day itineraries
   const waypointDates = waypoints
     .map((w) => (w.date || (pickupDate !== '날짜 미지정' ? pickupDate : '')).trim())
     .filter(Boolean);
-  const uniqueDates = Array.from(new Set(waypointDates));
+  const uniqueDates = Array.from(new Set(waypointDates)).sort();
   const hasMultipleDates = uniqueDates.length > 1;
+  const hasMultipleWaypoints = displayedWaypoints.length > 2 || hasMultipleDates;
+  const unconfirmedPlaces = activeExcelSchedule && extractedDraft?.activeVehicleScheduleId !== activeExcelSchedule.id
+    ? activeExcelSchedule.waypoints.filter(
+        (w) => !isVerifiedEmailRouteStop({
+          ...w,
+          date: w.date || activeExcelSchedule.dates[0] || pickupDate,
+          time: w.time || '',
+          isPoiConfirmed: Boolean(w.isPoiConfirmed),
+        })
+      ).length
+    : extractedDraft ? getUnconfirmedEmailRouteStops(extractedDraft).length : 0;
 
   // Group waypoints by unique date
   const dayGroups = (uniqueDates.length > 0 ? uniqueDates : [pickupDate !== '날짜 미지정' ? pickupDate : '']).map(
@@ -242,8 +305,9 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   };
 
   const saveWaypointEdit = () => {
-    if (!waypointEdit || !extractedDraft?.waypoints) return;
-    const original = extractedDraft.waypoints.find((wp) => wp.id === waypointEdit.id);
+    const baseDraft = ensureEditableScheduleDraft();
+    if (!waypointEdit || !baseDraft?.waypoints) return;
+    const original = baseDraft.waypoints.find((wp) => wp.id === waypointEdit.id);
     const location = waypointEdit.location.trim();
     if (!original || !location) return;
 
@@ -254,27 +318,31 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
     const lng = poi?.lng ?? (confirmed ? original.lng : undefined);
     const address = poi?.address ?? (confirmed ? original.address : undefined);
     const time = waypointEdit.time.trim();
-    const updated = extractedDraft.waypoints.map((wp) =>
+    const updated = baseDraft.waypoints.map((wp) =>
       wp.id === waypointEdit.id ? { ...wp, time, location, address, lat, lng, isPoiConfirmed: confirmed } : wp
     );
     const isFirst = updated[0]?.id === waypointEdit.id;
     const isLast = updated[updated.length - 1]?.id === waypointEdit.id;
 
-    onUpdateDraft?.({
-      ...extractedDraft,
-      waypoints: updated,
-      pickupTime: isFirst && time ? time : extractedDraft.pickupTime,
-      pickupLocation: isFirst ? location : extractedDraft.pickupLocation,
-      pickupLat: isFirst ? lat : extractedDraft.pickupLat,
-      pickupLng: isFirst ? lng : extractedDraft.pickupLng,
-      pickupAddress: isFirst ? address : extractedDraft.pickupAddress,
-      isPickupPoiConfirmed: isFirst ? confirmed : extractedDraft.isPickupPoiConfirmed,
-      dropoffLocation: isLast ? location : extractedDraft.dropoffLocation,
-      dropoffLat: isLast ? lat : extractedDraft.dropoffLat,
-      dropoffLng: isLast ? lng : extractedDraft.dropoffLng,
-      dropoffAddress: isLast ? address : extractedDraft.dropoffAddress,
-      isDropoffPoiConfirmed: isLast ? confirmed : extractedDraft.isDropoffPoiConfirmed,
-    });
+    const nextDraft = syncActiveVehicleScheduleWaypoints(
+      {
+        ...baseDraft,
+        waypoints: updated,
+        pickupTime: isFirst && time ? time : baseDraft.pickupTime,
+        pickupLocation: isFirst ? location : baseDraft.pickupLocation,
+        pickupLat: isFirst ? lat : baseDraft.pickupLat,
+        pickupLng: isFirst ? lng : baseDraft.pickupLng,
+        pickupAddress: isFirst ? address : baseDraft.pickupAddress,
+        isPickupPoiConfirmed: isFirst ? confirmed : baseDraft.isPickupPoiConfirmed,
+        dropoffLocation: isLast ? location : baseDraft.dropoffLocation,
+        dropoffLat: isLast ? lat : baseDraft.dropoffLat,
+        dropoffLng: isLast ? lng : baseDraft.dropoffLng,
+        dropoffAddress: isLast ? address : baseDraft.dropoffAddress,
+        isDropoffPoiConfirmed: isLast ? confirmed : baseDraft.isDropoffPoiConfirmed,
+      },
+      updated,
+    );
+    onUpdateDraft?.(nextDraft);
     setWaypointEdit(null);
   };
 
@@ -347,11 +415,12 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
 
   // Add a new waypoint specifically for a day
   const handleAddWaypointForDay = (targetDate: string) => {
-    if (!extractedDraft) return;
+    const baseDraft = ensureEditableScheduleDraft();
+    if (!baseDraft) return;
     haptics.lightTap();
     const fallbackDate = targetDate || (pickupDate !== '날짜 미지정' ? pickupDate : '');
-    const currentWps = extractedDraft.waypoints && extractedDraft.waypoints.length > 0
-      ? [...extractedDraft.waypoints]
+    const currentWps = baseDraft.waypoints && baseDraft.waypoints.length > 0
+      ? [...baseDraft.waypoints]
       : [];
 
     const newWpId = `wp-${Date.now()}-${currentWps.length + 1}`;
@@ -369,11 +438,16 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
     currentWps.splice(insertAt, 0, newWp);
 
     const reordered = currentWps.map((w, idx) => ({ ...w, order: idx + 1 }));
-    onUpdateDraft?.({
-      ...extractedDraft,
-      waypoints: reordered,
-      dropoffLocation: reordered[reordered.length - 1]?.location || extractedDraft.dropoffLocation,
-    });
+    onUpdateDraft?.(
+      syncActiveVehicleScheduleWaypoints(
+        {
+          ...baseDraft,
+          waypoints: reordered,
+          dropoffLocation: reordered[reordered.length - 1]?.location || baseDraft.dropoffLocation,
+        },
+        reordered,
+      )
+    );
     setWaypointEdit({
       id: newWpId,
       time: newWp.time || '',
@@ -385,31 +459,43 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
 
   // Remove a waypoint
   const handleRemoveWaypoint = (wpId: string) => {
-    if (!extractedDraft || !extractedDraft.waypoints || extractedDraft.waypoints.length <= 2) return;
+    const baseDraft = ensureEditableScheduleDraft();
+    if (!baseDraft || !baseDraft.waypoints || baseDraft.waypoints.length <= 2) return;
     haptics.lightTap();
-    const filtered = extractedDraft.waypoints.filter((w) => w.id !== wpId);
+    const filtered = baseDraft.waypoints.filter((w) => w.id !== wpId);
     const reordered = filtered.map((w, idx) => ({ ...w, order: idx + 1 }));
-    const isStillMulti = reordered.length > 2;
-    onUpdateDraft?.({
-      ...extractedDraft,
-      waypoints: isStillMulti ? reordered : undefined,
-      pickupLocation: reordered[0]?.location || extractedDraft.pickupLocation,
-      pickupTime: reordered[0]?.time || extractedDraft.pickupTime,
-      pickupDate: reordered[0]?.date || extractedDraft.pickupDate,
-      dropoffLocation: reordered[reordered.length - 1]?.location || extractedDraft.dropoffLocation,
-    });
+    const isStillMulti = reordered.length > 2 || new Set(reordered.map(w => w.date || '').filter(Boolean)).size > 1;
+    onUpdateDraft?.(
+      syncActiveVehicleScheduleWaypoints(
+        {
+          ...baseDraft,
+          waypoints: isStillMulti ? reordered : undefined,
+          pickupLocation: reordered[0]?.location || baseDraft.pickupLocation,
+          pickupTime: reordered[0]?.time || baseDraft.pickupTime,
+          pickupDate: reordered[0]?.date || baseDraft.pickupDate,
+          dropoffLocation: reordered[reordered.length - 1]?.location || baseDraft.dropoffLocation,
+        },
+        reordered,
+      )
+    );
   };
 
   // Update waypoint date
   const handleUpdateWaypointDate = (wpId: string, newDate: string) => {
-    if (!extractedDraft || !extractedDraft.waypoints) return;
-    const updated = extractedDraft.waypoints.map((w) => (w.id === wpId ? { ...w, date: newDate } : w));
+    const baseDraft = ensureEditableScheduleDraft();
+    if (!baseDraft || !baseDraft.waypoints) return;
+    const updated = baseDraft.waypoints.map((w) => (w.id === wpId ? { ...w, date: newDate } : w));
     const isFirst = updated[0]?.id === wpId;
-    onUpdateDraft?.({
-      ...extractedDraft,
-      waypoints: updated,
-      pickupDate: isFirst && newDate ? newDate : extractedDraft.pickupDate,
-    });
+    onUpdateDraft?.(
+      syncActiveVehicleScheduleWaypoints(
+        {
+          ...baseDraft,
+          waypoints: updated,
+          pickupDate: isFirst && newDate ? newDate : baseDraft.pickupDate,
+        },
+        updated,
+      )
+    );
   };
 
   // Convert single leg (pickup/dropoff) to multi-destination itinerary
@@ -472,19 +558,25 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
 
   const handleDragOver = (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
-    if (draggedIndex === null || draggedIndex === targetIndex || !extractedDraft?.waypoints) return;
-    const items = [...extractedDraft.waypoints];
+    const baseDraft = ensureEditableScheduleDraft();
+    if (draggedIndex === null || draggedIndex === targetIndex || !baseDraft?.waypoints) return;
+    const items = [...baseDraft.waypoints];
     const [draggedItem] = items.splice(draggedIndex, 1);
     items.splice(targetIndex, 0, draggedItem);
     const reordered = items.map((it, idx) => ({ ...it, order: idx + 1 }));
     setDraggedIndex(targetIndex);
-    onUpdateDraft?.({
-      ...extractedDraft,
-      waypoints: reordered,
-      pickupLocation: reordered[0]?.location || extractedDraft.pickupLocation,
-      pickupTime: reordered[0]?.time || extractedDraft.pickupTime,
-      dropoffLocation: reordered[reordered.length - 1]?.location || extractedDraft.dropoffLocation,
-    });
+    onUpdateDraft?.(
+      syncActiveVehicleScheduleWaypoints(
+        {
+          ...baseDraft,
+          waypoints: reordered,
+          pickupLocation: reordered[0]?.location || baseDraft.pickupLocation,
+          pickupTime: reordered[0]?.time || baseDraft.pickupTime,
+          dropoffLocation: reordered[reordered.length - 1]?.location || baseDraft.dropoffLocation,
+        },
+        reordered,
+      )
+    );
   };
 
   const handleDragEnd = () => {
@@ -985,6 +1077,62 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                 </p>
               )}
 
+              {hasMultipleExcelSchedules && (
+                <div className="space-y-2.5">
+                  <HqSegmentedTabs
+                    aria-label="차량별 첨부 일정표 선택"
+                    value={selectedScheduleTab}
+                    onValueChange={(nextTab) => {
+                      haptics.lightTap();
+                      setSelectedScheduleTab(nextTab);
+                      setWaypointEdit(null);
+                    }}
+                    tabs={[
+                      ...excelVehicleSchedules.map((schedule) => ({
+                        id: schedule.id,
+                        label: schedule.label,
+                        count: schedule.waypoints.length,
+                      })),
+                      ...(!extractedDraft?.activeVehicleScheduleId
+                        ? [{ id: 'merged', label: 'AI 통합 초안', count: extractedDraft?.waypoints?.length || 0 }]
+                        : []),
+                    ]}
+                  />
+                  {activeExcelSchedule && (() => {
+                    const isApplied = extractedDraft?.activeVehicleScheduleId === activeExcelSchedule.id;
+                    const dateRangeLabel = activeExcelSchedule.dates.length > 1
+                      ? `${activeExcelSchedule.dates[0]} ~ ${activeExcelSchedule.dates[activeExcelSchedule.dates.length - 1]}`
+                      : activeExcelSchedule.dates[0] || '날짜 미지정';
+                    return (
+                      <HqCard tone="muted" className="p-3.5 flex flex-wrap items-center justify-between gap-2.5">
+                        <div className="min-w-0 space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-bold text-[#17233B] break-all">
+                              {activeExcelSchedule.filename} · {activeExcelSchedule.sheetName}
+                            </span>
+                            <HqBadge tone={isApplied ? 'selected' : 'warning'}>
+                              {isApplied ? '현재 배차 경로에 적용됨' : '차량별 개별 배차 권장'}
+                            </HqBadge>
+                          </div>
+                          <p className="text-[11px] text-[#6E809B]">
+                            {dateRangeLabel} · {activeExcelSchedule.dates.length}일간 · 총 {activeExcelSchedule.waypoints.length}개 일정
+                          </p>
+                        </div>
+                        {!isApplied && (
+                          <HqButton
+                            variant="primary"
+                            size="sm"
+                            onClick={() => handleApplyVehicleSchedule(activeExcelSchedule.id)}
+                          >
+                            이 차량 일정으로 배차 경로 적용
+                          </HqButton>
+                        )}
+                      </HqCard>
+                    );
+                  })()}
+                </div>
+              )}
+
               {Boolean(batchReviewRows?.length) && (
                 <div role="group" aria-label="기존 예약 연결" className="space-y-2">
                   <p className="text-[11px] leading-relaxed text-[#73839D]">
@@ -1208,72 +1356,132 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                             </div>
                                           </div>
                                         </div>
-                                      ) : (
-                                        <div
-                                          onClick={() => { if (!window.getSelection()?.toString()) beginWaypointEdit(wp); }}
-                                          className="flex items-start justify-between p-2.5 rounded-2xl hover:bg-slate-50/80 transition-colors cursor-pointer select-text group/item"
-                                        >
-                                          <div className="flex min-w-0 flex-col gap-0.5">
-                                            <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-0.5">
-                                              <span className="w-12 shrink-0 text-xs font-black tabular-nums text-slate-900">
-                                                {wp.time || '--:--'}
-                                              </span>
-                                              <span className="min-w-0 text-xs font-black text-slate-900">
-                                                {wp.location || '장소 미지정'}
-                                              </span>
-                                              {isFirst && (
-                                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-100/80">
-                                                  {wp.id.startsWith('excel-') ? '첫 일정' : '출발'}
-                                                </span>
-                                              )}
-                                              {isLast && (
-                                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">
-                                                  {wp.id.startsWith('excel-') ? '마지막 일정' : '종료'}
-                                                </span>
-                                              )}
-                                            </div>
-                                            <div className="pl-14 mt-1 space-y-1">
-                                              {wp.address && <p className="break-words text-[11px] text-slate-500">{wp.address}</p>}
-                                              {!wp.clientAddress && !wp.address && (
-                                                <HqBadge tone="neutral" wrap>클라이언트측 주소 미지정</HqBadge>
-                                              )}
-                                              {!isVerifiedEmailRouteStop({ ...wp, date: wp.date || pickupDate, time: wp.time || '', isPoiConfirmed: Boolean(wp.isPoiConfirmed) }) && (
-                                                <HqBadge tone="warning" wrap>TMAP 위치 미확정 · 눌러서 검색 결과 선택</HqBadge>
-                                              )}
-                                            </div>
-                                            {wp.notes && (
-                                              <p className="pl-14 mt-0.5 text-[11px] text-slate-400 break-words">{wp.notes}</p>
-                                            )}
-                                          </div>
-
-                                          <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover/item:opacity-100 transition-opacity">
-                                            <button
-                                              type="button"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                beginWaypointEdit(wp);
-                                              }}
-                                              className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
-                                              aria-label="경유지 수정"
+                                      ) : (() => {
+                                        const parsedNote = parseExcelWaypointNotes(wp.notes);
+                                        const excelSource = parsedNote.excelSource;
+                                        const isSourceExpanded = Boolean(excelSource && expandedExcelSources[wp.id]);
+                                        return (
+                                          <>
+                                            <div
+                                              onClick={() => { if (!window.getSelection()?.toString()) beginWaypointEdit(wp); }}
+                                              className="flex items-start justify-between gap-2 p-2.5 rounded-2xl hover:bg-slate-50/80 transition-colors cursor-pointer select-text group/item"
                                             >
-                                              <Edit3 className="w-3.5 h-3.5" />
-                                            </button>
-                                            {waypoints.length > 2 && (
-                                              <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  handleRemoveWaypoint(wp.id);
-                                                }}
-                                                className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
-                                                aria-label="경유지 삭제"
-                                              >
-                                                <X className="w-3.5 h-3.5" />
-                                              </button>
+                                              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                                                <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-0.5">
+                                                  <span className="w-12 shrink-0 text-xs font-black tabular-nums text-slate-900">
+                                                    {wp.time || '--:--'}
+                                                  </span>
+                                                  <span className="min-w-0 text-xs font-black text-slate-900">
+                                                    {wp.location || '장소 미지정'}
+                                                  </span>
+                                                  {isFirst && (
+                                                    <HqBadge tone="selected">
+                                                      {wp.id.startsWith('excel-') ? '첫 일정' : '출발'}
+                                                    </HqBadge>
+                                                  )}
+                                                  {isLast && (
+                                                    <HqBadge tone="neutral">
+                                                      {wp.id.startsWith('excel-') ? '마지막 일정' : '종료'}
+                                                    </HqBadge>
+                                                  )}
+                                                </div>
+                                                <div className="pl-14 mt-1 space-y-1">
+                                                  {wp.address && <p className="break-words text-[11px] text-slate-500">{wp.address}</p>}
+                                                  {!wp.clientAddress && !wp.address && (
+                                                    <HqBadge tone="neutral" wrap>클라이언트측 주소 미지정</HqBadge>
+                                                  )}
+                                                  {!isVerifiedEmailRouteStop({ ...wp, date: wp.date || pickupDate, time: wp.time || '', isPoiConfirmed: Boolean(wp.isPoiConfirmed) }) && (
+                                                    <HqBadge tone="warning" wrap>TMAP 위치 미확정 · 눌러서 검색 결과 선택</HqBadge>
+                                                  )}
+                                                </div>
+                                                {parsedNote.plainNotes && (
+                                                  <p className="pl-14 mt-0.5 text-[11px] text-slate-400 break-words">{parsedNote.plainNotes}</p>
+                                                )}
+                                              </div>
+
+                                              <div className="flex shrink-0 items-center gap-1">
+                                                {excelSource && (
+                                                  <HqButton
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    aria-expanded={isSourceExpanded}
+                                                    aria-label={`Excel 원본 ${excelSource.sheetName}!${excelSource.cell} ${isSourceExpanded ? '닫기' : '보기'}`}
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      toggleExcelSource(wp.id);
+                                                    }}
+                                                  >
+                                                    <span>원본 {excelSource.cell}</span>
+                                                    {isSourceExpanded ? (
+                                                      <ChevronUp className="h-3.5 w-3.5" />
+                                                    ) : (
+                                                      <ChevronDown className="h-3.5 w-3.5" />
+                                                    )}
+                                                  </HqButton>
+                                                )}
+                                                <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover/item:opacity-100 transition-opacity">
+                                                  <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      beginWaypointEdit(wp);
+                                                    }}
+                                                    className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+                                                    aria-label="경유지 수정"
+                                                  >
+                                                    <Edit3 className="w-3.5 h-3.5" />
+                                                  </button>
+                                                  {waypoints.length > 2 && (
+                                                    <button
+                                                      type="button"
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleRemoveWaypoint(wp.id);
+                                                      }}
+                                                      className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+                                                      aria-label="경유지 삭제"
+                                                    >
+                                                      <X className="w-3.5 h-3.5" />
+                                                    </button>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            </div>
+                                            {isSourceExpanded && excelSource && (
+                                              <div className="pl-14 pr-2.5 pb-1">
+                                                <HqCard tone="muted" className="p-3 space-y-2">
+                                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                                                      <HqBadge tone="neutral" wrap>
+                                                        {excelSource.filename} · {excelSource.sheetName}!{excelSource.cell}
+                                                      </HqBadge>
+                                                      {excelSource.isGridClock && (
+                                                        <HqBadge tone="warning" wrap>
+                                                          시간표 행 기준 · 실제 출발 시각 미확정
+                                                        </HqBadge>
+                                                      )}
+                                                    </div>
+                                                    <HqButton
+                                                      type="button"
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      onClick={() => toggleExcelSource(wp.id)}
+                                                    >
+                                                      닫기
+                                                    </HqButton>
+                                                  </div>
+                                                  {excelSource.rawText && (
+                                                    <p className="text-[11px] leading-relaxed text-slate-600 whitespace-pre-wrap break-words select-text">
+                                                      {excelSource.rawText}
+                                                    </p>
+                                                  )}
+                                                </HqCard>
+                                              </div>
                                             )}
-                                          </div>
-                                        </div>
-                                      )}
+                                          </>
+                                        );
+                                      })()}
                                       {!isEditingThis && wp.clientAddress && (
                                         <HqEmailAddressCandidate
                                           onLocateInSource={locateSource}
@@ -1281,7 +1489,16 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                           sourceAddress={wp.clientAddress}
                                           placeName={wp.location}
                                           isPoiConfirmed={Boolean(wp.isPoiConfirmed)}
-                                          onPick={(poi) => extractedDraft && onUpdateDraft?.(confirmEmailRouteStop(extractedDraft, wp.id, poi))}
+                                          onPick={(poi) => {
+                                            const baseDraft = ensureEditableScheduleDraft();
+                                            if (!baseDraft) return;
+                                            const confirmedDraft = confirmEmailRouteStop(baseDraft, wp.id, poi);
+                                            onUpdateDraft?.(
+                                              confirmedDraft.waypoints
+                                                ? syncActiveVehicleScheduleWaypoints(confirmedDraft, confirmedDraft.waypoints)
+                                                : confirmedDraft
+                                            );
+                                          }}
                                         />
                                       )}
                                     </div>

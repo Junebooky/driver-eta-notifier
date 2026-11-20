@@ -22,7 +22,7 @@ test('Nov 11/12 then 11/05 inserts earlier date above, preserving manifest moves
 test('Undated manual notes and period rows remain in place while dated records compact',()=>{
  const old=appendKakaoExcelReport(kakaoWorkbookFixture(),{...draft,date:'2026-04-05'});
  const out=organizeManagedMonth(old.bytes,'4월',2026,{}, {row:old.rowNumber,date:'2026-04-05'});
- assert.equal(out.changed,true);
+ assert.equal(out.changed,false,'fresh reports already occupy the first safe blank row');
  const original=workbookFromFile(old.bytes).Sheets['4월'];
  const after=workbookFromFile(out.bytes).Sheets['4월'];
  assert.equal(after.cells.A2.v,original.cells.A2.v);

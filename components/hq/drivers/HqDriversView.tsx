@@ -169,6 +169,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
           onOpenLogin={() => setIsLoginModalOpen(true)}
           onUpdateDriver={updateDriver}
           onDeleteDriver={deleteDriver}
+          onCardAssetUpdated={refetch}
         />
       ) : (
         <HqDriverDetailSplitView
