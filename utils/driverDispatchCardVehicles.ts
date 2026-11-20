@@ -216,3 +216,126 @@ export function groupDriverCardVehicles(
     return [group];
   });
 }
+
+export interface DriverSearchMatchResult {
+  matched: boolean;
+  matchedVehicleIds: string[];
+  matchedHighlightLabel: string;
+}
+
+/**
+ * Matches whitespace-separated query tokens (e.g. "김승준 1336") across driver
+ * profile fields AND every dispatch-card vehicle slot, identifying which card
+ * slots should be visually called out in the dispatch-card vehicle list.
+ */
+export function matchDriverWithCardSlots({
+  query,
+  driver,
+  driverCoverage,
+  vehicleById,
+}: {
+  query: string;
+  driver: {
+    name: string;
+    phone?: string;
+    residence?: string;
+    affiliationLabel?: string;
+    vehicleModel?: string;
+    carNumber?: string;
+  };
+  driverCoverage?: DispatchCardCoverageDriver;
+  vehicleById: ReadonlyMap<string, VipRealVehicle>;
+}): DriverSearchMatchResult {
+  const rawTokens = query.trim().split(/\s+/).filter(Boolean);
+  if (!rawTokens.length) {
+    return { matched: true, matchedVehicleIds: [], matchedHighlightLabel: '' };
+  }
+
+  const phoneDigits = (driver.phone || '').replace(/\D/g, '');
+  const driverFields = [
+    driver.name,
+    driver.phone || '',
+    driver.residence || '',
+    driver.affiliationLabel || '',
+    driver.vehicleModel || '',
+    driver.carNumber || '',
+  ].map((value) => value.toLowerCase());
+
+  const slots = driverCoverage?.slots || [];
+  const slotInfos = slots.map((slot) => {
+    const vehicle = vehicleById.get(slot.vehicleId);
+    const plateLower = slot.plate.toLowerCase();
+    const plateCompact = plateLower.replace(/\s+/g, '');
+    const modelText = `${vehicle?.model || ''} ${vehicle?.modelShort || ''}`.toLowerCase();
+    return { slot, plateLower, plateCompact, modelText };
+  });
+
+  const plateMatchingTokens: string[] = [];
+  const modelMatchingTokens: string[] = [];
+
+  for (const rawToken of rawTokens) {
+    const token = rawToken.toLowerCase();
+    const compact = token.replace(/\s+/g, '');
+    const digitsOnly = token.replace(/\D/g, '');
+    const matchesDriver =
+      driverFields.some((field) => field.includes(token)) ||
+      (digitsOnly.length >= 2 && phoneDigits.includes(digitsOnly));
+
+    let matchedByPlate = false;
+    let matchedByModel = false;
+    for (const info of slotInfos) {
+      if (info.plateLower.includes(token) || info.plateCompact.includes(compact)) {
+        matchedByPlate = true;
+      } else if (info.modelText.includes(token)) {
+        matchedByModel = true;
+      }
+    }
+
+    if (!matchesDriver && !matchedByPlate && !matchedByModel) {
+      return { matched: false, matchedVehicleIds: [], matchedHighlightLabel: '' };
+    }
+    if (matchedByPlate) plateMatchingTokens.push(rawToken);
+    else if (matchedByModel && !matchesDriver) modelMatchingTokens.push(rawToken);
+  }
+
+  const targetTokens = plateMatchingTokens.length > 0 ? plateMatchingTokens : modelMatchingTokens;
+  if (!targetTokens.length) {
+    return { matched: true, matchedVehicleIds: [], matchedHighlightLabel: '' };
+  }
+
+  const matchedSlots = slotInfos.filter((info) =>
+    targetTokens.every((rawToken) => {
+      const token = rawToken.toLowerCase();
+      const compact = token.replace(/\s+/g, '');
+      return (
+        info.plateLower.includes(token) ||
+        info.plateCompact.includes(compact) ||
+        info.modelText.includes(token)
+      );
+    })
+  );
+
+  const fallbackSlots = matchedSlots.length
+    ? matchedSlots
+    : slotInfos.filter((info) =>
+        targetTokens.some((rawToken) => {
+          const token = rawToken.toLowerCase();
+          const compact = token.replace(/\s+/g, '');
+          return (
+            info.plateLower.includes(token) ||
+            info.plateCompact.includes(compact) ||
+            info.modelText.includes(token)
+          );
+        })
+      );
+
+  const highlightLabel =
+    plateMatchingTokens[plateMatchingTokens.length - 1] ||
+    (fallbackSlots[0]?.slot.plate.match(/\d{4}$/)?.[0] || fallbackSlots[0]?.slot.plate || '');
+
+  return {
+    matched: true,
+    matchedVehicleIds: fallbackSlots.map((info) => info.slot.vehicleId),
+    matchedHighlightLabel: highlightLabel,
+  };
+}

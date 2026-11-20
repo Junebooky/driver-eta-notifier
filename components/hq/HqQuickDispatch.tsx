@@ -40,7 +40,7 @@ import {
   getVehicleImage,
 } from '@/utils/vehicleData';
 import { HqDispatchTimeField } from './ui/HqDispatchTimeField';
-import { HqSearchInput } from '@/components/hq/ui';
+import { HqSearchInput, HqSegmentedTabs } from '@/components/hq/ui';
 import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
 import { HqCustomer } from '@/types/customerHq';
 import {
@@ -1293,9 +1293,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       >
         {/* 1. 배정 차량 Selector */}
         <div className="relative">
-          <label className="block text-xs font-bold text-slate-800 mb-1.5">
+          <label className="block text-xs font-medium text-[#60728C] mb-1.5">
             {allocations.length > 1 ? `${index + 1}번 배정 차량` : '배정 차량'}{' '}
-            <span className="text-red-500 font-bold">*</span>
+            <span className="text-red-500 font-semibold">*</span>
           </label>
 
           <button
@@ -1311,7 +1311,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 setVehicleCategoryFilter('all');
               }
             }}
-            className={`w-full h-11 sm:h-12 bg-white rounded-xl px-3.5 flex items-center justify-between transition-all cursor-pointer shadow-2xs border ${isOpenVehicle
+            className={`w-full min-h-12 sm:min-h-[54px] py-1.5 bg-white rounded-xl px-3.5 flex items-center justify-between transition-all cursor-pointer shadow-2xs border ${isOpenVehicle
               ? 'border-[#1E60F3] ring-1 ring-[#1E60F3]'
               : 'border-slate-200 hover:border-slate-300'
               }`}
@@ -1330,14 +1330,19 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                     className="w-full h-full object-contain"
                   />
                 </div>
-                <span className="text-xs sm:text-sm font-black text-slate-900 truncate">
-                  {selectedVehicle.model} · {selectedVehicle.plate}
-                </span>
+                <div className="min-w-0 flex-1 text-left">
+                  <span className="block truncate text-[13px] font-medium leading-snug text-[#17233B]">
+                    {selectedVehicle.model}
+                  </span>
+                  <span className="mt-0.5 block whitespace-nowrap text-[12px] font-normal leading-tight text-[#60728C] tabular-nums">
+                    {selectedVehicle.plate}
+                  </span>
+                </div>
               </div>
             ) : (
               <div className="flex items-center gap-2 text-slate-400">
                 <Car className="w-4 h-4 shrink-0 text-slate-400" />
-                <span className="text-xs sm:text-sm font-medium">배정 차량 선택</span>
+                <span className="text-[13px] font-medium">배정 차량 선택</span>
               </div>
             )}
             <ChevronDown
@@ -1352,46 +1357,31 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               ref={activeCardDropdownRef}
               className={`z-50 w-full max-w-[520px] rounded-[18px] bg-white p-3 shadow-[0_10px_34px_rgba(35,49,78,0.1)] animate-in fade-in duration-150 ${initialBooking ? 'relative mt-2' : 'absolute left-0 top-full mt-1.5 sm:min-w-[420px]'}`}
             >
-              {/* Top Bar: Search Input & Category Pills */}
-              <div className="flex flex-col gap-2 pb-2.5 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <HqSearchInput
-                    type="text"
-                    value={vehicleSearchQuery}
-                    onChange={(e) => setVehicleSearchQuery(e.target.value)}
-                    onClear={() => setVehicleSearchQuery('')}
-                    placeholder="차량명 또는 차량번호 검색"
-                    containerClassName="flex-1"
-                    className="sm:h-9 rounded-lg border border-slate-200/80 bg-slate-50 shadow-none focus:bg-white"
-                  />
+              {/* Top Bar: Full-width Search Input & Underline Category Tabs */}
+              <div className="flex flex-col gap-2.5 pb-1">
+                <HqSearchInput
+                  type="text"
+                  value={vehicleSearchQuery}
+                  onChange={(e) => setVehicleSearchQuery(e.target.value)}
+                  onClear={() => setVehicleSearchQuery('')}
+                  placeholder="차량명 또는 차량번호 검색"
+                  containerClassName="w-full"
+                  className="sm:h-10 rounded-xl border border-slate-200/80 bg-[#F7F9FC] shadow-none focus:bg-white"
+                />
 
-                  <div className="flex items-center gap-1 shrink-0">
-                    {(
-                      [
-                        { key: 'all', label: '전체' },
-                        { key: 'sedan', label: '세단' },
-                        { key: 'suv', label: 'SUV' },
-                        { key: 'van', label: '밴' },
-                        { key: 'sprinter', label: '스프린터' },
-                      ] as const
-                    ).map((cat) => {
-                      const active = vehicleCategoryFilter === cat.key;
-                      return (
-                        <button
-                          key={cat.key}
-                          type="button"
-                          onClick={() => setVehicleCategoryFilter(cat.key)}
-                          className={`px-2 py-1 rounded-full text-[11px] font-bold transition-colors cursor-pointer ${active
-                            ? 'bg-[#1E60F3] text-white shadow-2xs'
-                            : 'text-slate-600 hover:bg-slate-100'
-                            }`}
-                        >
-                          {cat.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                <HqSegmentedTabs
+                  variant="underline"
+                  aria-label="배정 차량 차종 카테고리"
+                  value={vehicleCategoryFilter}
+                  onValueChange={(next) => setVehicleCategoryFilter(next as typeof vehicleCategoryFilter)}
+                  tabs={[
+                    { id: 'all', label: '전체' },
+                    { id: 'sedan', label: '세단' },
+                    { id: 'suv', label: 'SUV' },
+                    { id: 'van', label: '밴' },
+                    { id: 'sprinter', label: '스프린터' },
+                  ]}
+                />
               </div>
 
               {/* Unassign Option */}
@@ -1399,7 +1389,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 <button
                   type="button"
                   onClick={() => handleSelectVehicle(allocation.id, null)}
-                  className="w-full mt-1.5 mb-1 px-2.5 py-1.5 text-left text-xs font-bold text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-between cursor-pointer"
+                  className="w-full mt-1.5 mb-1 px-2.5 py-1.5 text-left text-xs font-medium text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-between cursor-pointer"
                 >
                   <span>배정 해제 (미배정)</span>
                   <X className="w-3.5 h-3.5" />
@@ -1438,10 +1428,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                             />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-xs font-black text-slate-900 truncate">
+                            <p className="text-[13px] font-medium text-[#17233B] truncate">
                               {v.model}
                             </p>
-                            <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
+                            <p className="text-[12px] font-normal text-[#60728C] mt-0.5 tabular-nums">
                               {v.plate}
                             </p>
                           </div>
@@ -1473,9 +1463,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
         {/* 2. 담당 기사 Selector */}
         <div className="relative">
-          <label className="block text-xs font-bold text-slate-800 mb-1.5">
+          <label className="block text-xs font-medium text-[#60728C] mb-1.5">
             {allocations.length > 1 ? `${index + 1}번 담당 기사` : '담당 기사'}{' '}
-            <span className="text-red-500 font-bold">*</span>
+            <span className="text-red-500 font-semibold">*</span>
           </label>
 
           <button
@@ -1491,7 +1481,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               }
             }}
             disabled={allocation.serviceMode === 'vehicle_only'}
-            className={`w-full h-11 sm:h-12 bg-white rounded-xl px-3.5 flex items-center justify-between transition-all cursor-pointer shadow-2xs border ${isOpenDriver
+            className={`w-full min-h-12 sm:min-h-[54px] py-1.5 bg-white rounded-xl px-3.5 flex items-center justify-between transition-all cursor-pointer shadow-2xs border ${isOpenDriver
               ? 'border-[#1E60F3] ring-1 ring-[#1E60F3]'
               : 'border-slate-200 hover:border-slate-300'
               } disabled:opacity-50 disabled:pointer-events-none`}
@@ -1510,14 +1500,19 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                     className="w-full h-full object-cover"
                   />
                 </div>
-                <span className="text-xs sm:text-sm font-black text-slate-900 truncate">
-                  {selectedDriver.name} · {selectedDriver.phone}
-                </span>
+                <div className="min-w-0 flex-1 text-left">
+                  <span className="block truncate text-[13px] font-medium leading-snug text-[#17233B]">
+                    {selectedDriver.name}
+                  </span>
+                  <span className="mt-0.5 block whitespace-nowrap text-[12px] font-normal leading-tight text-[#60728C] tabular-nums">
+                    {selectedDriver.phone}
+                  </span>
+                </div>
               </div>
             ) : (
               <div className="flex items-center gap-2 text-slate-400">
                 <Users className="w-4 h-4 shrink-0 text-slate-400" />
-                <span className="text-xs sm:text-sm font-medium">담당 기사 선택</span>
+                <span className="text-[13px] font-medium">담당 기사 선택</span>
               </div>
             )}
             <ChevronDown
@@ -1540,7 +1535,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   onChange={(e) => setDriverSearchQuery(e.target.value)}
                   onClear={() => setDriverSearchQuery('')}
                   placeholder="기사명 또는 연락처 검색"
-                  className="sm:h-9 rounded-lg border border-slate-200/80 bg-slate-50 shadow-none focus:bg-white"
+                  className="sm:h-10 rounded-xl border border-slate-200/80 bg-[#F7F9FC] shadow-none focus:bg-white"
                 />
               </div>
 
@@ -1549,7 +1544,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 <button
                   type="button"
                   onClick={() => handleSelectDriver(allocation.id, null)}
-                  className="w-full mt-1.5 mb-1 px-2.5 py-1.5 text-left text-xs font-bold text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-between cursor-pointer"
+                  className="w-full mt-1.5 mb-1 px-2.5 py-1.5 text-left text-xs font-medium text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-between cursor-pointer"
                 >
                   <span>배정 해제 (미배정)</span>
                   <X className="w-3.5 h-3.5" />
@@ -1596,7 +1591,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5">
-                              <p className="text-xs font-black text-slate-900 truncate">
+                              <p className="text-[13px] font-medium text-[#17233B] truncate">
                                 {d.name}
                               </p>
                               {d.affiliationType === 'employed' && (
@@ -1605,7 +1600,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                                 </span>
                               )}
                             </div>
-                            <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
+                            <p className="text-[12px] font-normal text-[#60728C] mt-0.5 tabular-nums">
                               {d.phone}
                             </p>
                           </div>
@@ -1800,7 +1795,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             </div>
 
             {/* Card 2: 출발일 · 출발 시간 · 종료 시간 (3 columns) */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 items-start">
               {/* Col 1: 출발일 */}
               <TossDateRangePicker
                 align="left"
@@ -1811,11 +1806,11 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   setPickupEndDate(end);
                 }}
                 customTrigger={() => (
-                  <div className="flex min-h-[88px] cursor-pointer select-none items-center gap-3 rounded-[20px] bg-white p-4 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] transition-all hover:shadow-[0_7px_24px_rgba(35,49,78,0.08)] sm:p-5">
-                    <Calendar className="w-5 h-5 text-slate-400 shrink-0" />
-                    <div>
-                      <div className="text-xs text-slate-400 font-medium">출발일</div>
-                      <div className="text-sm sm:text-base font-bold text-slate-800 tracking-tight">
+                  <div className="flex min-h-[96px] cursor-pointer select-none items-center gap-3 rounded-[20px] bg-white px-4 py-4 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] transition-all hover:shadow-[0_7px_24px_rgba(35,49,78,0.08)] sm:px-5">
+                    <Calendar className="h-5 w-5 shrink-0 text-[#8290A1]" />
+                    <div className="min-w-0 flex-1">
+                      <div className="block text-[12px] font-medium text-[#73839D]">출발일</div>
+                      <div className="mt-1.5 flex h-9 items-center whitespace-nowrap text-[14px] sm:text-[15px] font-semibold text-[#17233B] tracking-tight tabular-nums">
                         {formatDisplayDateWithDay(pickupDate)}
                       </div>
                     </div>

@@ -12,6 +12,8 @@ interface Props{
   vehicles:readonly VipRealVehicle[];
   onView:(slot:DispatchCardCoverageSlot)=>void;
   onCreate:(slot:DispatchCardCoverageSlot)=>void;
+  highlightedVehicleIds?:readonly string[];
+  highlightLabel?:string;
 }
 const dotClass={
   complete:'bg-[#5A9D83]',
@@ -20,8 +22,18 @@ const dotClass={
   photos_missing:'bg-[#B7C1CE]',
 } as const;
 
-export function HqDriverCardVehicleGroups({driverName,slots,vehicles,onView,onCreate}:Props){
+export function HqDriverCardVehicleGroups({
+  driverName,
+  slots,
+  vehicles,
+  onView,
+  onCreate,
+  highlightedVehicleIds = [],
+  highlightLabel = '',
+}:Props){
   const groups=groupDriverCardVehicles(slots,vehicles);
+  const highlightedSet=React.useMemo(()=>new Set(highlightedVehicleIds),[highlightedVehicleIds]);
+  const hasHighlights=highlightedSet.size>0;
   const totals=groups.reduce((sum,group)=>({
     complete:sum.complete+group.complete,
     partial:sum.partial+group.partial,
@@ -74,28 +86,49 @@ export function HqDriverCardVehicleGroups({driverName,slots,vehicles,onView,onCr
           <div className="space-y-2.5">
             {Array.from(models.entries()).map(([model,entries])=><div key={model} className="space-y-1.5">
               {models.size>1&&<p className="text-[11px] font-medium text-[#8291A6]">{model}</p>}
-              <div className="flex flex-wrap gap-1.5">
+              <div className={hasHighlights ? 'flex flex-wrap gap-x-2 gap-y-4 pt-6' : 'flex flex-wrap gap-1.5'}>
                 {entries.map(({slot,status,modelLabel})=>{
                   const label=status==='complete'?'PC·모바일 모두 완료':
                     status==='partial'?(slot.pc?'PC만 등록':'모바일만 등록'):
                     status==='photos_missing'?'차량 이미지 미준비':'카드 미등록';
+                  const isHighlighted=highlightedSet.has(slot.vehicleId);
+                  const bubbleTarget=highlightLabel || slot.plate.match(/\d{4}$/)?.[0] || slot.plate;
+                  const bubbleBadge=isHighlighted ? (
+                    <span
+                      role="status"
+                      className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2"
+                    >
+                      <span className="relative block whitespace-nowrap rounded-full bg-[#1E60F3] px-2.5 py-1 text-[11px] font-bold leading-none text-white shadow-[0_6px_16px_rgba(30,96,243,0.3)]">
+                        {bubbleTarget} 여깄어요!
+                        <span aria-hidden="true" className="absolute -bottom-1 left-1/2 size-2 -translate-x-1/2 rotate-45 bg-[#1E60F3]" />
+                      </span>
+                    </span>
+                  ) : null;
                   if(status==='photos_missing'){
-                    return <span key={slot.vehicleId}
-                      aria-label={driverName+' '+modelLabel+' '+slot.plate+' '+label}
-                      title={modelLabel+' · '+label+' · 차량 이미지가 준비되면 생성할 수 있어요.'}
-                      className="inline-flex min-h-9 items-center gap-1.5 rounded-[11px] bg-[#F3F5F8] px-2.5 text-[12px] font-medium text-[#8D9AAA]">
-                      <span aria-hidden="true" className={'size-1.5 shrink-0 rounded-full '+dotClass[status]}/>
-                      {slot.plate}
+                    return <span key={slot.vehicleId} className={isHighlighted ? 'relative inline-flex hq-card-plate-float' : 'inline-flex'}>
+                      {bubbleBadge}
+                      <span
+                        aria-label={driverName+' '+modelLabel+' '+slot.plate+' '+label}
+                        title={modelLabel+' · '+label+' · 차량 이미지가 준비되면 생성할 수 있어요.'}
+                        className={'inline-flex min-h-9 items-center gap-1.5 rounded-[11px] px-2.5 text-[12px] font-medium ' +
+                          (isHighlighted ? 'bg-[#EEF3FF] text-[#1E60F3] ring-2 ring-[#1E60F3] shadow-[0_6px_16px_rgba(30,96,243,0.18)] font-semibold' : 'bg-[#F3F5F8] text-[#8D9AAA]')}>
+                        <span aria-hidden="true" className={'size-1.5 shrink-0 rounded-full '+dotClass[status]}/>
+                        {slot.plate}
+                      </span>
                     </span>;
                   }
-                  return <HqButton key={slot.vehicleId} variant="subtle" size="sm"
-                    className="max-w-full gap-1.5 rounded-[11px] px-2.5"
-                    aria-label={driverName+' '+modelLabel+' '+slot.plate+' '+label+(status==='missing'?' · 카드 만들기':' · 카드 보기')}
-                    title={modelLabel+' · '+label}
-                    onClick={()=>status==='missing'?onCreate(slot):onView(slot)}>
-                    <span className={'size-1.5 shrink-0 rounded-full '+dotClass[status]} aria-hidden="true"/>
-                    <span className="whitespace-nowrap text-[12px] font-semibold">{slot.plate}</span>
-                  </HqButton>;
+                  return <span key={slot.vehicleId} className={isHighlighted ? 'relative inline-flex hq-card-plate-float' : 'inline-flex'}>
+                    {bubbleBadge}
+                    <HqButton variant="subtle" size="sm"
+                      className={'max-w-full gap-1.5 rounded-[11px] px-2.5 ' +
+                        (isHighlighted ? '!bg-[#EEF3FF] !text-[#1E60F3] ring-2 ring-[#1E60F3] shadow-[0_6px_16px_rgba(30,96,243,0.18)]' : '')}
+                      aria-label={driverName+' '+modelLabel+' '+slot.plate+' '+label+(status==='missing'?' · 카드 만들기':' · 카드 보기')}
+                      title={modelLabel+' · '+label}
+                      onClick={()=>status==='missing'?onCreate(slot):onView(slot)}>
+                      <span className={'size-1.5 shrink-0 rounded-full '+dotClass[status]} aria-hidden="true"/>
+                      <span className="whitespace-nowrap text-[12px] font-semibold">{slot.plate}</span>
+                    </HqButton>
+                  </span>;
                 })}
               </div>
             </div>)}

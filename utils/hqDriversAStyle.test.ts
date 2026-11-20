@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { matchDriverWithCardSlots } from '@/utils/driverDispatchCardVehicles';
 const r = (p: string) => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 const page = r('components/hq/drivers/HqDriversView.tsx');
 const table = r('components/hq/drivers/HqDriversTableView.tsx');
@@ -54,20 +55,20 @@ test('driver profile details, schedule and table actions remain hooked up', () =
   assert.match(detail, /setFilterAffiliation/);
 });
 
-test('driver table keeps mobile search larger, desktop search compact, names horizontal, and cache sync deferred out of state updaters',()=>{
-  const ui=r('components/hq/ui/index.tsx');
-  assert.match(table,/<HqSearchInput[\s\S]*aria-label="기사명 차종 연락처 검색"/);
-  assert.match(table,/<HqSearchInput[\s\S]*aria-label="기사 이름 연락처 검색"/);
-  assert.match(ui,/hq-ui-search-input h-12 sm:h-11 w-full rounded-\[14px\] bg-white pl-10 text-\[15px\] sm:text-\[14px\] font-medium text-\[#17233B\] outline-none placeholder:text-\[14px\] sm:placeholder:text-\[14px\]/);
-  assert.match(css,/input\.hq-ui-search-input::placeholder/);
-  assert.match(css,/\.hq-drivers-a input\.hq-ui-search-input::placeholder/);
-  assert.match(table,/<td className="py-4 px-5 whitespace-nowrap">/);
-  assert.match(table,/whitespace-nowrap font-bold text-slate-900/);
-  assert.match(table,/shrink-0 whitespace-nowrap px-1\.5 py-0\.5 rounded text-\[10px\]/);
-  assert.match(hook,/queueMicrotask\(/);
-  assert.doesNotMatch(hook,/setDrivers\(\(prev\) => [\s\S]*?(writeCache|setCounts)\(/);
-  assert.match(header,/sticky top-0 z-40/);
-  assert.match(table,/relative z-10 rounded-\[23px\]/);
+test('driver table keeps mobile search larger, desktop search compact, names horizontal, and cache sync deferred out of state updaters', () => {
+  const ui = r('components/hq/ui/index.tsx');
+  assert.match(table, /<HqSearchInput[\s\S]*aria-label="기사명 차종 연락처 검색"/);
+  assert.match(table, /<HqSearchInput[\s\S]*aria-label="기사 이름 연락처 검색"/);
+  assert.match(ui, /hq-ui-search-input h-12 sm:h-11 w-full rounded-\[14px\] bg-white pl-10 text-\[15px\] sm:text-\[14px\] font-medium text-\[#17233B\] outline-none placeholder:text-\[14px\] sm:placeholder:text-\[14px\]/);
+  assert.match(css, /input\.hq-ui-search-input::placeholder/);
+  assert.match(css, /\.hq-drivers-a input\.hq-ui-search-input::placeholder/);
+  assert.match(table, /<td className="py-4 px-5 whitespace-nowrap">/);
+  assert.match(table, /whitespace-nowrap font-bold text-slate-900/);
+  assert.match(table, /shrink-0 whitespace-nowrap px-1\.5 py-0\.5 rounded text-\[10px\]/);
+  assert.match(hook, /queueMicrotask\(/);
+  assert.doesNotMatch(hook, /setDrivers\(\(prev\) => [\s\S]*?(writeCache|setCounts)\(/);
+  assert.match(header, /sticky top-0 z-40/);
+  assert.match(table, /relative z-10 rounded-\[23px\]/);
 
   const picker = r('components/hq/drivers/HqDriverCardPickerModal.tsx');
   const quickFind = r('components/hq/drivers/HqDispatchCardQuickFindModal.tsx');
@@ -77,4 +78,47 @@ test('driver table keeps mobile search larger, desktop search compact, names hor
   assert.match(quickFind, /h-\[min\(680px,88dvh\)\]/);
   assert.match(css, /\.hq-ui-underline-tabs[\s\S]*scrollbar-width:\s*none/);
   assert.match(css, /\.hq-ui-underline-tabs::-webkit-scrollbar\s*\{\s*display:\s*none/);
+  assert.match(css, /@keyframes hqCardPlateFloat/);
+  assert.match(r('components/hq/drivers/HqDriverCardVehicleGroups.tsx'), /여깄어요!/);
+  assert.match(picker, /여깄어요!/);
+});
+
+test('multi-token driver search ("김승준 1336") finds driver via dispatch card slot and identifies the 1336 plate', () => {
+  const vehicleById = new Map([
+    ['v-1336', { uuid: 'v-1336', model: 'Mercedes Sprinter', modelShort: '스프린터 15인승', plate: '서울70바 1336' } as any],
+    ['v-9999', { uuid: 'v-9999', model: 'Carnival Hi-Limousine', modelShort: '카니발', plate: '서울70바 9999' } as any],
+  ]);
+  const coverage = {
+    id: 'drv-1',
+    slots: [
+      { vehicleId: 'v-1336', plate: '서울70바 1336', pc: true, mobile: true },
+      { vehicleId: 'v-9999', plate: '서울70바 9999', pc: false, mobile: false },
+    ],
+  } as any;
+
+  const matched = matchDriverWithCardSlots({
+    query: '김승준 1336',
+    driver: { name: '김승준', phone: '010-1234-5678', residence: '서울 강남', affiliationLabel: '소속' },
+    driverCoverage: coverage,
+    vehicleById,
+  });
+  assert.equal(matched.matched, true);
+  assert.deepEqual(matched.matchedVehicleIds, ['v-1336']);
+  assert.equal(matched.matchedHighlightLabel, '1336');
+
+  const wrongDriver = matchDriverWithCardSlots({
+    query: '홍길동 1336',
+    driver: { name: '김승준', phone: '010-1234-5678', residence: '서울 강남', affiliationLabel: '소속' },
+    driverCoverage: coverage,
+    vehicleById,
+  });
+  assert.equal(wrongDriver.matched, false);
+
+  const wrongPlate = matchDriverWithCardSlots({
+    query: '김승준 7777',
+    driver: { name: '김승준', phone: '010-1234-5678', residence: '서울 강남', affiliationLabel: '소속' },
+    driverCoverage: coverage,
+    vehicleById,
+  });
+  assert.equal(wrongPlate.matched, false);
 });

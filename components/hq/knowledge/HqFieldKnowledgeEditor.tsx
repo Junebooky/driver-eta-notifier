@@ -5,7 +5,7 @@ import {BookOpen,Camera,CheckCircle2,ChevronLeft,ImagePlus,Trash2} from 'lucide-
 import type {FieldKnowledgeItem,FieldKnowledgeCategory} from '@/types/fieldKnowledge';
 import {emptyFieldKnowledgeGuide} from '@/utils/fieldKnowledgeGuide';
 import {validateKnowledgePhoto} from '@/utils/fieldKnowledgeImageUpload';
-import {HqBadge,HqButton,HqCard,HqInput,HqTextarea,HqSegmentedTabs} from '@/components/hq/ui';
+import {HqBadge,HqButton,HqCard,HqFieldHint,HqFieldLabel,HqInput,HqSectionTitle,HqTextarea,HqSegmentedTabs} from '@/components/hq/ui';
 import {HqSearchSelect} from '@/components/hq/ui/HqSearchSelect';
 import {HqFieldKnowledgeStructuredForm} from './HqFieldKnowledgeStructuredForm';
 
@@ -19,7 +19,6 @@ interface Props {
 }
 const CATEGORIES:Exclude<FieldKnowledgeCategory,'전체'>[]=
   ['공항','호텔','식당','쇼핑','교통','긴급','기타'];
-const inputLabel='mb-1.5 block text-[12px] font-medium text-[#60728C]';
 export function HqFieldKnowledgeEditor({item,onChange,onSave,onCancel,onDelete,saving}:Props){
   const [tab,setTab]=useState<'guide'|'photos'>('guide');
   const [cover,setCover]=useState<File|null>(null);
@@ -61,10 +60,10 @@ export function HqFieldKnowledgeEditor({item,onChange,onSave,onCancel,onDelete,s
         <img src="/images/icons/knowledge/icon_knowledge.png" alt="" draggable={false}
           className="size-11 shrink-0 object-contain"/>
         <div>
-          <h2 className="text-[17px] font-semibold tracking-[-0.02em] text-[#17233B]">
+          <h2 className="text-[18px] sm:text-[17px] font-semibold tracking-[-0.02em] text-[#17233B]">
             {item.version?'현장 지식 수정':'현장 지식 등록'}
           </h2>
-          <p className="mt-0.5 text-[11px] text-[#8392A8]">정해진 양식으로 저장하면 모든 기사 화면에 같은 형식으로 표시됩니다.</p>
+          <HqFieldHint className="mt-0.5">정해진 양식으로 저장하면 모든 기사 화면에 같은 형식으로 표시됩니다.</HqFieldHint>
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -80,7 +79,7 @@ export function HqFieldKnowledgeEditor({item,onChange,onSave,onCancel,onDelete,s
     <HqCard className="p-4 sm:p-5">
       <div className="grid gap-4 md:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
         <div className="space-y-2">
-          <p className={inputLabel}>대표 이미지</p>
+          <HqFieldLabel>대표 이미지</HqFieldLabel>
           <div className="relative aspect-[4/3] overflow-hidden rounded-[15px] bg-[#F5F7FB]">
             <img src={coverPreview} alt={item.title||'대표 이미지'}
               className="size-full object-cover"/>
@@ -93,29 +92,29 @@ export function HqFieldKnowledgeEditor({item,onChange,onSave,onCancel,onDelete,s
           <input ref={coverRef} type="file" className="hidden" accept="image/png,image/jpeg,image/webp"
             aria-label="대표 이미지 파일 업로드" disabled={saving}
             onChange={event=>{selectCover(event.target.files?.[0]);event.target.value='';}}/>
-          <p className="text-[11px] leading-relaxed text-[#8A98AA]">파일 직접 업로드 · PNG/JPG/WebP · 각 8MB 이하. 최종 저장 시 서버에 업로드돼요.</p>
+          <HqFieldHint>파일 직접 업로드 · PNG/JPG/WebP · 각 8MB 이하. 최종 저장 시 서버에 업로드돼요.</HqFieldHint>
         </div>
         <div className="grid content-start gap-3 sm:grid-cols-2">
           <label className="block min-w-0 sm:col-span-2">
-            <span className={inputLabel}>장소명 *</span>
+            <HqFieldLabel>장소명 *</HqFieldLabel>
             <HqInput required maxLength={160} value={item.title}
               onChange={event=>onChange({...item,title:event.target.value})}
               placeholder="예: 안다즈 서울 강남"/>
           </label>
           <div className="min-w-0">
-            <p className={inputLabel}>카테고리 *</p>
+            <HqFieldLabel>카테고리 *</HqFieldLabel>
             <HqSearchSelect label="현장 지식 카테고리" placeholder="카테고리 선택" value={item.category} size="md"
               onChange={value=>onChange({...item,category:value as FieldKnowledgeItem['category'],categoryBadge:value})}
               options={CATEGORIES.map(value=>({value,label:value}))}/>
           </div>
           <label className="block min-w-0">
-            <span className={inputLabel}>한 줄 설명 <span className="text-[#9AA5B4]">({item.description.length}/100)</span></span>
+            <HqFieldLabel>한 줄 설명 <span className="text-[#9AA5B4]">({item.description.length}/100)</span></HqFieldLabel>
             <HqInput maxLength={100} value={item.description}
               onChange={event=>onChange({...item,description:event.target.value})}
               placeholder="장소 특징을 100자 이내로"/>
           </label>
           <label className="block min-w-0 sm:col-span-2">
-            <span className={inputLabel}>기사에게 보여줄 한 줄 안내</span>
+            <HqFieldLabel>기사에게 보여줄 한 줄 안내</HqFieldLabel>
             <HqInput maxLength={240} value={item.subtitle||''}
               onChange={event=>onChange({...item,subtitle:event.target.value})}
               placeholder="예: VIP 승하차는 정문 우측에서 진행"/>
@@ -131,24 +130,24 @@ export function HqFieldKnowledgeEditor({item,onChange,onSave,onCancel,onDelete,s
 
     {tab==='guide'&&<>
       <HqCard className="p-4 sm:p-5">
-        <h3 className="mb-3 flex items-center gap-2 text-[14px] font-semibold text-[#243750]">
+        <HqSectionTitle className="mb-3">
           <BookOpen className="size-4 text-[#8292A6]"/> 기본 연락처
-        </h3>
+        </HqSectionTitle>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block min-w-0 sm:col-span-2">
-            <span className={inputLabel}>주소</span>
+            <HqFieldLabel>주소</HqFieldLabel>
             <HqInput maxLength={500} value={item.address}
               onChange={event=>onChange({...item,address:event.target.value})}
               placeholder="예: 서울시 강남구 논현로 854"/>
           </label>
           <label className="block min-w-0">
-            <span className={inputLabel}>대표전화</span>
+            <HqFieldLabel>대표전화</HqFieldLabel>
             <HqInput type="tel" maxLength={150} value={item.phone||''}
               onChange={event=>onChange({...item,phone:event.target.value})}
               placeholder="02-123-4567"/>
           </label>
           <label className="block min-w-0">
-            <span className={inputLabel}>공식 웹사이트</span>
+            <HqFieldLabel>공식 웹사이트</HqFieldLabel>
             <HqInput type="url" maxLength={2048} value={item.website||''}
               onChange={event=>onChange({...item,website:event.target.value})}
               placeholder="https://"/>
@@ -162,8 +161,8 @@ export function HqFieldKnowledgeEditor({item,onChange,onSave,onCancel,onDelete,s
     {tab==='photos'&&<HqCard className="space-y-4 p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-[14px] font-semibold text-[#243750]">현장 사진 갤러리</h3>
-          <p className="mt-1 text-[11px] text-[#8392A8]">입구, 주차장, 승하차 지점 등 현장 참고 사진을 추가해 주세요.</p>
+          <HqSectionTitle>현장 사진 갤러리</HqSectionTitle>
+          <HqFieldHint className="mt-1">입구, 주차장, 승하차 지점 등 현장 참고 사진을 추가해 주세요.</HqFieldHint>
         </div>
         <HqButton variant="secondary" size="sm" disabled={saving||gallery.length>=25}
           onClick={()=>galleryRef.current?.click()}><ImagePlus className="size-4"/> 사진 업로드</HqButton>
@@ -186,10 +185,10 @@ export function HqFieldKnowledgeEditor({item,onChange,onSave,onCancel,onDelete,s
           </HqButton>
         </div>)}
       </div>
-      {!gallery.length&&<p className="py-8 text-center text-[12px] text-[#9BA8B7]">등록된 현장 사진이 없습니다.</p>}
+      {!gallery.length&&<p className="py-8 text-center text-[13px] sm:text-[12px] text-[#9BA8B7]">등록된 현장 사진이 없습니다.</p>}
     </HqCard>}
 
-    {issue&&<p role="alert" className="rounded-[13px] bg-[#FFF5F2] px-4 py-3 text-[12px] text-[#A95045]">{issue}</p>}
+    {issue&&<p role="alert" className="rounded-[13px] bg-[#FFF5F2] px-4 py-3 text-[13px] sm:text-[12px] text-[#A95045]">{issue}</p>}
     <div className="flex flex-wrap items-center justify-end gap-2 pb-6">
       <HqButton variant="secondary" disabled={saving} onClick={onCancel}>취소</HqButton>
       <HqButton variant="primary" disabled={saving||!item.title.trim()} loading={saving}

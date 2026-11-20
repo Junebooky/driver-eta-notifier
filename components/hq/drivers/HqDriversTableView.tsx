@@ -21,7 +21,11 @@ import { useHqDrivers } from '@/utils/useHqDrivers';
 import { haptics } from '@/utils/haptics';
 import { formatPhoneNumber } from '@/utils/formatters';
 import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
-import { summarizeDriverCardCoverage } from '@/utils/driverDispatchCardVehicles';
+import {
+  matchDriverWithCardSlots,
+  summarizeDriverCardCoverage,
+  type DriverSearchMatchResult,
+} from '@/utils/driverDispatchCardVehicles';
 import { HqButton, HqBadge, HqCard, HqSearchInput } from '@/components/hq/ui';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 import { HqDriverCardVehicleGroups } from './HqDriverCardVehicleGroups';
@@ -83,6 +87,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
   const [coverageLoading, setCoverageLoading] = useState(true);
   const [coverageError, setCoverageError] = useState('');
   const [expandedCardDriverIds, setExpandedCardDriverIds] = useState<Record<string, boolean>>({});
+  const [searchCollapsedDriverIds, setSearchCollapsedDriverIds] = useState<Record<string, boolean>>({});
   const [cardPickerDriverId, setCardPickerDriverId] = useState<string | null>(null);
   const [globalCardSearchOpen, setGlobalCardSearchOpen] = useState(false);
   const [cardPreviewTarget, setCardPreviewTarget] = useState<{ driverId: string; vehiclePlate?: string } | null>(null);
@@ -118,6 +123,31 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
     () => new Map((coverage?.drivers || []).map((item) => [item.id, item])),
     [coverage]
   );
+
+  const vehicleById = useMemo(
+    () => new Map((coverage?.vehicles || []).map((vehicle) => [vehicle.uuid, vehicle])),
+    [coverage?.vehicles]
+  );
+
+  useEffect(() => {
+    setSearchCollapsedDriverIds({});
+  }, [searchQuery]);
+
+  const searchMatchesByDriverId = useMemo(() => {
+    const map = new Map<string, DriverSearchMatchResult>();
+    for (const driver of drivers) {
+      map.set(
+        driver.id,
+        matchDriverWithCardSlots({
+          query: searchQuery,
+          driver,
+          driverCoverage: coverageByDriverId.get(driver.id),
+          vehicleById,
+        })
+      );
+    }
+    return map;
+  }, [drivers, searchQuery, coverageByDriverId, vehicleById]);
 
   const handleCardAssetUpdated = useCallback(() => {
     void refreshCoverage();
@@ -173,17 +203,10 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
         if (statusFilter === 'vacation' && driver.isAvailable) return false;
       }
 
-      // Search query
+      // Search query (supports multi-token e.g. "김승준 1336" across driver profile & card slots)
       if (searchQuery.trim()) {
-        const q = searchQuery.trim().toLowerCase();
-        const matches =
-          driver.name.toLowerCase().includes(q) ||
-          driver.phone.toLowerCase().includes(q) ||
-          driver.residence.toLowerCase().includes(q) ||
-          driver.affiliationLabel.toLowerCase().includes(q) ||
-          (driver.vehicleModel && driver.vehicleModel.toLowerCase().includes(q)) ||
-          (driver.carNumber && driver.carNumber.toLowerCase().includes(q));
-        if (!matches) return false;
+        const match = searchMatchesByDriverId.get(driver.id);
+        if (!match?.matched) return false;
       }
 
       return true;
@@ -196,7 +219,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
       }
       return a.name.localeCompare(b.name, 'ko');
     });
-  }, [drivers, affiliationFilter, residenceFilter, statusFilter, searchQuery]);
+  }, [drivers, affiliationFilter, residenceFilter, statusFilter, searchQuery, searchMatchesByDriverId]);
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(filteredDrivers.length / pageSize));
@@ -413,6 +436,8 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
               filteredDrivers.map(driver => {
                 const opStatus = getDriverStatus(driver);
                 const summary = summarizeDriverCardCoverage(coverageByDriverId.get(driver.id));
+                const searchMatch = searchMatchesByDriverId.get(driver.id);
+                const hasMatchedCard = Boolean(searchMatch?.matchedVehicleIds.length);
                 return <div key={driver.id} className="rounded-[17px] bg-white p-3.5 shadow-[0_3px_15px_rgba(35,49,78,0.065)]">
                   <button type="button" onClick={() => handleRowClick(driver.id)}
                     className="flex min-h-12 w-full items-center gap-3 text-left" aria-label={driver.name + ' 기사 프로필 보기'}>
@@ -435,6 +460,11 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                       disabled={!coverage && coverageLoading}
                       className="inline-flex min-h-11 items-center gap-2 rounded-[11px] px-2 text-[12px] font-semibold text-[#526680]">
                       배차카드 <span className="text-[#8D99A9]">{coverageLoading ? '조회 중' : coverageError ? '조회 실패' : summary.label}</span>
+                      {hasMatchedCard && searchMatch?.matchedHighlightLabel && (
+                        <span className="hq-card-plate-float inline-flex items-center rounded-full bg-[#1E60F3] px-2 py-0.5 text-[10px] font-bold text-white shadow-xs">
+                          {searchMatch.matchedHighlightLabel} 여깄어요!
+                        </span>
+                      )}
                       <ChevronRight className="size-3.5 text-[#9CA9BA]" />
                     </button>
                     {driver.phone && <a href={'tel:' + driver.phone} aria-label={driver.name + ' 전화 걸기'}
@@ -565,7 +595,10 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                 const hasForeignLanguage = foreignLanguages.length > 0;
                 const driverCoverage = coverageByDriverId.get(driver.id);
                 const cardSummary = summarizeDriverCardCoverage(driverCoverage);
-                const isCardExpanded = Boolean(expandedCardDriverIds[driver.id]);
+                const searchMatch = searchMatchesByDriverId.get(driver.id);
+                const matchedVehicleIds = searchMatch?.matchedVehicleIds || [];
+                const autoExpandForVehicle = matchedVehicleIds.length > 0 && !searchCollapsedDriverIds[driver.id];
+                const isCardExpanded = Boolean(expandedCardDriverIds[driver.id]) || autoExpandForVehicle;
 
                 return (
                   <Fragment key={driver.id}>
@@ -640,7 +673,13 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                             aria-label={`${driver.name} 배차카드 차량별 현황`}
                             onClick={() => {
                               haptics.lightTap();
-                              setExpandedCardDriverIds(prev => ({ ...prev, [driver.id]: !prev[driver.id] }));
+                              if (matchedVehicleIds.length > 0) {
+                                const nextExpanded = !isCardExpanded;
+                                setSearchCollapsedDriverIds(prev => ({ ...prev, [driver.id]: !nextExpanded }));
+                                setExpandedCardDriverIds(prev => ({ ...prev, [driver.id]: nextExpanded }));
+                              } else {
+                                setExpandedCardDriverIds(prev => ({ ...prev, [driver.id]: !prev[driver.id] }));
+                              }
                             }}
                             className={`inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-[12px] px-2 py-1 transition-colors ${isCardExpanded ? 'bg-[#EEF3FF]' : 'hover:bg-[#F3F6FB]'}`}
                           >
@@ -740,6 +779,8 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                               driverName={driver.name}
                               slots={driverCoverage.slots}
                               vehicles={coverage?.vehicles || []}
+                              highlightedVehicleIds={matchedVehicleIds}
+                              highlightLabel={searchMatch?.matchedHighlightLabel}
                               onView={slot => {
                                 haptics.lightTap();
                                 setCardPreviewTarget({ driverId: driver.id, vehiclePlate: slot.plate });
@@ -847,6 +888,8 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
           driverName={drivers.find(item => item.id === cardPickerDriverId)?.name || '기사'}
           slots={coverageByDriverId.get(cardPickerDriverId)?.slots || []}
           vehicles={coverage.vehicles}
+          highlightedVehicleIds={searchMatchesByDriverId.get(cardPickerDriverId)?.matchedVehicleIds}
+          highlightLabel={searchMatchesByDriverId.get(cardPickerDriverId)?.matchedHighlightLabel}
           onClose={() => setCardPickerDriverId(null)}
           onView={slot => {
             setCardPickerDriverId(null);

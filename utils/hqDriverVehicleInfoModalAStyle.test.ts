@@ -15,7 +15,9 @@ test('dispatch card A-plan modal keeps a white accessible dialog and both previe
   assert.match(component, /<HqSegmentedTabs aria-label="배차카드 미리보기 규격"/);
   assert.match(component, /id:'pc'/);
   assert.match(component, /id:'mobile'/);
-  assert.match(component, /navigator\.share/);
+  assert.match(component, /prepareSavedDispatchCardPng/);
+  assert.match(component, /shareDispatchCardPngPair/);
+  assert.doesNotMatch(component, /title:\s*['"]VIP LIMOUSINE KOREA 배차카드['"]/);
   assert.match(component, /누락 카드 만들기/);
   assert.match(component, /currentAsset\.signedUrl/);
   assert.match(component, /handleDownload/);

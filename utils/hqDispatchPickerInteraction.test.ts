@@ -43,6 +43,9 @@ test('existing and new dispatch share exactly one picker implementation', () => 
   assert.match(source, /allocations\.map\(\(allocation, index\) => renderAllocationSelector\(allocation, index\)\)/);
   assert.match(source, /initialBooking \? 'relative mt-2' : 'absolute left-0 top-full/);
   assert.match(source, /disabled=\{!v\.isAvailable \|\| !fleet\.data\}/);
+  assert.match(source, /<HqSegmentedTabs[\s\S]*variant="underline"[\s\S]*aria-label="배정 차량 차종 카테고리"/);
+  assert.match(source, /placeholder="차량명 또는 차량번호 검색"[\s\S]*containerClassName="w-full"/);
+  assert.match(source, /flex min-h-\[96px\][\s\S]*출발일/);
   assert.doesNotMatch(source, /setIsVehicleModalOpen|setIsDriverModalOpen|<HqVehicleSelectModal|<HqDriverSelectModal/);
 });
 

@@ -122,6 +122,18 @@ export const HqTextarea = forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttr
   return <textarea {...props} ref={ref} className={classes('hq-ui-field', 'hq-ui-textarea', className)} />;
 });
 
+export function HqFieldLabel({ className, children, ...props }: React.HTMLAttributes<HTMLSpanElement>) {
+  return <span {...props} className={classes('hq-ui-field-label', className)}>{children}</span>;
+}
+
+export function HqFieldHint({ className, children, ...props }: React.HTMLAttributes<HTMLParagraphElement>) {
+  return <p {...props} className={classes('hq-ui-field-hint', className)}>{children}</p>;
+}
+
+export function HqSectionTitle({ className, children, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
+  return <h3 {...props} className={classes('hq-ui-section-title', className)}>{children}</h3>;
+}
+
 export interface HqBadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   tone?: 'neutral' | 'selected' | 'warning' | 'critical';
   wrap?: boolean;

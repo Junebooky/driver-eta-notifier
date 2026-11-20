@@ -13,6 +13,8 @@ interface Props {
   driverName: string;
   slots: readonly DispatchCardCoverageSlot[];
   vehicles: readonly VipRealVehicle[];
+  highlightedVehicleIds?: readonly string[];
+  highlightLabel?: string;
   onClose: () => void;
   onView: (slot: DispatchCardCoverageSlot) => void;
   onCreate: (slot: DispatchCardCoverageSlot) => void;
@@ -20,10 +22,11 @@ interface Props {
 
 /** Mobile-first vehicle picker. A car is ONE row, not separate PC/mobile rows. */
 export function HqDriverCardPickerModal({
-  isOpen, driverName, slots, vehicles, onClose, onView, onCreate,
+  isOpen, driverName, slots, vehicles, highlightedVehicleIds = [], highlightLabel = '', onClose, onView, onCreate,
 }: Props) {
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const highlightedSet = useMemo(() => new Set(highlightedVehicleIds), [highlightedVehicleIds]);
 
   useEffect(() => {
     if (isOpen) {
@@ -109,19 +112,32 @@ export function HqDriverCardPickerModal({
             {group.entries.map(({ slot, status, modelLabel }, index) => {
               const ready = status !== 'photos_missing';
               const missing = status === 'missing';
+              const isHighlighted = highlightedSet.has(slot.vehicleId);
+              const bubbleTarget = highlightLabel || slot.plate.match(/\d{4}$/)?.[0] || slot.plate;
               const statusText = status === 'complete' ? '완료' : status === 'partial' ? '일부 등록' :
                 ready ? '미등록' : '이미지 미준비';
               return <button key={slot.vehicleId} type="button" disabled={!ready}
                 onClick={() => missing ? onCreate(slot) : onView(slot)}
                 aria-label={modelLabel + ' ' + slot.plate + ' ' + statusText + (missing ? ' 카드 만들기' : ' 카드 보기')}
-                className={'flex min-h-[67px] w-full items-center gap-3 px-3.5 py-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-65 ' + (index ? 'border-t border-[#F0F3F6] ' : '') + (ready ? 'hover:bg-[#F8FAFD]' : '')}>
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-[12px] bg-[#F6F8FA]">
-                  {ready ? <CarFront className="size-[19px] text-[#64748B]" /> :
+                className={'flex min-h-[67px] w-full items-center gap-3 px-3.5 py-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-65 ' +
+                  (index ? 'border-t border-[#F0F3F6] ' : '') +
+                  (isHighlighted ? 'bg-[#EEF3FF]/80 ring-1 ring-inset ring-[#1E60F3]/35 ' : '') +
+                  (ready ? 'hover:bg-[#F8FAFD]' : '')}>
+                <span className={'flex size-10 shrink-0 items-center justify-center rounded-[12px] ' +
+                  (isHighlighted ? 'bg-[#1E60F3]/12 text-[#1E60F3] hq-card-plate-float' : 'bg-[#F6F8FA]')}>
+                  {ready ? <CarFront className={'size-[19px] ' + (isHighlighted ? 'text-[#1E60F3]' : 'text-[#64748B]')} /> :
                     <ImageOff className="size-[18px] text-[#9AA6B5]" />}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[12px] font-medium text-[#74849A]">{modelLabel}</span>
-                  <span className="mt-0.5 block truncate text-[14px] font-semibold text-[#243750]">{slot.plate}</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="block truncate text-[12px] font-medium text-[#74849A]">{modelLabel}</span>
+                    {isHighlighted && (
+                      <span className="hq-card-plate-float inline-flex shrink-0 items-center rounded-full bg-[#1E60F3] px-2 py-0.5 text-[10px] font-bold text-white shadow-xs">
+                        {bubbleTarget} 여깄어요!
+                      </span>
+                    )}
+                  </span>
+                  <span className={'mt-0.5 block truncate text-[14px] font-semibold ' + (isHighlighted ? 'text-[#1E60F3]' : 'text-[#243750]')}>{slot.plate}</span>
                 </span>
                 <HqBadge tone={status === 'complete' ? 'selected' : status === 'partial' ? 'warning' : 'neutral'}>
                   {statusText}

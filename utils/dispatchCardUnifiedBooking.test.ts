@@ -38,7 +38,7 @@ test('booking dispatch card uses the same live driver x vehicle bundle and creat
   assert.match(bookingModal,/HqSegmentedTabs/);
   assert.match(bookingModal,/배차카드 만들기·갱신/);
   assert.match(bookingModal,/onOpenAssetManager\(booking\.driverId \|\| '', booking\.vehiclePlate \|\| ''\)/);
-  assert.match(bookingModal,/navigator\.share/);
+  assert.match(bookingModal,/shareDispatchCardPngPair/);
   assert.match(dashboard,/onOpenAssetManager=\{\(driverId,vehiclePlate\)=>/);
   assert.match(dashboard,/<HqBookingCardManagerLauncher/);
   assert.match(launcher,/<HqDriverAssetManagerModal/);

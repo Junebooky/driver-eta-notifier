@@ -23,6 +23,13 @@ import { DriverVehicleAssetBundle, DriverInfoDispatchLog } from '@/types/driverV
 import { haptics } from '@/utils/haptics';
 import { formatPhoneNumber } from '@/utils/formatters';
 import { HqButton, HqSegmentedTabs } from '@/components/hq/ui';
+import {
+  downloadDispatchCardPng,
+  prepareSavedDispatchCardPng,
+  shareDispatchCardPng,
+  shareDispatchCardPngPair,
+  supportsDispatchCardPairShare,
+} from '@/utils/shareDispatchCardPng';
 
 export interface HqDriverVehicleInfoModalProps {
   isOpen: boolean;
@@ -54,6 +61,14 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [prepared, setPrepared] = useState<Record<'pc' | 'mobile', { file: File; path: string } | null>>({
+    pc: null,
+    mobile: null,
+  });
+  const [preparing, setPreparing] = useState<Record<'pc' | 'mobile', boolean>>({
+    pc: false,
+    mobile: false,
+  });
   const [recipient, setRecipient] = useState(booking?.passengerPhone || '');
   const [manualDeliveryConfirmed, setManualDeliveryConfirmed] = useState(false);
   const submittingRef = useRef(false);
@@ -148,6 +163,44 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
     setFeedback(null);
   }, [isOpen, currentBookingId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setPrepared({ pc: null, mobile: null });
+    setPreparing({ pc: false, mobile: false });
+    if (!isOpen || !bundle) return;
+    for (const variant of ['pc', 'mobile'] as const) {
+      const asset = variant === 'pc' ? bundle.pcInfo : bundle.mobileInfo;
+      if (!asset?.filePath) continue;
+      setPreparing((previous) => ({ ...previous, [variant]: true }));
+      const path = asset.filePath;
+      const driverName = booking?.driverName || bundle.driverName || '기사';
+      const vehiclePlate = booking?.vehiclePlate || bundle.vehiclePlate || '차량';
+      const fileName = 'VIP_' + driverName + '_' + vehiclePlate + '_' + variant;
+      void prepareSavedDispatchCardPng(path, fileName)
+        .then((file) => {
+          if (!cancelled) {
+            setPrepared((previous) => ({ ...previous, [variant]: { file, path } }));
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setFeedback({
+              type: 'warning',
+              message: '배차카드 PNG 준비에 실패했습니다. 새로고침 후 다시 시도해 주세요.',
+            });
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setPreparing((previous) => ({ ...previous, [variant]: false }));
+          }
+        });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, bundle, booking?.driverName, booking?.vehiclePlate]);
+
   // Prevent the dispatch screen from moving behind the mobile modal.
   // Restore the previously focused control on close.
   useEffect(() => {
@@ -226,7 +279,29 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
     ? '/api/hq/drivers/assets/preview?path=' + encodeURIComponent(currentAsset.filePath) : '';
   const assetFileName = 'VIP_배차카드_' + (booking.driverName || '기사') +
     '_' + (booking.vehiclePlate || '차량') + '_' + activeTab + '.webp';
+
+  const pcPrepared = Boolean(
+    bundle?.pcInfo?.filePath && prepared.pc?.path === bundle.pcInfo.filePath && prepared.pc.file
+  );
+  const mobilePrepared = Boolean(
+    bundle?.mobileInfo?.filePath && prepared.mobile?.path === bundle.mobileInfo.filePath && prepared.mobile.file
+  );
+  const bothCardsReady = Boolean(bundle?.pcInfo?.filePath && bundle?.mobileInfo?.filePath);
+  const bothFilesPrepared = pcPrepared && mobilePrepared;
+  const sharePairFiles = bothFilesPrepared
+    ? ([prepared.pc!.file, prepared.mobile!.file] as [File, File])
+    : null;
+  const canNativePairShare = sharePairFiles ? supportsDispatchCardPairShare(sharePairFiles) : false;
+  const currentPreparedFile = activeTab === 'pc'
+    ? (pcPrepared ? prepared.pc!.file : null)
+    : (mobilePrepared ? prepared.mobile!.file : null);
+
   const handleDownload = () => {
+    if (currentPreparedFile) {
+      downloadDispatchCardPng(currentPreparedFile);
+      haptics.success();
+      return;
+    }
     if (!currentAssetUrl) return;
     const anchor=document.createElement('a');
     anchor.href=currentAssetUrl;
@@ -237,23 +312,41 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
     haptics.success();
   };
   const handleShare=async()=>{
-    if(!currentAssetUrl||isSharing)return;
-    if(!navigator.share){
-      setFeedback({type:'warning',message:'이 브라우저는 파일 공유를 지원하지 않아요. 이미지를 저장한 다음 직접 전송해 주세요.'});
-      return;
-    }
+    if(isSharing||preparing.pc||preparing.mobile)return;
     setIsSharing(true);
     try {
-      const response=await fetch(currentAssetUrl,{cache:'no-store'});
-      if(!response.ok)throw new Error('이미지 파일을 불러올 수 없습니다.');
-      const blob=await response.blob();
-      const file=new File([blob],assetFileName,{type:'image/webp'});
-      if(navigator.canShare&&!navigator.canShare({files:[file]}))
-        throw new Error('파일 공유를 지원하지 않는 환경입니다. 이미지를 저장해서 전송해 주세요.');
-      await navigator.share({files:[file],title:'VIP LIMOUSINE KOREA 배차카드'});
-      setFeedback({type:'success',message:'공유 메뉴를 열었어요. 실제 전달 여부는 확인한 뒤 기록해 주세요.'});
+      if(bothCardsReady){
+        if(!sharePairFiles){
+          setFeedback({type:'warning',message:'PC·모바일 배차카드 PNG를 준비하고 있습니다. 잠시 후 다시 시도해 주세요.'});
+          return;
+        }
+        const outcome=await shareDispatchCardPngPair(
+          sharePairFiles,
+          'VIP_'+(booking.driverName||'기사')+'_'+(booking.vehiclePlate||'차량')+'_PC_Mobile',
+        );
+        if(outcome==='shared'){
+          haptics.success();
+          setFeedback({type:'success',message:'PC·모바일 배차카드 공유 메뉴를 열었어요. 실제 전달 여부는 확인한 뒤 기록해 주세요.'});
+        }else if(outcome==='downloaded'){
+          haptics.success();
+          setFeedback({type:'success',message:'PC·모바일 PNG 두 장을 ZIP으로 저장했어요. 메신저에 첨부해 주세요.'});
+        }
+        return;
+      }
+      const singleFile=currentPreparedFile||(pcPrepared?prepared.pc!.file:mobilePrepared?prepared.mobile!.file:null);
+      if(!singleFile){
+        setFeedback({type:'warning',message:'공유할 배차카드 PNG 파일을 준비하고 있습니다. 잠시 후 다시 시도해 주세요.'});
+        return;
+      }
+      const outcome=await shareDispatchCardPng(singleFile);
+      if(outcome==='shared'){
+        haptics.success();
+        setFeedback({type:'success',message:'공유 메뉴를 열었어요. 실제 전달 여부는 확인한 뒤 기록해 주세요.'});
+      }else if(outcome==='downloaded'){
+        haptics.success();
+        setFeedback({type:'success',message:'배차카드 PNG 이미지를 저장했어요. 메신저에 첨부해 주세요.'});
+      }
     }catch(err){
-      if(err instanceof Error&&err.name==='AbortError')return;
       setFeedback({type:'warning',message:err instanceof Error?err.message:'공유할 수 없습니다. 이미지를 저장해 주세요.'});
     }finally{setIsSharing(false);}
   };
@@ -464,10 +557,25 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                     <HqButton variant="secondary" size="sm" onClick={handleDownload}>
                       <Download className="size-4"/> 이미지 저장
                     </HqButton>
-                    <HqButton variant="secondary" size="sm" disabled={isSharing}
-                      onClick={()=>{void handleShare();}}>
-                      {isSharing?<Loader2 className="size-4 animate-spin"/>:<Share2 className="size-4"/>}
-                      공유하기
+                    <HqButton
+                      variant="secondary"
+                      size="sm"
+                      disabled={
+                        isSharing ||
+                        preparing.pc ||
+                        preparing.mobile ||
+                        (bothCardsReady ? !bothFilesPrepared : !currentPreparedFile && !pcPrepared && !mobilePrepared)
+                      }
+                      onClick={() => { void handleShare(); }}
+                    >
+                      {isSharing || preparing.pc || preparing.mobile
+                        ? <Loader2 className="size-4 animate-spin" />
+                        : <Share2 className="size-4" />}
+                      {preparing.pc || preparing.mobile
+                        ? 'PNG 준비 중…'
+                        : bothCardsReady
+                          ? (canNativePairShare ? 'PC·모바일 함께 공유' : 'PC·모바일 ZIP 저장')
+                          : '공유하기'}
                     </HqButton>
                   </>}
                 </div>

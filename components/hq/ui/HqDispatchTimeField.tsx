@@ -100,10 +100,10 @@ export function HqDispatchTimeField({
       ref={rootRef}
       className={compact
         ? 'relative min-w-0 self-start'
-        : 'min-w-0 self-start rounded-[20px] bg-white p-4 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-5'}
+        : 'min-w-0 self-start rounded-[20px] bg-white px-4 py-4 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:px-5'}
       data-hq-dispatch-time={label}
     >
-      <div className={compact ? 'flex items-end gap-2' : 'flex items-center gap-3'}>
+      <div className={compact ? 'flex items-end gap-2' : 'flex min-h-[64px] items-center gap-3'}>
         {!compact && <Clock aria-hidden="true" className="h-5 w-5 shrink-0 text-[#8290A1]" strokeWidth={1.8} />}
         <div className="min-w-0 flex-1">
           <label htmlFor={id} className={compact ? 'mb-1.5 block text-xs font-bold text-[#17233B]' : 'block text-[12px] font-medium text-[#73839D]'}>
@@ -147,7 +147,7 @@ export function HqDispatchTimeField({
             }}
             className={compact
               ? 'h-11 w-full min-w-0 rounded-[13px] bg-white px-3 text-[14px] font-semibold tabular-nums text-[#17233B] shadow-[0_4px_14px_rgba(35,49,78,0.045)] outline-none placeholder:text-[#9AA6B6] focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 disabled:cursor-not-allowed disabled:opacity-50 sm:h-12'
-              : 'mt-1.5 min-h-9 w-full min-w-0 rounded-[12px] bg-[#FAFBFD] px-3 text-[14px] font-semibold tabular-nums text-[#17233B] outline-none placeholder:text-[#9AA6B6] focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 disabled:cursor-not-allowed disabled:opacity-50'}
+              : 'mt-1.5 h-9 min-h-9 w-full min-w-0 rounded-[12px] bg-[#FAFBFD] px-3 text-[14px] font-semibold tabular-nums text-[#17233B] outline-none placeholder:text-[#9AA6B6] focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 disabled:cursor-not-allowed disabled:opacity-50'}
           />
         </div>
         <button
