@@ -9,18 +9,12 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  MoreHorizontal,
   Phone,
   Loader2,
   ShieldAlert,
   AlertTriangle,
   Key,
   RefreshCw,
-  Edit3,
-  UserCheck,
-  UserMinus,
-  User,
-  Trash2,
 } from 'lucide-react';
 import { HqDriverSummary } from '@/types/driverHq';
 import type { DispatchCardCoverage } from '@/lib/dispatchCards/dispatchCardCoverage';
@@ -30,10 +24,9 @@ import { formatPhoneNumber } from '@/utils/formatters';
 import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
 import { summarizeDriverCardCoverage } from '@/utils/driverDispatchCardVehicles';
 import { HqButton, HqBadge, HqCard } from '@/components/hq/ui';
-import { HqDriverEditModal } from './HqDriverEditModal';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
-import { HqModal } from '@/components/hq/ui/HqModal';
 import { HqDriverCardVehicleGroups } from './HqDriverCardVehicleGroups';
+import { HqDriverCardPickerModal } from './HqDriverCardPickerModal';
 import { HqDriverAssetManagerModal } from './HqDriverAssetManagerModal';
 import { HqDispatchCardBuilderModal } from './HqDispatchCardBuilderModal';
 
@@ -69,8 +62,6 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
   statusCode: propStatusCode,
   onRetry: propOnRetry,
   onOpenLogin,
-  onUpdateDriver: propOnUpdateDriver,
-  onDeleteDriver: propOnDeleteDriver,
   onCardAssetUpdated,
 }) => {
   // If not passed from parent, use the custom hook
@@ -78,8 +69,6 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
   const drivers = propDrivers ?? hookState.drivers;
   const counts = propCounts ?? hookState.counts;
   const isLoading = propIsLoading ?? hookState.isLoading;
-  const updateDriver = propOnUpdateDriver ?? hookState.updateDriver;
-  const deleteDriver = propOnDeleteDriver ?? hookState.deleteDriver;
   const error = propError ?? hookState.error;
   const statusCode = propStatusCode ?? hookState.statusCode;
   const onRetry = propOnRetry ?? hookState.refetch;
@@ -89,21 +78,11 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
   const [residenceFilter, setResidenceFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'driving' | 'off' | 'active' | 'vacation'>('all');
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [menuOpenDriverId, setMenuOpenDriverId] = useState<string | null>(null);
-  const [menuPosition, setMenuPosition] = useState<{
-    top?: number;
-    bottom?: number;
-    right: number;
-  } | null>(null);
-  const [editingDriver, setEditingDriver] = useState<HqDriverSummary | null>(null);
-  const [driverIconError, setDriverIconError] = useState(false);
-  const [driverToRemove, setDriverToRemove] = useState<HqDriverSummary | null>(null);
-  const [removingDriver, setRemovingDriver] = useState(false);
-  const [removeError, setRemoveError] = useState('');
   const [coverage, setCoverage] = useState<DispatchCardCoverage | null>(null);
   const [coverageLoading, setCoverageLoading] = useState(true);
   const [coverageError, setCoverageError] = useState('');
   const [expandedCardDriverIds, setExpandedCardDriverIds] = useState<Record<string, boolean>>({});
+  const [cardPickerDriverId, setCardPickerDriverId] = useState<string | null>(null);
   const [cardPreviewTarget, setCardPreviewTarget] = useState<{ driverId: string; vehiclePlate?: string } | null>(null);
   const [cardBuilderTarget, setCardBuilderTarget] = useState<{ driver: HqDriverSummary; vehicleId?: string } | null>(null);
   const pageSize = 10;
@@ -279,8 +258,8 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
         </div>
       </div>
 
-      {/* 1. Control & Filter Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-5 text-[12px] sm:px-6">
+      {/* Desktop filters: mobile has its own compact search & tabs. */}
+      <div className="hidden lg:flex flex-wrap items-center justify-between gap-3 px-5 pb-5 text-[12px] sm:px-6">
         {/* Left: Affiliation & Dropdown Filters */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Affiliation Tabs */}
@@ -394,8 +373,72 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
         </div>
       </div>
 
-      {/* 3. Driver Table (Toss / Apple Style 5 Columns) */}
-      <div className="overflow-x-auto">
+      {/* Mobile: each driver opens a full detail view; the card action stays separate. */}
+      <section className="space-y-3 px-4 pb-5 lg:hidden" aria-label="모바일 기사 목록">
+        <label className="flex min-h-11 items-center gap-2.5 rounded-[13px] bg-[#F6F8FA] px-3.5">
+          <Search aria-hidden="true" className="size-4 shrink-0 text-[#8795A7]"/>
+          <input type="search" aria-label="기사 이름 연락처 검색"
+            value={searchQuery} onChange={event=>{setSearchQuery(event.target.value);setCurrentPage(1);}}
+            placeholder="기사 이름, 연락처 검색"
+            className="min-w-0 flex-1 bg-transparent py-3 text-[13px] text-[#243750] outline-none placeholder:text-[#9AA6B5]"/>
+        </label>
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+          {([{key:'all',label:'전체',count:counts.total},{key:'employed',label:'소속',count:counts.employed},
+            {key:'freelance',label:'프리랜서',count:counts.freelance}] as const).map(item=>
+            <button type="button" key={item.key} onClick={()=>{setAffiliationFilter(item.key);setCurrentPage(1);}}
+              aria-pressed={affiliationFilter===item.key}
+              className={'min-h-10 shrink-0 rounded-[12px] px-3.5 text-[12px] font-semibold transition-colors '+
+                (affiliationFilter===item.key?'bg-[#EEF3FF] text-[#1E60F3]':'bg-[#F7F9FC] text-[#6C7C91]')}>
+              {item.label} {item.count}
+            </button>)}
+          <button type="button" onClick={()=>setCardPreviewTarget({driverId:drivers[0]?.id||''})}
+            disabled={!drivers.length} className="ml-auto min-h-10 shrink-0 rounded-[12px] px-3 text-[12px] font-semibold text-[#526680] disabled:opacity-40">
+            전체 카드 찾기
+          </button>
+        </div>
+        {isLoading?<p role="status" className="py-12 text-center text-[12px] text-[#8190A4]">기사 목록을 불러오는 중…</p>:
+          error?<div role="alert" className="space-y-2 rounded-[14px] bg-[#FFF7F5] p-4 text-[12px] text-[#9B5F56]">
+            <p>{error}</p><button type="button" onClick={onRetry} className="min-h-10 font-semibold underline">다시 시도</button>
+            {(statusCode===401||statusCode===403)&&<button type="button" onClick={onOpenLogin} className="ml-4 min-h-10 font-semibold underline">관리자 로그인</button>}
+          </div>:
+          !filteredDrivers.length?<p className="py-12 text-center text-[12px] text-[#8190A4]">조건에 맞는 기사가 없습니다.</p>:
+          filteredDrivers.map(driver=>{
+            const opStatus=getDriverStatus(driver);
+            const summary=summarizeDriverCardCoverage(coverageByDriverId.get(driver.id));
+            return <div key={driver.id} className="rounded-[17px] bg-white p-3.5 shadow-[0_3px_15px_rgba(35,49,78,0.065)]">
+              <button type="button" onClick={()=>handleRowClick(driver.id)}
+                className="flex min-h-12 w-full items-center gap-3 text-left" aria-label={driver.name+' 기사 프로필 보기'}>
+                <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#F3F5F8] text-[15px] font-semibold text-[#526680]">
+                  {driver.avatarUrl?<img src={driver.avatarUrl} alt="" className="size-full object-cover"/>:driver.name.slice(0,1)}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2">
+                    <span className="truncate text-[14px] font-semibold text-[#17233B]">{driver.name}</span>
+                    {driver.affiliationType==='employed'&&<span className="text-[11px] text-[#73839D]">소속</span>}
+                  </span>
+                  <span className="mt-1 block text-[11px] text-[#8190A4]">
+                    {opStatus==='driving'?'운행 중':opStatus==='off'?'휴무':'운행 가능'}
+                  </span>
+                </span>
+                <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-[#9CA9BA]"/>
+              </button>
+              <div className="mt-3 flex items-center justify-between border-t border-[#F1F3F6] pt-2.5">
+                <button type="button" onClick={()=>setCardPickerDriverId(driver.id)}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-[11px] px-2 text-[12px] font-semibold text-[#526680]">
+                  배차카드 <span className="text-[#8D99A9]">{coverageLoading?'조회 중':summary.label}</span>
+                  <ChevronRight className="size-3.5 text-[#9CA9BA]"/>
+                </button>
+                {driver.phone&&<a href={'tel:'+driver.phone} aria-label={driver.name+' 전화 걸기'}
+                  className="inline-flex size-11 items-center justify-center rounded-full bg-[#F6F8FA] text-[#60728B]">
+                  <Phone className="size-[17px]"/>
+                </a>}
+              </div>
+            </div>;
+          })}
+      </section>
+
+      {/* 3. Driver Table (desktop) */}
+      <div className="hidden overflow-x-auto lg:block">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/60 text-xs font-medium text-slate-400 select-none">
@@ -404,13 +447,12 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
               <th className="py-3.5 px-5 font-medium">배차카드</th>
               <th className="py-3.5 px-5 font-medium">연락처</th>
               <th className="py-3.5 px-5 font-medium">지원 언어</th>
-              <th className="py-3.5 px-5 font-medium text-right w-24">더보기</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="py-16 text-center text-slate-400">
+                <td colSpan={5} className="py-16 text-center text-slate-400">
                   <Loader2 className="w-8 h-8 mx-auto text-[#1E60F3] animate-spin mb-3" />
                   <p className="font-bold text-slate-600">실시간 기사 데이터 동기화 중...</p>
                 </td>
@@ -418,7 +460,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
             ) : error ? (
               statusCode === 401 || statusCode === 403 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 px-4 text-center">
+                  <td colSpan={5} className="py-12 px-4 text-center">
                     <div className="max-w-md mx-auto p-6 bg-amber-50/80 border border-amber-200/90 rounded-3xl space-y-3 shadow-sm">
                       <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto shadow-xs">
                         <ShieldAlert className="w-6 h-6 text-amber-600" />
@@ -459,7 +501,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                 </tr>
               ) : (
                 <tr>
-                  <td colSpan={6} className="py-12 px-4 text-center">
+                  <td colSpan={5} className="py-12 px-4 text-center">
                     <div className="max-w-md mx-auto p-6 bg-rose-50/80 border border-rose-200/90 rounded-3xl space-y-3 shadow-sm">
                       <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center mx-auto shadow-xs">
                         <AlertTriangle className="w-6 h-6 text-rose-600" />
@@ -491,7 +533,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
               )
             ) : paginatedDrivers.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-12 text-center text-slate-400">
+                <td colSpan={5} className="py-12 text-center text-slate-400">
                   <Users className="w-8 h-8 mx-auto text-slate-300 mb-2" />
                   <p className="font-bold text-slate-600">
                     {drivers.length === 0
@@ -640,131 +682,10 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                       ) : null}
                     </td>
 
-                    {/* 5열: 더보기 (··· 아이콘 클릭 시 소속 전환 및 정보 수정 팝오버) */}
-                    <td className="py-4 px-5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end relative">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            haptics.lightTap();
-                            if (menuOpenDriverId === driver.id) {
-                              setMenuOpenDriverId(null);
-                              setMenuPosition(null);
-                              return;
-                            }
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            const right = Math.max(12, window.innerWidth - rect.right);
-                            const openUpward = rect.bottom + 185 > window.innerHeight;
-                            setMenuPosition(
-                              openUpward
-                                ? { bottom: window.innerHeight - rect.top + 6, right }
-                                : { top: rect.bottom + 6, right }
-                            );
-                            setMenuOpenDriverId(driver.id);
-                          }}
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${menuOpenDriverId === driver.id
-                            ? 'bg-[#EEF3FF] text-[#31598F]'
-                            : 'hover:bg-slate-100 text-slate-400 hover:text-slate-700'
-                            }`}
-                          title="기사 관리 메뉴"
-                        >
-                          <MoreHorizontal className="w-4 h-4" />
-                        </button>
-
-                        {/* Dropdown Menu (Fixed Top-Layer Portal Style so it is never clipped by overflow or covered by footer) */}
-                        {menuOpenDriverId === driver.id && menuPosition && (
-                          <>
-                            <div
-                              className="fixed inset-0 z-[9990]"
-                              onClick={() => {
-                                setMenuOpenDriverId(null);
-                                setMenuPosition(null);
-                              }}
-                            />
-                            <div
-                              style={{
-                                top: menuPosition.top,
-                                bottom: menuPosition.bottom,
-                                right: menuPosition.right,
-                              }}
-                              className="fixed z-[9999] w-44 bg-white rounded-2xl shadow-[0_14px_36px_rgba(15,23,42,0.16)] border border-slate-200/90 p-1.5 text-xs text-left animate-in fade-in zoom-in-95 duration-100"
-                            >
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setMenuOpenDriverId(null);
-                                  setMenuPosition(null);
-                                  handleRowClick(driver.id);
-                                }}
-                                className="w-full py-2 px-3 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer transition-colors"
-                              >
-                                <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                <span>프로필 보기</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  haptics.selection();
-                                  setMenuOpenDriverId(null);
-                                  setMenuPosition(null);
-                                  const targetAffiliation = driver.affiliationType === 'employed' ? 'freelance' : 'employed';
-                                  await updateDriver(driver.id, { affiliationType: targetAffiliation });
-                                }}
-                                className="w-full py-2 px-3 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer transition-colors"
-                              >
-                                {driver.affiliationType === 'employed' ? (
-                                  <>
-                                    <UserMinus className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                    <span>프리랜서로 변경</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <UserCheck className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                    <span>소속 기사로 변경</span>
-                                  </>
-                                )}
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  haptics.lightTap();
-                                  setMenuOpenDriverId(null);
-                                  setMenuPosition(null);
-                                  setEditingDriver(driver);
-                                }}
-                                className="w-full py-2 px-3 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer transition-colors"
-                              >
-                                <Edit3 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                <span>정보 수정</span>
-                              </button>
-
-                              <div className="my-1 border-t border-slate-100" />
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  haptics.warningPulse();
-                                  setMenuOpenDriverId(null);
-                                  setMenuPosition(null);
-                                  setRemoveError('');
-                                  setDriverToRemove(driver);
-                                }}
-                                className="w-full py-2 px-3 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer transition-colors"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                                <span>등록 해제</span>
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </td>
                   </tr>
                   {isCardExpanded && driverCoverage && (
                     <tr className="bg-[#FAFBFD]">
-                      <td colSpan={6} className="px-5 py-3.5">
+                      <td colSpan={5} className="px-5 py-3.5">
                         <HqCard className="space-y-3 p-3.5 sm:p-4">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex flex-wrap items-center gap-1.5">
@@ -834,7 +755,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
       </div>
 
       {/* 4. Table Footer (Pagination & Count) */}
-      <div className="p-4 sm:px-6 border-t border-slate-100 flex flex-wrap items-center justify-between gap-4 text-xs bg-white">
+      <div className="hidden p-4 sm:px-6 border-t border-slate-100 lg:flex flex-wrap items-center justify-between gap-4 text-xs bg-white">
         <div className="flex items-center gap-2 text-slate-500 font-medium">
           <span>
             총 <strong className="font-bold text-slate-900">{filteredDrivers.length}명</strong>의 기사님이 등록되어 있어요
@@ -898,65 +819,21 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
         </div>
       </div>
 
-      <HqModal
-        isOpen={Boolean(driverToRemove)}
-        title="기사 등록 해제"
-        subtitle={driverToRemove ? `${driverToRemove.name} 기사님의 등록 상태를 변경합니다.` : undefined}
-        onClose={() => { if (!removingDriver) { setDriverToRemove(null); setRemoveError(''); } }}
-        footer={
-          <>
-            <button type="button" disabled={removingDriver}
-              onClick={() => { setDriverToRemove(null); setRemoveError(''); }}
-              className="min-h-11 rounded-[13px] bg-[#F7F9FC] px-4 text-[12px] font-semibold text-[#60728B] disabled:opacity-50">
-              취소
-            </button>
-            <button type="button" disabled={removingDriver}
-              onClick={async () => {
-                if (!driverToRemove || removingDriver) return;
-                setRemovingDriver(true);
-                setRemoveError('');
-                try {
-                  const ok = await deleteDriver(driverToRemove.id);
-                  if (!ok) {
-                    setRemoveError('등록 해제에 실패했습니다. 서버 연결과 배차 상태를 확인해 주세요.');
-                    return;
-                  }
-                  haptics.success();
-                  setDriverToRemove(null);
-                } catch (error) {
-                  setRemoveError(error instanceof Error ? error.message : '등록 해제에 실패했습니다.');
-                } finally {
-                  setRemovingDriver(false);
-                }
-              }}
-              className="min-h-11 rounded-[13px] bg-[#A85C54] px-4 text-[12px] font-semibold text-white disabled:opacity-50">
-              {removingDriver ? '등록 해제 중…' : '등록 해제'}
-            </button>
-          </>
-        }
-      >
-        <p className="text-[13px] leading-relaxed text-[#5D6C82]">
-          등록 해제된 기사는 새 배차에 지정할 수 없습니다. 기존 운행 기록이 있는 경우 기사 배정만 해제될 수 있습니다.
-        </p>
-        {removeError && (
-          <p role="alert" className="mt-3 rounded-[12px] bg-[#FFF5F3] p-3 text-[12px] font-medium text-[#A45B54]">
-            {removeError}
-          </p>
-        )}
-      </HqModal>
-
-      {/* Driver Edit Modal */}
-      {editingDriver && (
-        <HqDriverEditModal
-          isOpen={Boolean(editingDriver)}
-          onClose={() => setEditingDriver(null)}
-          driver={editingDriver}
-          onSave={async (id, updates) => {
-            const ok = await updateDriver(id, updates);
-            if (ok) {
-              setEditingDriver(null);
-            }
-            return ok;
+      {cardPickerDriverId && coverage && ( 
+        <HqDriverCardPickerModal
+          isOpen
+          driverName={drivers.find(item=>item.id===cardPickerDriverId)?.name||'기사'}
+          slots={coverageByDriverId.get(cardPickerDriverId)?.slots||[]}
+          vehicles={coverage.vehicles}
+          onClose={()=>setCardPickerDriverId(null)}
+          onView={slot=>{
+            setCardPickerDriverId(null);
+            setCardPreviewTarget({driverId:cardPickerDriverId,vehiclePlate:slot.plate});
+          }}
+          onCreate={slot=>{
+            const driver=drivers.find(item=>item.id===cardPickerDriverId);
+            setCardPickerDriverId(null);
+            if(driver)setCardBuilderTarget({driver,vehicleId:slot.vehicleId});
           }}
         />
       )}
