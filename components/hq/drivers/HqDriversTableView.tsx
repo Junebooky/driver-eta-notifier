@@ -79,6 +79,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
   const [residenceFilter, setResidenceFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'driving' | 'off' | 'active' | 'vacation'>('all');
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [driverIconError, setDriverIconError] = useState(false);
   const [coverage, setCoverage] = useState<DispatchCardCoverage | null>(null);
   const [coverageLoading, setCoverageLoading] = useState(true);
   const [coverageError, setCoverageError] = useState('');
