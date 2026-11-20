@@ -14,11 +14,15 @@ export interface EmailFlightHintInfo {
 }
 
 const VALID_FLIGHT_RE = /^([A-Z]{2}|[A-Z]\d|\d[A-Z])\d{1,4}$/;
+const KOREAN_AIRPORTS = new Set(['ICN', 'GMP', 'PUS', 'CJU', 'TAE', 'CJJ', 'MWX']);
+const SEOUL_AIRPORTS = new Set(['ICN', 'GMP']);
 const GMP_INTL_PARTNERS = new Set(['HND', 'NRT', 'KIX', 'SHA', 'PVG', 'PEK', 'PKX', 'TSA', 'TPE', 'HKG']);
 const GMP_DOM_PARTNERS = new Set(['CJU', 'PUS', 'USN', 'KWJ', 'RSU', 'MWX', 'YNY']);
 const GMP_REGIONAL_AIRLINE_RE = /^(?:KE21\d{2}|OZ10\d{2}|JL9\d{1,2}|NH86\d|NH87\d|BR15\d|CI26\d|FM82\d|MU5\d{2}|CZ3\d{2})$/;
 
 const IATA_CITY_KO: Record<string, string> = {
+  ICN: '인천공항',
+  GMP: '김포공항',
   HND: '도쿄(하네다)',
   NRT: '도쿄(나리타)',
   KIX: '오사카',
@@ -43,6 +47,75 @@ const IATA_CITY_KO: Record<string, string> = {
   CJU: '제주',
   PUS: '부산',
 };
+
+export interface ResolvedFlightHintDirection {
+  queryType: FlightType;
+  localAirportCode?: string;
+  partnerCode?: string;
+}
+
+/**
+ * Resolves which Korean airport is the local ground-pickup/dropoff airport and
+ * whether the leg is an arrival or departure without creating impossible pairs
+ * like "인천공항 ... · GMP행" when only GMP departure was mentioned.
+ */
+export function resolveFlightHintDirection(params: {
+  originAirport?: string | null;
+  destinationAirport?: string | null;
+  role?: 'arrival' | 'departure' | 'connection' | 'unknown';
+  scheduledArrival?: string | null;
+  scheduledDeparture?: string | null;
+}): ResolvedFlightHintDirection | null {
+  const origin = params.originAirport?.trim().toUpperCase() || undefined;
+  const destination = params.destinationAirport?.trim().toUpperCase() || undefined;
+  const originInKorea = Boolean(origin && KOREAN_AIRPORTS.has(origin));
+  const destInKorea = Boolean(destination && KOREAN_AIRPORTS.has(destination));
+
+  // Case 1: Departs Korea -> Foreign airport
+  if (originInKorea && !destInKorea) {
+    return { queryType: 'departure', localAirportCode: origin, partnerCode: destination };
+  }
+
+  // Case 2: Destination is a Korean airport, origin is not
+  if (destInKorea && !originInKorea) {
+    if (origin) {
+      return { queryType: 'arrival', localAirportCode: destination, partnerCode: origin };
+    }
+    const departureOnly =
+      params.role === 'departure' ||
+      (Boolean(params.scheduledDeparture?.trim()) && !params.scheduledArrival?.trim());
+    if (departureOnly) {
+      return { queryType: 'departure', localAirportCode: destination, partnerCode: undefined };
+    }
+    return { queryType: 'arrival', localAirportCode: destination, partnerCode: undefined };
+  }
+
+  // Case 3: Both origin and destination are in Korea
+  if (originInKorea && destInKorea) {
+    if (origin && destination && SEOUL_AIRPORTS.has(origin) && SEOUL_AIRPORTS.has(destination)) {
+      const localAirportCode = origin === 'GMP' || destination === 'GMP' ? 'GMP' : origin;
+      const queryType: FlightType = params.role === 'departure' ? 'departure' : 'arrival';
+      return { queryType, localAirportCode, partnerCode: undefined };
+    }
+    const queryType: FlightType = params.role === 'departure' ? 'departure' : 'arrival';
+    return {
+      queryType,
+      localAirportCode: queryType === 'departure' ? origin : destination,
+      partnerCode: queryType === 'departure' ? destination : origin,
+    };
+  }
+
+  // Case 4: Neither origin nor destination is in Korea
+  if (origin && destination) {
+    return null;
+  }
+  const queryType: FlightType = params.role === 'departure' ? 'departure' : 'arrival';
+  return {
+    queryType,
+    localAirportCode: undefined,
+    partnerCode: queryType === 'arrival' ? origin : destination,
+  };
+}
 
 export function normalizeFlightCode(raw?: string | null): string | null {
   if (!raw) return null;
@@ -116,23 +189,26 @@ export function buildFallbackFlightHint(params: {
   const code = normalizeFlightCode(params.flightNumber);
   if (!code) return null;
 
-  const origin = params.originAirport?.trim().toUpperCase();
-  const destination = params.destinationAirport?.trim().toUpperCase();
-  const isDeparture = params.role === 'departure' || (origin === 'ICN' || origin === 'GMP');
-  const queryType: FlightType = isDeparture ? 'departure' : 'arrival';
-  const partnerCode = queryType === 'arrival' ? origin : destination;
-  const localAirportCode = queryType === 'arrival' ? destination : origin;
+  const direction = resolveFlightHintDirection(params);
+  if (!direction) return null;
+
+  const { queryType, localAirportCode } = direction;
+  let { partnerCode } = direction;
+
+  if (
+    partnerCode &&
+    (partnerCode === localAirportCode ||
+      (localAirportCode && SEOUL_AIRPORTS.has(localAirportCode) && SEOUL_AIRPORTS.has(partnerCode)))
+  ) {
+    partnerCode = undefined;
+  }
 
   let airportLabel = '인천공항';
   let terminalLabel = resolveTerminal(undefined, code, params.date).terminal;
 
   if (localAirportCode === 'GMP') {
     airportLabel = '김포공항';
-    if (partnerCode && GMP_DOM_PARTNERS.has(partnerCode)) {
-      terminalLabel = '국내선';
-    } else {
-      terminalLabel = '국제선';
-    }
+    terminalLabel = partnerCode && GMP_DOM_PARTNERS.has(partnerCode) ? '국내선' : '국제선';
   } else if (localAirportCode === 'PUS') {
     airportLabel = '김해공항';
     terminalLabel = partnerCode && GMP_DOM_PARTNERS.has(partnerCode) ? '국내선' : '국제선';

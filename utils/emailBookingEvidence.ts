@@ -124,19 +124,32 @@ export function extractFlightEvidence(body: string, pickupDate: string): EmailFl
       const pair = windowText.toUpperCase().match(/\b([A-Z]{3})\s*[-–/→>]\s*([A-Z]{3})\b/);
       let origin = pair?.[1] || windowText.toUpperCase().match(/\bFROM\s+([A-Z]{3})\b/)?.[1];
       let destination = pair?.[2] || windowText.toUpperCase().match(/\b(?:INTO|TO)\s+([A-Z]{3})\b/)?.[1];
-      if (!destination && origin !== 'GMP' && /\bGMP\b|gimpo|김포/i.test(windowText)) destination = 'GMP';
-      if (!destination && origin !== 'ICN' && /\bICN\b|incheon|인천/i.test(windowText)) destination = 'ICN';
+      const hasDepartureCue = /\b(?:depart(?:ing|ure)?|leave\s+for|flight\s+out)\b|출발|출국/i.test(windowText);
+      const hasArrivalCue = /\b(?:arriving|arrive|arrival)\b|도착|입국/i.test(windowText);
+      const mentionedGmp = /\bGMP\b|gimpo|김포/i.test(windowText);
+      const mentionedIcn = /\bICN\b|incheon|인천/i.test(windowText);
+
+      if (hasDepartureCue && !hasArrivalCue) {
+        if (!origin && mentionedGmp && destination !== 'GMP') origin = 'GMP';
+        if (!origin && mentionedIcn && destination !== 'ICN') origin = 'ICN';
+      } else {
+        if (!destination && origin !== 'GMP' && mentionedGmp) destination = 'GMP';
+        if (!destination && origin !== 'ICN' && mentionedIcn) destination = 'ICN';
+      }
       if (!origin && !destination) continue;
 
-      const role: EmailFlightLeg['role'] = destination && KOREAN_AIRPORTS.has(destination)
-        ? 'arrival'
-        : origin && KOREAN_AIRPORTS.has(origin)
+      const role: EmailFlightLeg['role'] =
+        hasDepartureCue && !hasArrivalCue && (!destination || !KOREAN_AIRPORTS.has(destination))
           ? 'departure'
-          : /\b(?:arriving|arrive|arrival)\b|도착|입국/i.test(windowText)
+          : destination && KOREAN_AIRPORTS.has(destination)
             ? 'arrival'
-            : /\b(?:departing|depart|departure)\b|출발|출국/i.test(windowText)
+            : origin && KOREAN_AIRPORTS.has(origin)
               ? 'departure'
-              : 'connection';
+              : hasArrivalCue
+                ? 'arrival'
+                : hasDepartureCue
+                  ? 'departure'
+                  : 'connection';
       const clock = extractNaturalClock(windowText);
       seenKeys.add(key);
       found.push({
@@ -369,7 +382,7 @@ export function extractItineraryEvidence(body: string, pickupDate: string): Rout
       ...(notes ? { notes } : {}),
       isPoiConfirmed: false,
     };
-    if (!points.some(point=>point.date === date && point.time === time && sameVenue(point.location, candidate.location))) {
+    if (!points.some(point => point.date === date && point.time === time && sameVenue(point.location, candidate.location))) {
       points.push(candidate);
     }
     if (target) untimedTargets.push({ date, location: target, after: points.length, departureTime: time });
@@ -380,7 +393,7 @@ export function extractItineraryEvidence(body: string, pickupDate: string): Rout
     const venue = canonicalKoreanPlaceName(target.location);
     // Only a LATER explicit appointment satisfies the arrow destination.
     // Visiting Conrad at noon does not eliminate the final 17:30 return.
-    if (points.some((p, index)=>index >= target.after && p.date === target.date && sameVenue(p.location, venue))) continue;
+    if (points.some((p, index) => index >= target.after && p.date === target.date && sameVenue(p.location, venue))) continue;
     points.push({
       id: 'source-destination-' + points.length,
       order: points.length + 1,
@@ -472,8 +485,8 @@ export function enrichBookingDraftWithEmailEvidence(
     // so array order alone is not a reliable indication of the final venue.
     const sourceDepartureTime = source.notes?.match(/\b\d{2}:\d{2}\b/)?.[0];
     const matchingUntimed = !source.time
-      ? matching.find(p=>Boolean(sourceDepartureTime) && p.time === sourceDepartureTime)
-        || matching.find(p=>!p.time)
+      ? matching.find(p => Boolean(sourceDepartureTime) && p.time === sourceDepartureTime)
+      || matching.find(p => !p.time)
       : undefined;
     const existing = matchingAtTime || matchingUntimed;
     if (existing) {
@@ -577,7 +590,7 @@ export function enrichBookingDraftWithEmailEvidence(
   if (/\bmeet\s*&\s*greet\b/i.test(body) && !/미팅|meet.*greet/i.test(draft.specialRequests)) {
     specialRequirements.push('미팅 & 그리팅');
   }
-  if (enriched.some(p=>/\bTBA\b/i.test(p.location))) {
+  if (enriched.some(p => /\bTBA\b/i.test(p.location))) {
     warnings.push('TBA로 표시된 방문 장소는 아직 정해지지 않았습니다. 임의 위치를 지정하지 마세요.');
   }
   return {

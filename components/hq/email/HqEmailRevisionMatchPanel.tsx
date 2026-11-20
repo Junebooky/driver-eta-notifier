@@ -16,7 +16,7 @@ interface Props {
 
 /** Only appears AFTER an explicit AI extraction. Never auto-applies a revision. */
 export function HqEmailRevisionMatchPanel({ draft, matches, decision, onSelect, onNew }: Props) {
-  if (!matches.length && draft.tripType !== 'modification' && draft.tripType !== 'cancellation') return null;
+  if (!matches.length && draft.tripType !== 'cancellation') return null;
   const selected = matches.find(m => m.scheduleId === decision);
   const diffs = selected ? emailRevisionDiff(draft, selected) : [];
   return (
@@ -28,16 +28,16 @@ export function HqEmailRevisionMatchPanel({ draft, matches, decision, onSelect, 
         <div className="min-w-0 flex-1">
           <h3 className="text-[14px] font-semibold text-[#17233B]">기존 예약과 대조</h3>
           <p className="mt-1 text-xs leading-relaxed text-[#73839D]">
-            고객사·발신자·날짜·예약번호를 코드로 비교했습니다. 후보를 직접 선택해야 기존 예약이 변경됩니다.
+            후보를 선택하지 않고 바로 예약 확정을 누르면 신규 예약으로 처리됩니다. 기존 예약을 수정할 때만 아래 후보를 선택하세요.
           </p>
         </div>
       </div>
-      {matches.length ? (
+      {matches.length > 0 && (
         <div className="space-y-2">
           {matches.map((candidate) => {
             const active = decision === candidate.scheduleId;
             return (
-              <button key={candidate.scheduleId} type="button" onClick={() => onSelect(candidate)}
+              <button key={candidate.scheduleId} type="button" onClick={() => active ? onNew() : onSelect(candidate)}
                 aria-pressed={active}
                 className={`flex w-full items-start gap-3 rounded-2xl p-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#1E60F3] ${active ? 'bg-[#EEF3FF]' : 'bg-[#F8FAFC] hover:bg-[#F1F4F8]'}`}>
                 <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${active ? 'bg-[#1E60F3] text-white' : 'border border-[#CDD6E2] bg-white'}`}>
@@ -53,10 +53,6 @@ export function HqEmailRevisionMatchPanel({ draft, matches, decision, onSelect, 
             );
           })}
         </div>
-      ) : (
-        <p className="rounded-xl bg-[#FAFBFD] p-3 text-xs leading-relaxed text-[#64748B]">
-          수정 요청으로 추출됐지만 기존 예약을 특정하지 못했습니다. 이메일 원문과 기존 예약을 확인해 주세요.
-        </p>
       )}
       {selected && (
         <div className="rounded-2xl bg-[#FAFBFD] p-3.5 sm:p-4">
@@ -80,15 +76,9 @@ export function HqEmailRevisionMatchPanel({ draft, matches, decision, onSelect, 
           </p>
         </div>
       )}
-      <button type="button" onClick={onNew} aria-pressed={decision === 'new'}
-        className={`flex min-h-10 w-full items-center justify-center gap-2 rounded-xl px-3 text-xs font-medium transition-colors ${decision === 'new' ? 'bg-[#EAF0FF] text-[#1E60F3]' : 'bg-[#F8FAFC] text-[#73839D] hover:bg-[#EFF3F7]'}`}>
-        {decision === 'new' ? <Check className="h-3.5 w-3.5"/> : <Info className="h-3.5 w-3.5"/>}
-        기존 예약과 관계없는 신규 예약으로 처리
-      </button>
       {draft.tripType === 'cancellation' && (
         <p className="text-xs text-[#A16262]">취소 요청은 신규 일정 생성이나 자동 취소로 처리하지 않습니다. 관리자 배차관리에서 기존 예약을 직접 확인해 주세요.</p>
       )}
-      {!decision && <p className="text-[11px] text-[#A16262]">기존 예약을 선택하거나 신규 예약임을 명시해야 다음 단계로 진행할 수 있습니다.</p>}
     </section>
   );
 }

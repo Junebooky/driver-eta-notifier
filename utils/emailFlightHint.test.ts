@@ -99,3 +99,37 @@ test('formatLiveFlightHint formats arrival exit, delay delta, and departure door
   const depHint = formatLiveFlightHint(departure);
   assert.equal(depHint.summaryText, '인천공항 제2여객터미널 · 14:40 출발 · 로스앤젤레스행 · 4번 도어 앞');
 });
+
+test('KE5707 GMP departure hint resolves 김포공항 without contradicting 인천공항 or GMP행', () => {
+  const gmpDepOnly = buildFallbackFlightHint({
+    flightNumber: 'KE5707',
+    date: '2026-11-09',
+    destinationAirport: 'GMP',
+    role: 'departure',
+    scheduledDeparture: '09:30',
+  });
+  assert.ok(gmpDepOnly);
+  assert.equal(gmpDepOnly.summaryText, '김포공항 국제선 · 09:30 출발');
+  assert.doesNotMatch(gmpDepOnly.summaryText, /인천공항|GMP행/);
+
+  const hndToGmpMislabeled = buildFallbackFlightHint({
+    flightNumber: 'KE5707',
+    date: '2026-11-09',
+    originAirport: 'HND',
+    destinationAirport: 'GMP',
+    role: 'departure',
+    scheduledArrival: '15:00',
+  });
+  assert.ok(hndToGmpMislabeled);
+  assert.equal(hndToGmpMislabeled.summaryText, '김포공항 국제선 · 15:00 도착 · 도쿄(하네다)발');
+  assert.doesNotMatch(hndToGmpMislabeled.summaryText, /인천공항|GMP행/);
+
+  const foreignConn = buildFallbackFlightHint({
+    flightNumber: 'AS34',
+    date: '2026-11-20',
+    originAirport: 'SEA',
+    destinationAirport: 'JFK',
+    role: 'connection',
+  });
+  assert.equal(foreignConn, null);
+});

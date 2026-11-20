@@ -7,6 +7,7 @@ import {
   buildFallbackFlightHint,
   formatLiveFlightHint,
   normalizeFlightCode,
+  resolveFlightHintDirection,
   type EmailFlightHintInfo,
 } from '@/utils/emailFlightHint';
 
@@ -78,11 +79,18 @@ export const HqFlightInfoHint: React.FC<HqFlightInfoHintProps> = ({
   className = '',
 }) => {
   const normalizedCode = normalizeFlightCode(flightNumber);
-  const queryType: FlightType = role === 'departure' ? 'departure' : 'arrival';
+  const direction = resolveFlightHintDirection({
+    originAirport,
+    destinationAirport,
+    role,
+    scheduledArrival,
+    scheduledDeparture,
+  });
+  const queryType: FlightType = direction?.queryType || (role === 'departure' ? 'departure' : 'arrival');
   const [liveHint, setLiveHint] = useState<EmailFlightHintInfo | null>(null);
 
   useEffect(() => {
-    if (!normalizedCode || role === 'connection') {
+    if (!normalizedCode || role === 'connection' || !direction) {
       setLiveHint(null);
       return;
     }
@@ -108,7 +116,7 @@ export const HqFlightInfoHint: React.FC<HqFlightInfoHintProps> = ({
     return () => {
       active = false;
     };
-  }, [normalizedCode, queryType, date, role]);
+  }, [normalizedCode, queryType, date, role, direction]);
 
   if (!normalizedCode || role === 'connection') return null;
 

@@ -50,16 +50,25 @@ export function HqFlightAssignmentSection<T extends Slot>({
           </p>
         </div>
       </div>
-      <div className="space-y-2.5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {flights.map(flight => {
           const key = emailFlightKey(flight);
           const owner = slots.findIndex(slot => (slot.assignedFlightKeys || []).includes(key));
           const passengers = (flight.passengers || []).join(', ');
+          const cardClock = flight.role === 'departure'
+            ? (flight.scheduledDeparture || flight.scheduledArrival)
+            : (flight.scheduledArrival || flight.scheduledDeparture);
+          const cardClockLabel = flight.role === 'departure' ? '출발' : '도착';
           return (
-            <HqCard key={key} tone="muted" className="space-y-2.5 p-3.5 border border-[#E1E7F0]/70">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-2 min-w-0">
-                  <span className="font-mono text-[13px] font-bold text-[#17233B]">{flight.flightNumber}</span>
+            <HqCard key={key} tone="muted" className="flex flex-col justify-between gap-2.5 p-3.5 border border-[#E1E7F0]/70">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-[13px] font-bold text-[#17233B] shrink-0">{flight.flightNumber}</span>
+                  <HqBadge tone="neutral" className="tabular-nums shrink-0">
+                    {flight.date}{cardClock ? ` · ${cardClockLabel} ${cardClock}` : ''}
+                  </HqBadge>
+                </div>
+                <div className="min-h-[20px] flex items-center">
                   <HqFlightInfoHint
                     flightNumber={flight.flightNumber}
                     date={flight.date}
@@ -70,54 +79,53 @@ export function HqFlightAssignmentSection<T extends Slot>({
                     scheduledDeparture={flight.scheduledDeparture}
                   />
                 </div>
-                <HqBadge tone="neutral" className="tabular-nums">
-                  {flight.date}{flight.scheduledArrival ? ` · 도착 ${flight.scheduledArrival}` : ''}
-                </HqBadge>
               </div>
-              <label className="block space-y-1">
-                <span className="text-[11px] font-semibold text-[#61728A]">이 항공편 승객</span>
-                <HqInput
-                  type="text"
-                  value={editingPassengers[key] ?? passengers}
-                  disabled={disabled || !onUpdateDraft}
-                  onChange={event => {
-                    const value = event.target.value;
-                    setEditingPassengers(previous => ({ ...previous, [key]: value }));
-                    const names = value.split(/[,，;\n]+/).map(name => name.trim()).filter(Boolean);
-                    onUpdateDraft?.({
-                      ...draft,
-                      flights: (draft.flights || []).map(row =>
-                        emailFlightKey(row) === key ? { ...row, passengers: names } : row),
-                    });
-                  }}
-                  onBlur={() => setEditingPassengers(previous => {
-                    const next = { ...previous };
-                    delete next[key];
-                    return next;
-                  })}
-                  placeholder="승객 이름을 쉼표로 구분해 입력"
-                  className="hq-compact-input min-h-10 text-xs placeholder:text-[11px] sm:placeholder:text-xs"
-                  aria-label={flight.flightNumber + ' 탑승객 이름'}
-                />
-              </label>
-              {split && (
-                <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={flight.flightNumber + ' 담당 차량 선택'}>
-                  {slots.map((_, index) => (
-                    <HqButton
-                      key={index}
-                      variant={owner === index ? 'primary' : 'secondary'}
-                      size="sm"
-                      aria-pressed={owner === index}
-                      disabled={disabled || !onUpdateSlots}
-                      onClick={() => assign(key, index)}
-                      className="min-h-9 px-3 text-[11px]"
-                    >
-                      {index + 1}호차
-                    </HqButton>
-                  ))}
-                  {owner < 0 && <HqBadge tone="warning">담당 미지정</HqBadge>}
-                </div>
-              )}
+              <div className="mt-auto space-y-2">
+                <label className="block space-y-1">
+                  <span className="block text-[11px] font-semibold text-[#61728A]">이 항공편 승객</span>
+                  <HqInput
+                    type="text"
+                    value={editingPassengers[key] ?? passengers}
+                    disabled={disabled || !onUpdateDraft}
+                    onChange={event => {
+                      const value = event.target.value;
+                      setEditingPassengers(previous => ({ ...previous, [key]: value }));
+                      const names = value.split(/[,，;\n]+/).map(name => name.trim()).filter(Boolean);
+                      onUpdateDraft?.({
+                        ...draft,
+                        flights: (draft.flights || []).map(row =>
+                          emailFlightKey(row) === key ? { ...row, passengers: names } : row),
+                      });
+                    }}
+                    onBlur={() => setEditingPassengers(previous => {
+                      const next = { ...previous };
+                      delete next[key];
+                      return next;
+                    })}
+                    placeholder="승객 이름을 쉼표로 구분해 입력"
+                    className="hq-compact-input min-h-10 text-xs placeholder:text-[11px] sm:placeholder:text-xs"
+                    aria-label={flight.flightNumber + ' 탑승객 이름'}
+                  />
+                </label>
+                {split && (
+                  <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={flight.flightNumber + ' 담당 차량 선택'}>
+                    {slots.map((_, index) => (
+                      <HqButton
+                        key={index}
+                        variant={owner === index ? 'primary' : 'secondary'}
+                        size="sm"
+                        aria-pressed={owner === index}
+                        disabled={disabled || !onUpdateSlots}
+                        onClick={() => assign(key, index)}
+                        className="min-h-9 px-3 text-[11px]"
+                      >
+                        {index + 1}호차
+                      </HqButton>
+                    ))}
+                    {owner < 0 && <HqBadge tone="warning">담당 미지정</HqBadge>}
+                  </div>
+                )}
+              </div>
             </HqCard>
           );
         })}

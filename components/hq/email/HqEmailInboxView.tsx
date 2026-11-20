@@ -889,13 +889,12 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     setIsDispatching(true); setDispatchError(null);
     try {
       if (currentDraft.savedScheduleIds) throw new Error('이미 저장된 요청입니다. 모바일·PC의 예약 목록에서 날짜별 배정을 진행해 주세요.');
-      const decision = matchDecisionByEmail[currentSummary.id] || '';
+      const decision = matchDecisionByEmail[currentSummary.id] || 'new';
       const candidates = matchesByEmail[currentSummary.id] || [];
       const batch = emailBatchNeedsReview(currentDraft, vehicleSlots.length, candidates.length);
       if (currentDraft.tripType === 'cancellation') throw new Error('취소 요청은 배차관리에서 해당 예약을 확인한 뒤 직접 처리해 주세요.');
-      if (!batch && ((!decision && (candidates.length || currentDraft.tripType === 'modification')) ||
-        (currentDraft.revisionMatchedScheduleId && decision !== currentDraft.revisionMatchedScheduleId))) {
-        throw new Error('기존 예약 수정 여부를 먼저 확인해 주세요.');
+      if (!batch && currentDraft.revisionMatchedScheduleId && decision !== 'new' && decision !== currentDraft.revisionMatchedScheduleId) {
+        throw new Error('선택한 기존 예약 후보가 현재 초안과 일치하지 않습니다. 다시 선택해 주세요.');
       }
       const matched = candidates.find(c => c.scheduleId === decision);
       let items: Array<Record<string, unknown>>;
@@ -1004,9 +1003,8 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
         showToast('날짜·호차별 기존 예약을 중복 없이 모두 선택해 주세요.');
         return;
       }
-    } else if (!decision && ((matchesByEmail[currentSummary.id] || []).length || currentDraft.tripType === 'modification')) {
-      showToast('기존 예약 후보를 선택하거나 신규 예약으로 처리할지 먼저 확인해 주세요.');
-      return;
+    } else if (!decision) {
+      setMatchDecisionByEmail((prev) => ({ ...prev, [currentSummary.id]: 'new' }));
     }
     haptics.success();
     const confirmationKey = `${currentSummary.id}:${currentDraft.id}`;

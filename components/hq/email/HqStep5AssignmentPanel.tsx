@@ -42,9 +42,8 @@ export const HqStep5AssignmentPanel: React.FC<HqStep5AssignmentPanelProps> = ({
   const selectedDriverIds = slots.map((slot) => slot.driver?.id).filter((id): id is string => Boolean(id));
   const uniqueDrivers = new Set(selectedDriverIds).size === selectedDriverIds.length;
   const unconfirmedStops = draft ? getUnconfirmedEmailRouteStops(draft) : [];
-  const allPlacesConfirmed = Boolean(draft) && unconfirmedStops.length === 0;
   const flightIssues = draft ? emailFlightAssignmentIssues(draft, slots) : [];
-  const allAssigned = flightIssues.length === 0 && allPlacesConfirmed && !loading && !fleetError && uniqueDrivers && slots.length > 0 && slots.every((slot) => {
+  const allAssigned = flightIssues.length === 0 && !loading && !fleetError && uniqueDrivers && slots.length > 0 && slots.every((slot) => {
     const vehicle = vehicles?.find((item) => item.plate === slot.vehiclePlate);
     return Boolean(vehicle?.isAvailable && slot.driver && (language !== 'english' || driverSupportsEnglish(slot.driver)));
   });
@@ -238,15 +237,15 @@ export const HqStep5AssignmentPanel: React.FC<HqStep5AssignmentPanelProps> = ({
 
         <div className="space-y-2.5 pt-1">
           {unconfirmedStops.length > 0 ? (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-[13px] bg-[#FFF9F1] px-3.5 py-2.5 text-xs text-[#8E633F]">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-[13px] bg-[#F5F7FB] px-3.5 py-2.5 text-xs text-[#61728A]">
               <span className="font-medium">
-                미확정 장소 {unconfirmedStops.length}곳의 TMAP 주소를 먼저 확정해 주세요.
+                미확정 장소 {unconfirmedStops.length}곳은 현장 확인·추후 수정 상태로 배차할 수 있어요.
               </span>
               <a
                 href="#email-route-place-verification"
                 className="font-bold text-[#1E60F3] underline underline-offset-2 shrink-0"
               >
-                아래 운행 경로에서 확인
+                운행 경로에서 수정
               </a>
             </div>
           ) : (

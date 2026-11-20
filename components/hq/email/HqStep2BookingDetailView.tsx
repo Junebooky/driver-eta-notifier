@@ -404,13 +404,83 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
         />
       )}
 
-      {/* Unified Booking Summary + Date-Grouped TMAP-Editable Schedule */}
+      {/* Card 2: 추가 정보 — positioned right below 항공편별 담당 차량 · 승객 */}
+      <HqCard className="p-4 sm:p-5 space-y-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-1 border-b border-[#E1E7F0]/50">
+          <h3 className="text-[14px] font-bold text-[#17233B]">추가 정보</h3>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-medium text-[#61728A]">기사 언어</span>
+            <HqSegmentedTabs
+              aria-label="추가 정보 기사 언어 조건"
+              value={selectedLanguage}
+              onValueChange={(value) => changeDriverLanguage(value as 'any' | 'english')}
+              tabs={[
+                { id: 'any', label: '무관' },
+                { id: 'english', label: '영어 가능' },
+              ]}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-2.5 text-xs">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[#73839D] font-medium shrink-0">탑승객 수</span>
+            <span className="font-bold text-[#17233B]">{passengerCount}명</span>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[#73839D] font-medium shrink-0">탑승객명</span>
+            <span className="font-bold text-[#17233B] text-right truncate">{passengerDisplayName}</span>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[#73839D] font-medium shrink-0">탑승객 연락처</span>
+            <span className="font-medium text-[#61728A] text-right truncate">{passengerPhone || '연락처 미입력'}</span>
+          </div>
+        </div>
+
+        <div className="pt-3 border-t border-[#E1E7F0]/50 space-y-2 text-xs">
+          <span className="block text-[#73839D] font-medium">항공편명</span>
+          {normalizedDraftFlights.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              {normalizedDraftFlights.map((flight, index) => (
+                <div
+                  key={`${flight.date}-${flight.flightNumber}-${index}`}
+                  className="grid grid-cols-[64px_1fr] items-center gap-2 rounded-[12px] bg-[#FAFBFD] border border-[#E1E7F0]/70 px-3 py-2"
+                >
+                  <span className="font-mono font-bold text-[#1E60F3] truncate">{flight.flightNumber}</span>
+                  <div className="min-w-0">
+                    <HqFlightInfoHint
+                      flightNumber={flight.flightNumber}
+                      date={flight.date}
+                      role={flight.role}
+                      originAirport={flight.originAirport}
+                      destinationAirport={flight.destinationAirport}
+                      scheduledArrival={flight.scheduledArrival}
+                      scheduledDeparture={flight.scheduledDeparture}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : fallbackFlightCode ? (
+            <div className="grid grid-cols-[64px_1fr] items-center gap-2 rounded-[12px] bg-[#FAFBFD] border border-[#E1E7F0]/70 px-3 py-2 sm:max-w-md">
+              <span className="font-mono font-bold text-[#1E60F3] truncate">{fallbackFlightCode}</span>
+              <div className="min-w-0">
+                <HqFlightInfoHint flightNumber={fallbackFlightCode} date={bookingDate} />
+              </div>
+            </div>
+          ) : (
+            <span className="inline-block font-medium text-[#73839D]">항공편 없음</span>
+          )}
+        </div>
+      </HqCard>
+
+      {/* Card 3: Unified Booking Summary + 2-Column Date-Grouped TMAP-Editable Schedule */}
       <HqCard className="p-4 sm:p-6 space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-2 pb-1 border-b border-[#E1E7F0]/50">
           <div>
             <h3 className="text-[15px] font-bold text-[#17233B]">예약 기본 정보 · 운행 일정</h3>
             <p className="mt-0.5 text-[11px] font-medium text-[#73839D]">
-              날짜별 일정을 확인하고 TMAP 검색으로 출발·방문 장소를 바로 수정할 수 있습니다.
+              날짜별 일정을 확인하고 필요 시 TMAP 검색으로 장소를 수정할 수 있습니다.
             </p>
           </div>
           <HqButton
@@ -432,17 +502,25 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
           </HqButton>
         </div>
 
-        {/* Basic Info Grid */}
-        <div className="space-y-2.5 text-xs">
+        {/* Basic Info 2-Column Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 text-xs">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[#73839D] font-medium">예약 번호</span>
+            <span className="text-[#73839D] font-medium shrink-0">예약 번호</span>
             <span className="font-mono font-bold text-[#17233B]">{bookingCode}</span>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[#73839D] font-medium">고객사</span>
-            <span className="font-bold text-[#17233B] text-right">{companyName}</span>
+            <span className="text-[#73839D] font-medium shrink-0">고객사</span>
+            <span className="font-bold text-[#17233B] text-right truncate">{companyName}</span>
           </div>
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[#73839D] font-medium shrink-0">운행 기간</span>
+            <span className="font-bold text-[#17233B]">{servicePeriodLabel}</span>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[#73839D] font-medium shrink-0">첫 픽업 시간</span>
+            <span className="font-bold text-[#17233B] tabular-nums">{bookingTime}</span>
+          </div>
+          <div className="flex items-center justify-between gap-2 sm:col-span-2">
             <label htmlFor="hq-booking-event-title" className="shrink-0 font-medium text-[#73839D]">행사명</label>
             <HqInput
               id="hq-booking-event-title"
@@ -452,10 +530,10 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
               value={extractedDraft?.eventName || ''}
               onChange={(e) => extractedDraft && onUpdateDraft?.({ ...extractedDraft, eventName: e.target.value })}
               placeholder="행사명 입력 (미입력 시 고객사명)"
-              className="hq-compact-input min-h-9 w-[66%] sm:w-[68%] bg-[#F7F9FC] text-right text-xs font-semibold placeholder:text-[11px] sm:placeholder:text-xs"
+              className="hq-compact-input min-h-9 w-[66%] sm:w-[75%] bg-[#F7F9FC] text-right text-xs font-semibold placeholder:text-[11px] sm:placeholder:text-xs"
             />
           </div>
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start justify-between gap-3 sm:col-span-2">
             <span className="text-[#73839D] font-medium pt-0.5 shrink-0">예약 담당자</span>
             <div className="text-right min-w-0">
               <div className="font-bold text-[#17233B]">
@@ -464,24 +542,16 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
                   ({contactSource === 'signature' ? '서명' : contactSource === 'body' ? '본문' : '발신 헤더'})
                 </span>
               </div>
-              <div className="mt-1 flex flex-wrap items-center justify-end gap-x-2 gap-y-0.5 text-[11px] text-[#73839D] font-medium">
+              <div className="mt-0.5 flex flex-wrap items-center justify-end gap-x-2 gap-y-0.5 text-[11px] text-[#73839D] font-medium">
                 <span>{contactPhone || '연락처 미등록'}</span>
                 <span aria-hidden="true">·</span>
                 <span className="break-all">{contactEmail || '이메일 없음'}</span>
               </div>
             </div>
           </div>
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-[#73839D] font-medium">운행 기간</span>
-            <span className="font-bold text-[#17233B]">{servicePeriodLabel}</span>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-[#73839D] font-medium">첫 픽업 시간</span>
-            <span className="font-bold text-[#17233B] tabular-nums">{bookingTime}</span>
-          </div>
         </div>
 
-        {/* Date-grouped Schedule Timeline with inline TMAP Search Editing */}
+        {/* Date-grouped 2-Column Card Schedule with inline TMAP Search Editing */}
         <section id="email-route-place-verification" className="space-y-3 pt-2 border-t border-[#E1E7F0]/50" aria-label="날짜별 운행 경로">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-1.5">
@@ -492,7 +562,7 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
               <HqBadge tone="selected">
                 {dispatchDays.length || 1}일 · {totalStopCount}개 일정
               </HqBadge>
-              <HqBadge tone={unconfirmedCount > 0 ? 'warning' : 'selected'}>
+              <HqBadge tone={unconfirmedCount > 0 ? 'neutral' : 'selected'}>
                 {unconfirmedCount > 0 ? `TMAP 미확정 ${unconfirmedCount}곳` : '전 구간 확정'}
               </HqBadge>
             </div>
@@ -513,181 +583,147 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
           {dispatchDaysError ? (
             <HqInlineFeedback message={dispatchDaysError} tone="error" />
           ) : (
-            <div className="space-y-3">
-              {visibleDays.map((day) => {
-                const startClock = normalizeTimeHHmm(day.start.time);
-                const endClock = normalizeTimeHHmm(day.endTime);
-                const endTimeInvalid = !endClock || (Boolean(startClock) && endClock <= startClock);
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 items-start">
+              {visibleDays.map((day) => (
+                <HqCard key={day.date} tone="muted" className="p-3.5 space-y-2.5 border border-[#E1E7F0]/70">
+                  {/* Compact Day Header */}
+                  <div className="flex items-center justify-between gap-2 pb-2 border-b border-[#E1E7F0]/60">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EEF3FF] px-2.5 py-1 text-xs font-bold text-[#1E60F3]">
+                      <Calendar className="h-3.5 w-3.5 shrink-0" />
+                      <span>{formatIsoDayWithWeekday(day.date)}</span>
+                    </span>
+                    <HqBadge tone="neutral">{day.points.length}개</HqBadge>
+                  </div>
 
-                return (
-                  <HqCard key={day.date} tone="muted" className="p-3.5 sm:p-4 space-y-3 border border-[#E1E7F0]/70">
-                    {/* Day Header + Compact End Time Control */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-[#E1E7F0]/60">
-                      <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EEF3FF] px-3 py-1 text-xs font-bold text-[#1E60F3]">
-                          <Calendar className="h-3.5 w-3.5 shrink-0" />
-                          <span>{formatIsoDayWithWeekday(day.date)}</span>
-                        </span>
-                        <HqBadge tone="neutral">{day.points.length}개</HqBadge>
-                      </div>
+                  {/* Stops Timeline */}
+                  <ol className="space-y-2">
+                    {day.points.map((point, pointIdx) => {
+                      const stopMeta = stopLookup.get(point.id);
+                      const isConfirmed = stopMeta ? isVerifiedEmailRouteStop(stopMeta) : Boolean(point.isPoiConfirmed);
+                      const isEditing = editingStopId === point.id;
+                      const stopFlight = findStopFlightHintProps(point, day.date);
+                      const stopClock = normalizeTimeHHmm(point.time) || point.time || '';
 
-                      <div className="flex flex-wrap items-center gap-2">
-                        <label className="inline-flex items-center gap-1.5 rounded-xl bg-white border border-[#E1E7F0] px-2.5 py-1.5 text-[11px] font-semibold text-[#61728A] hover:border-[#1E60F3]/40 transition-colors cursor-pointer">
-                          <span>종료</span>
-                          <Clock className="h-3 w-3 text-[#8FA0B8]" />
-                          <input
-                            type="time"
-                            aria-label={`${day.date} 실제 종료 시간`}
-                            value={endClock || day.endTime || ''}
-                            onChange={(event) => {
-                              if (!extractedDraft) return;
-                              onUpdateDraft?.({
-                                ...extractedDraft,
-                                dayEndTimes: { ...extractedDraft.dayEndTimes, [day.date]: event.target.value },
-                              });
-                            }}
-                            className="bg-transparent text-xs font-bold text-[#17233B] outline-none tabular-nums cursor-pointer"
-                          />
-                        </label>
-                        {endTimeInvalid && <HqBadge tone="warning">종료 시간 확인</HqBadge>}
-                      </div>
-                    </div>
+                      return (
+                        <li
+                          key={point.id}
+                          className="rounded-[14px] bg-white border border-[#E1E7F0]/70 p-2.5 shadow-[0_2px_8px_rgba(35,49,78,0.03)] space-y-2 transition-colors"
+                        >
+                          <div className="flex items-start gap-2">
+                            <span
+                              className={`mt-0.5 flex h-5.5 w-5.5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                                isConfirmed
+                                  ? 'bg-[#1E60F3] text-white'
+                                  : 'bg-[#EEF3FF] text-[#1E60F3] border border-[#1E60F3]/25'
+                              }`}
+                            >
+                              {pointIdx + 1}
+                            </span>
 
-                    {/* Stops Timeline */}
-                    <ol className="space-y-2.5">
-                      {day.points.map((point, pointIdx) => {
-                        const stopMeta = stopLookup.get(point.id);
-                        const isConfirmed = stopMeta ? isVerifiedEmailRouteStop(stopMeta) : Boolean(point.isPoiConfirmed);
-                        const isEditing = editingStopId === point.id;
-                        const stopFlight = findStopFlightHintProps(point, day.date);
-                        const stopClock = normalizeTimeHHmm(point.time) || point.time || '';
-
-                        return (
-                          <li
-                            key={point.id}
-                            className="rounded-[16px] bg-white border border-[#E1E7F0]/70 p-3 shadow-[0_2px_8px_rgba(35,49,78,0.03)] space-y-2.5 transition-colors"
-                          >
-                            <div className="flex items-start gap-2.5">
-                              {/* Timeline Index Badge */}
-                              <span
-                                className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-                                  isConfirmed
-                                    ? 'bg-[#1E60F3] text-white'
-                                    : 'bg-[#EEF3FF] text-[#1E60F3] border border-[#1E60F3]/25'
-                                }`}
-                              >
-                                {pointIdx + 1}
-                              </span>
-
-                              {/* Stop Content */}
-                              <div className="min-w-0 flex-1 space-y-1">
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <div className="flex flex-wrap items-center gap-2 min-w-0">
-                                    <label className="inline-flex items-center gap-1 rounded-lg bg-[#F7F9FC] px-2 py-0.5 text-[11px] font-bold text-[#59708F] hover:bg-[#EDF2FA] cursor-pointer">
-                                      <Clock className="h-3 w-3 text-[#8FA0B8] shrink-0" />
-                                      <input
-                                        type="time"
-                                        aria-label={`${day.date} ${pointIdx + 1}번째 일정 시간`}
-                                        value={stopClock}
-                                        onChange={(e) => applyStopTime(point.id, e.target.value)}
-                                        className="bg-transparent text-[11px] font-bold text-[#17233B] outline-none tabular-nums cursor-pointer"
-                                      />
-                                    </label>
-                                    <span className="text-[13px] font-bold text-[#17233B] break-words">
-                                      {point.location || '장소 미입력'}
-                                    </span>
-                                  </div>
-
-                                  <div className="flex items-center gap-1.5 shrink-0">
-                                    <HqBadge tone={isConfirmed ? 'selected' : 'warning'}>
-                                      {isConfirmed ? (
-                                        <>
-                                          <CheckCircle2 className="h-3 w-3" />
-                                          <span>TMAP 확정</span>
-                                        </>
-                                      ) : (
-                                        <span>TMAP 미확정</span>
-                                      )}
-                                    </HqBadge>
-                                    <HqButton
-                                      variant={isEditing ? 'secondary' : 'subtle'}
-                                      size="sm"
-                                      onClick={() => setEditingStopId(isEditing ? null : point.id)}
-                                      disabled={isDispatching || !onUpdateDraft}
-                                      className="min-h-8 px-2.5 text-[11px]"
-                                    >
-                                      {isEditing ? (
-                                        <>
-                                          <X className="h-3 w-3" />
-                                          <span>닫기</span>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Search className="h-3 w-3" />
-                                          <span>{isConfirmed ? '변경' : 'TMAP 검색'}</span>
-                                        </>
-                                      )}
-                                    </HqButton>
-                                  </div>
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex flex-wrap items-center justify-between gap-1.5">
+                                <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                                  <label className="inline-flex items-center gap-1 rounded-lg bg-[#F7F9FC] px-1.5 py-0.5 text-[11px] font-bold text-[#59708F] hover:bg-[#EDF2FA] cursor-pointer">
+                                    <Clock className="h-3 w-3 text-[#8FA0B8] shrink-0" />
+                                    <input
+                                      type="time"
+                                      aria-label={`${day.date} ${pointIdx + 1}번째 일정 시간`}
+                                      value={stopClock}
+                                      onChange={(e) => applyStopTime(point.id, e.target.value)}
+                                      className="bg-transparent text-[11px] font-bold text-[#17233B] outline-none tabular-nums cursor-pointer"
+                                    />
+                                  </label>
+                                  <span className="text-[12.5px] font-bold text-[#17233B] break-words">
+                                    {point.location || '장소 미입력'}
+                                  </span>
                                 </div>
 
-                                {/* Address or Client Hint */}
-                                {isConfirmed && stopMeta?.address ? (
-                                  <p className="text-[11px] font-medium text-[#61728A] break-words">
-                                    {stopMeta.address}
-                                  </p>
-                                ) : (stopMeta?.clientAddress || point.clientAddress) ? (
-                                  <p className="text-[11px] font-medium text-[#73839D] break-words">
-                                    원본 기재: {stopMeta?.clientAddress || point.clientAddress}
-                                  </p>
-                                ) : null}
-
-                                {/* Flight Info API Hint beside airport stops */}
-                                {stopFlight && (
-                                  <div className="pt-0.5">
-                                    <HqFlightInfoHint
-                                      flightNumber={stopFlight.flightNumber}
-                                      date={stopFlight.date}
-                                      role={stopFlight.role}
-                                      originAirport={stopFlight.originAirport}
-                                      destinationAirport={stopFlight.destinationAirport}
-                                      scheduledArrival={stopFlight.scheduledArrival}
-                                      scheduledDeparture={stopFlight.scheduledDeparture}
-                                    />
-                                  </div>
-                                )}
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <HqBadge tone={isConfirmed ? 'selected' : 'neutral'} className="px-2 py-0.5 text-[10px]">
+                                    {isConfirmed ? (
+                                      <>
+                                        <CheckCircle2 className="h-2.5 w-2.5" />
+                                        <span>TMAP 확정</span>
+                                      </>
+                                    ) : (
+                                      <span>TMAP 미확정</span>
+                                    )}
+                                  </HqBadge>
+                                  <HqButton
+                                    variant={isEditing ? 'secondary' : 'subtle'}
+                                    size="sm"
+                                    onClick={() => setEditingStopId(isEditing ? null : point.id)}
+                                    disabled={isDispatching || !onUpdateDraft}
+                                    className="min-h-7 px-2 text-[10.5px]"
+                                  >
+                                    {isEditing ? (
+                                      <>
+                                        <X className="h-3 w-3" />
+                                        <span>닫기</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Search className="h-3 w-3" />
+                                        <span>{isConfirmed ? '변경' : 'TMAP'}</span>
+                                      </>
+                                    )}
+                                  </HqButton>
+                                </div>
                               </div>
+
+                              {isConfirmed && stopMeta?.address ? (
+                                <p className="text-[11px] font-medium text-[#61728A] break-words">
+                                  {stopMeta.address}
+                                </p>
+                              ) : (stopMeta?.clientAddress || point.clientAddress) ? (
+                                <p className="text-[11px] font-medium text-[#73839D] break-words">
+                                  원본 기재: {stopMeta?.clientAddress || point.clientAddress}
+                                </p>
+                              ) : null}
+
+                              {stopFlight && (
+                                <div className="pt-0.5">
+                                  <HqFlightInfoHint
+                                    flightNumber={stopFlight.flightNumber}
+                                    date={stopFlight.date}
+                                    role={stopFlight.role}
+                                    originAirport={stopFlight.originAirport}
+                                    destinationAirport={stopFlight.destinationAirport}
+                                    scheduledArrival={stopFlight.scheduledArrival}
+                                    scheduledDeparture={stopFlight.scheduledDeparture}
+                                  />
+                                </div>
+                              )}
                             </div>
+                          </div>
 
-                            {/* Inline TMAP Place Search Editor */}
-                            {isEditing && extractedDraft && (
-                              <div className="pt-2 border-t border-[#E1E7F0]/60 space-y-1.5">
-                                <HqPlaceSearchInput
-                                  value={point.location}
-                                  isConfirmed={isConfirmed}
-                                  autoSearch={!isConfirmed}
-                                  disabled={isDispatching || !onUpdateDraft}
-                                  addressHint={stopMeta?.clientAddress || point.clientAddress}
-                                  heightClass="h-11 rounded-[12px]"
-                                  icon="mapPin"
-                                  placeholder="TMAP 장소명 또는 도로명 주소 검색"
-                                  onChange={(loc) => applyStopLocationName(point.id, loc)}
-                                  onSelectPoi={(poi) => applyStopPoi(point.id, poi)}
-                                />
-                                {(stopMeta?.clientAddress || point.clientAddress) && (
-                                  <p className="text-[11px] text-[#73839D] pl-1">
-                                    검색 힌트: {stopMeta?.clientAddress || point.clientAddress}
-                                  </p>
-                                )}
-                              </div>
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ol>
-                  </HqCard>
-                );
-              })}
+                          {isEditing && extractedDraft && (
+                            <div className="pt-2 border-t border-[#E1E7F0]/60 space-y-1.5">
+                              <HqPlaceSearchInput
+                                value={point.location}
+                                isConfirmed={isConfirmed}
+                                autoSearch={!isConfirmed}
+                                disabled={isDispatching || !onUpdateDraft}
+                                addressHint={stopMeta?.clientAddress || point.clientAddress}
+                                heightClass="h-10 rounded-[12px]"
+                                icon="mapPin"
+                                placeholder="TMAP 장소명·주소 검색"
+                                onChange={(loc) => applyStopLocationName(point.id, loc)}
+                                onSelectPoi={(poi) => applyStopPoi(point.id, poi)}
+                              />
+                              {(stopMeta?.clientAddress || point.clientAddress) && (
+                                <p className="text-[11px] text-[#73839D] pl-1">
+                                  검색 힌트: {stopMeta?.clientAddress || point.clientAddress}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </HqCard>
+              ))}
             </div>
           )}
         </section>
@@ -697,67 +733,6 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
           <p className="font-bold text-[#17233B] leading-snug break-words">
             {specialRequests || '요청 사항 없음'}
           </p>
-        </div>
-      </HqCard>
-
-      {/* Card 2: 추가 정보 */}
-      <HqCard className="p-4 sm:p-6 space-y-3.5">
-        <h3 className="text-[15px] font-bold text-[#17233B]">추가 정보</h3>
-
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-0.5">
-          <span className="text-[#61728A] font-medium">기사 언어 조건</span>
-          <HqSegmentedTabs
-            aria-label="추가 정보 기사 언어 조건"
-            value={selectedLanguage}
-            onValueChange={(value) => changeDriverLanguage(value as 'any' | 'english')}
-            tabs={[
-              { id: 'any', label: '무관' },
-              { id: 'english', label: '영어 가능' },
-            ]}
-          />
-        </div>
-
-        <div className="space-y-2.5 text-xs pt-1">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-[#73839D] font-medium">탑승객 수</span>
-            <span className="font-bold text-[#17233B]">{passengerCount}명</span>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-[#73839D] font-medium">탑승객명</span>
-            <span className="font-bold text-[#17233B] text-right">{passengerDisplayName}</span>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-[#73839D] font-medium">탑승객 연락처</span>
-            <span className="font-medium text-[#61728A]">{passengerPhone || '연락처 미입력'}</span>
-          </div>
-          <div className="flex items-start justify-between gap-3">
-            <span className="text-[#73839D] font-medium shrink-0 pt-0.5">항공편명</span>
-            <div className="min-w-0 text-right space-y-1">
-              {normalizedDraftFlights.length > 0 ? (
-                normalizedDraftFlights.map((flight, index) => (
-                  <div key={`${flight.date}-${flight.flightNumber}-${index}`} className="flex flex-wrap items-center justify-end gap-1.5">
-                    <span className="font-mono font-bold text-[#1E60F3]">{flight.flightNumber}</span>
-                    <HqFlightInfoHint
-                      flightNumber={flight.flightNumber}
-                      date={flight.date}
-                      role={flight.role}
-                      originAirport={flight.originAirport}
-                      destinationAirport={flight.destinationAirport}
-                      scheduledArrival={flight.scheduledArrival}
-                      scheduledDeparture={flight.scheduledDeparture}
-                    />
-                  </div>
-                ))
-              ) : fallbackFlightCode ? (
-                <div className="flex flex-wrap items-center justify-end gap-1.5">
-                  <span className="font-mono font-bold text-[#1E60F3]">{fallbackFlightCode}</span>
-                  <HqFlightInfoHint flightNumber={fallbackFlightCode} date={bookingDate} />
-                </div>
-              ) : (
-                <span className="font-medium text-[#73839D]">항공편 없음</span>
-              )}
-            </div>
-          </div>
         </div>
       </HqCard>
     </div>

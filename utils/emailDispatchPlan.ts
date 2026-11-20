@@ -1,7 +1,7 @@
 import type { HqEmailExtractedDraft,RouteWaypointItem } from '@/types/emailHq';
 import { assertAttachmentDatesReviewed } from './emailAttachmentCoverage';
 import { VIP_REAL_VEHICLES } from './vehicleData';
-import { normalizeDateToIso,normalizeTimeHHmm } from './dispatchConflictDetector';
+import { normalizeDateToIso,normalizeTimeHHmm,shiftIsoDate } from './dispatchConflictDetector';
 import { buildAirportArrivalPickupGroups } from './emailBookingEvidence';
 /**
  * HQ flight-to-vehicle assignment identity: a flight can only be identified
@@ -97,12 +97,27 @@ export function buildEmailDispatchPlan(draft:HqEmailExtractedDraft,slots:Array<{
  const assignmentIssues=status==='published'?emailFlightAssignmentIssues(draft,slots):[];
  if(assignmentIssues.length)throw new Error(assignmentIssues[0]);
  const requestedLanguage = draft.requestedLanguage || (/영어|english|외국인/i.test(draft.specialRequests || '') ? 'en' : 'ko');
- if(draft.tripType==='group' && draft.groupTrips?.length)throw new Error('탑승객별 별도 일정은 각 예약에서 확인한 뒤 배차해 주세요. 첫 일정만 배차하지 않습니다.');
  if(!slots.length)throw new Error('요청 차량을 추가해 주세요.');
  return emailDispatchDays(draft).flatMap(day=>{
-  if(!normalizeDateToIso(day.date)||day.points.length<2||!day.start.location||!day.end.location)throw new Error(`${day.date}: 출발·도착지를 확인해 주세요.`);
-  if(status==='published'&&!normalizeTimeHHmm(day.start.time||''))throw new Error(`${day.date}: 배차 확정 전 출발 시간을 지정해 주세요.`);
-  if(status==='published' && (!normalizeTimeHHmm(day.endTime)||day.endTime<=day.start.time!))throw new Error(`${day.date}: 실제 종료 시간을 확인해 주세요.`);
+  if(!normalizeDateToIso(day.date)||day.points.length<1||!day.start.location||!day.end.location)throw new Error(`${day.date}: 출발·도착지를 확인해 주세요.`);
+  const startClock=normalizeTimeHHmm(day.start.time||'');
+  if(status==='published'&&!startClock)throw new Error(`${day.date}: 배차 확정 전 출발 시간을 지정해 주세요.`);
+  const explicitEndClock=normalizeTimeHHmm(day.endTime);
+  const laterStopClock=[...day.points].reverse().map(p=>normalizeTimeHHmm(p.time||'')).find(t=>Boolean(t)&&(!startClock||t>startClock))||'';
+  let resolvedEndDate=day.date;
+  let resolvedEndTime:string|undefined=day.endTime||undefined;
+  if(status==='published'){
+   if(explicitEndClock && (!startClock || explicitEndClock>startClock)){
+    resolvedEndTime=explicitEndClock;
+   }else if(laterStopClock){
+    resolvedEndTime=laterStopClock;
+   }else if(startClock==='23:59'){
+    resolvedEndDate=shiftIsoDate(day.date,1);
+    resolvedEndTime='00:59';
+   }else{
+    resolvedEndTime='23:59';
+   }
+  }
   const dayFlights=emailAssignableFlights(draft).filter(f=>f.date===day.date);
   const splitByFlight=status==='published' && dayFlights.length>0 &&
     (slots.length>1 || slots.some(slot=>Array.isArray(slot.assignedFlightKeys)));
@@ -124,7 +139,6 @@ export function buildEmailDispatchPlan(draft:HqEmailExtractedDraft,slots:Array<{
     ).join(' · ');
   };
   const confirmed=day.points.every(p=>p.isPoiConfirmed&&Number.isFinite(p.lat)&&Number.isFinite(p.lng));
-  if(status==='published'&&!confirmed)throw new Error(`${day.date}: 모든 경유지의 위치 후보를 확정해 주세요.`);
   return slots.map((slot,index)=>{
    if(status==='published'&&(!slot.driver?.id||!slot.vehiclePlate))throw new Error('각 차량 슬롯의 기사와 실제 차량 번호판을 모두 선택해 주세요.');
    if(status==='published'&&requestedLanguage==='en' && !(slot.driver?.englishAvailable || slot.driver?.languages?.some(l=>l.toLowerCase()==='en'||l.toLowerCase()==='english'||l.includes('영어'))))throw new Error('영어 가능 조건에 맞는 기사를 선택해 주세요.');
@@ -159,11 +173,11 @@ export function buildEmailDispatchPlan(draft:HqEmailExtractedDraft,slots:Array<{
      }
      return {...point,notes:safe||undefined};
    });
-   return {scheduleId:draft.savedScheduleIds?.[`${day.date}:${index}`],date:day.date,endDate:day.date,pickupTime:day.start.time!,endTime:day.endTime||undefined,origin:day.start.location,originLat:day.start.lat,originLng:day.start.lng,destination:day.end.location,destinationLat:day.end.lat,destinationLng:day.end.lng,routeWaypoints,
+   return {scheduleId:draft.savedScheduleIds?.[`${day.date}:${index}`],date:day.date,endDate:resolvedEndDate,pickupTime:day.start.time!,endTime:resolvedEndTime,origin:day.start.location,originLat:day.start.lat,originLng:day.start.lng,destination:day.end.location,destinationLat:day.end.lat,destinationLng:day.end.lng,routeWaypoints,
     customerName:draft.companyName,customerId:draft.clientId || undefined,passengerName:selectedPassengers.length?selectedPassengers.join(', '):draft.passengerName,passengerPhone:splitByFlight?'':draft.passengerPhone,passengerCount:splitByFlight?selectedPassengers.length:Math.max(draft.passengerCount,selectedPassengers.length),flightNumber:assignedFlights.map(f=>f.flightNumber).join(', ') || (!splitByFlight && day.date===draft.pickupDate ? draft.flightNumber : ''),notes:combinedNotes,
     eventId:`email-${draft.emailId}`,eventName:draft.eventName?.trim() || draft.companyName || '',groupId:`email-${draft.emailId}-${day.date}`,groupVehicleIndex:index+1,groupTotalVehicles:slots.length,
     vehicleModel:status==='published'?(VIP_REAL_VEHICLES.find(vehicle=>vehicle.plate===slot.vehiclePlate)?.model || slot.vehicleModel):slot.vehicleModel,vehiclePlate:status==='published'?slot.vehiclePlate:undefined,driverId:status==='published'?slot.driver?.id:undefined,driverName:status==='published'?slot.driver?.name:undefined,driverPhone:status==='published'?slot.driver?.phone:undefined,
-    dispatchStatus:status,intakeSource:'email' as const,requestedLanguage,placeVerified:confirmed,allowUnverified:status==='unassigned'};
+    dispatchStatus:status,intakeSource:'email' as const,requestedLanguage,placeVerified:confirmed,allowUnverified:true};
   });
  });
 }

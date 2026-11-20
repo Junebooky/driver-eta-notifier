@@ -8,6 +8,8 @@ const compose=r('components/hq/email/HqComposeEmailModal.tsx');
 const batch=r('components/hq/email/HqEmailBatchRevisionPanel.tsx');
 const detail=r('components/hq/email/HqStep2BookingDetailView.tsx');
 const step5=r('components/hq/email/HqStep5AssignmentPanel.tsx');
+const flightSection=r('components/hq/email/HqFlightAssignmentSection.tsx');
+const revPanel=r('components/hq/email/HqEmailRevisionMatchPanel.tsx');
 const placeSearch=r('components/hq/HqPlaceSearchInput.tsx');
 const css=r('app/globals.css');
 
@@ -61,13 +63,23 @@ test('A02 multi-day/vehicle atomic approval panel remains available',()=>{
   assert.match(batch,/onCancelReason/);
 });
 
-test('Step 5 removes redundant verification cards, groups routes by date with inline TMAP edit, flight hints, shared CTA, and mobile placeholder sizing',()=>{
+test('Step 5 removes redundant verification cards, groups routes by date in 2 columns without end-time inputs, allows unconfirmed TMAP dispatch, places 추가 정보 right after assignment, and fixes mobile placeholder sizing',()=>{
+  assert.doesNotMatch(inbox,/기존 예약 후보를 선택하거나 신규 예약으로 처리할지 먼저 확인해 주세요/);
+  assert.doesNotMatch(revPanel,/기존 예약과 관계없는 신규 예약으로 처리/);
+
   assert.doesNotMatch(step5,/HqRoutePlaceVerification/);
+  assert.doesNotMatch(step5,/allPlacesConfirmed\s*&&/);
   assert.match(step5,/<HqButton[\s\S]*variant="primary"/);
   assert.match(step5,/배차 확정 및 알림 전송/);
   assert.match(step5,/<HqSegmentedTabs/);
 
+  assert.match(flightSection,/grid-cols-1 md:grid-cols-2/);
+  assert.match(flightSection,/flex flex-col justify-between/);
+  assert.match(detail,/grid-cols-\[64px_1fr\]/);
+
   assert.doesNotMatch(detail,/날짜별 장소·종료시간 확인/);
+  assert.doesNotMatch(detail,/실제 종료 시간/);
+  assert.match(detail,/grid-cols-1 md:grid-cols-2/);
   assert.match(detail,/emailDispatchDays\(/);
   assert.match(detail,/id="email-route-place-verification"/);
   assert.match(detail,/<HqPlaceSearchInput/);
@@ -77,6 +89,10 @@ test('Step 5 removes redundant verification cards, groups routes by date with in
   assert.match(detail,/<HqBadge/);
   assert.match(detail,/<HqButton/);
   assert.match(detail,/<HqSegmentedTabs/);
+  const panelPos=detail.indexOf('<HqStep5AssignmentPanel');
+  const addInfoPos=detail.indexOf('추가 정보</h3>');
+  const basicInfoPos=detail.indexOf('예약 기본 정보 · 운행 일정</h3>');
+  assert.ok(panelPos > 0 && addInfoPos > panelPos && basicInfoPos > addInfoPos, '추가 정보 card must appear directly below assignment panel and before 기본 정보');
 
   assert.match(placeSearch,/hq-place-search-input/);
   assert.match(placeSearch,/placeholder:text-\[11px\]/);

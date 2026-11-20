@@ -7,6 +7,7 @@ import {
   buildExcelVehicleSchedules,
   datedExcelCalendarBlocks,
   excelCalendarClock,
+  flightFromOriginal,
   parseExcelWaypointNotes,
   reconcileSingleExcelCalendar,
   syncActiveVehicleScheduleWaypoints,
@@ -389,4 +390,17 @@ test('extracts Korean venue from multiline Location label and natural-language a
     scheduledArrival: '15:00',
     role: 'arrival',
   }]);
+});
+
+test('flightFromOriginal keeps departure GMP airport as originAirport with role=departure', () => {
+  assert.deepEqual(flightFromOriginal('Departure from GMP at 9:30 am (KE5707)'), {
+    flightNumber: 'KE5707',
+    originAirport: 'GMP',
+    role: 'departure',
+  });
+  assert.deepEqual(flightFromOriginal('09:30 GMP 출발 KE5707'), {
+    flightNumber: 'KE5707',
+    originAirport: 'GMP',
+    role: 'departure',
+  });
 });

@@ -148,7 +148,7 @@ export function resolveFleetAvailabilityWindows(
 
   const uniqueProvisional = [...new Set(provisionalDates)];
   const notice = uniqueProvisional.length > 0
-    ? `종료 시간 미확정 일정(${uniqueProvisional.join(', ')})은 당일 23:59까지 종일 기준으로 가용 차량을 조회했습니다. 배차 확정 전 실제 종료 시간을 입력해 주세요.`
+    ? `종료 시각 미기재 일정(${uniqueProvisional.join(', ')})은 당일 23:59까지 종일 기준으로 가용 차량을 조회했습니다.`
     : undefined;
 
   return {

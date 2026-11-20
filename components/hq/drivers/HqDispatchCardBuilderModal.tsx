@@ -188,7 +188,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
   useEffect(() => {
     if (!isOpen) return;
     setSelectedVehicleId(previous =>
-      initialVehicleId && availableVehicles.some(v=>v.uuid===initialVehicleId)
+      initialVehicleId && availableVehicles.some(v => v.uuid === initialVehicleId)
         ? initialVehicleId
         : availableVehicles.some(v => v.uuid === previous) ? previous : (availableVehicles[0]?.uuid || ''));
   }, [isOpen, driver.id, initialVehicleId, availableVehicles]);
@@ -621,297 +621,297 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
 
   return (
     <>
-    <HqModal
-      isOpen={isOpen && !compareOpen}
-      title="배차카드 만들기"
-      subtitle="기사 정보 한 번으로 모든 차량 카드 완성"
-      icon={<img src="/images/icons/drivers/icon_profile_card.png" alt="" aria-hidden="true" draggable={false} className="size-10 shrink-0 object-contain" />}
-      onClose={closeModal}
-      className="max-w-[1180px]! w-full"
-      footer={
-        <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <HqButton variant="secondary" onClick={() => setDownloadsOpen(value => !value)}
-            disabled={!isComplete || busy || portraitSaving} aria-expanded={downloadsOpen} className="w-full sm:w-auto">
-            <Download className="size-4" /> 파일 다운로드 <ChevronDown className={'size-4 transition-transform ' + (downloadsOpen ? 'rotate-180' : '')} />
-          </HqButton>
-          <div className="flex w-full gap-2 sm:w-auto">
-            <HqButton variant="subtle" onClick={closeModal} className="flex-1 sm:flex-none">닫기</HqButton>
-            <HqButton variant="primary" className="min-w-0 flex-[2] whitespace-nowrap sm:flex-none" loading={busy}
-              disabled={!isComplete || !dbReady || !summaryLoaded || busy || portraitSaving || photoUploading || previewLoading || (!needsCardRefresh && generationMode === 'missing' && missingVehicles.length === 0)}
-              onClick={() => {
-                if (needsCardRefresh || generationMode !== 'all' || window.confirm('준비된 모든 차량의 기존 카드를 새 버전으로 교체할까요?')) {
-                  void saveAllToAssetLibrary();
-                }
-              }}>
-              {busy ? (progress || '저장 중…') : (
-                <><CheckCircle2 className="size-4" />{needsCardRefresh ? '기사 정보 반영 · 전체 카드 갱신' : generationMode === 'missing' ? '비어 있는 카드 등록하기' : generationMode === 'selected' ? '선택 차량 등록' : '전체 카드 재생성'}</>
-              )}
+      <HqModal
+        isOpen={isOpen && !compareOpen}
+        title="배차카드 만들기"
+        subtitle="기사 정보 한 번으로 모든 차량 카드 완성"
+        icon={<img src="/images/icons/drivers/icon_profile_card.png" alt="" aria-hidden="true" draggable={false} className="size-10 shrink-0 object-contain" />}
+        onClose={closeModal}
+        className="max-w-[1180px]! w-full"
+        footer={
+          <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <HqButton variant="secondary" onClick={() => setDownloadsOpen(value => !value)}
+              disabled={!isComplete || busy || portraitSaving} aria-expanded={downloadsOpen} className="w-full sm:w-auto">
+              <Download className="size-4" /> 파일 다운로드 <ChevronDown className={'size-4 transition-transform ' + (downloadsOpen ? 'rotate-180' : '')} />
             </HqButton>
+            <div className="flex w-full gap-2 sm:w-auto">
+              <HqButton variant="subtle" onClick={closeModal} className="flex-1 sm:flex-none">닫기</HqButton>
+              <HqButton variant="primary" className="min-w-0 flex-[2] whitespace-nowrap sm:flex-none" loading={busy}
+                disabled={!isComplete || !dbReady || !summaryLoaded || busy || portraitSaving || photoUploading || previewLoading || (!needsCardRefresh && generationMode === 'missing' && missingVehicles.length === 0)}
+                onClick={() => {
+                  if (needsCardRefresh || generationMode !== 'all' || window.confirm('준비된 모든 차량의 기존 카드를 새 버전으로 교체할까요?')) {
+                    void saveAllToAssetLibrary();
+                  }
+                }}>
+                {busy ? (progress || '저장 중…') : (
+                  <><CheckCircle2 className="size-4" />{needsCardRefresh ? '기사 정보 반영 · 전체 카드 갱신' : generationMode === 'missing' ? '비어 있는 카드 등록하기' : generationMode === 'selected' ? '선택 차량 등록' : '전체 카드 재생성'}</>
+                )}
+              </HqButton>
+            </div>
           </div>
-        </div>
-      }
-    >
-      <div className="grid min-w-0 gap-5 lg:grid-cols-[340px_minmax(0,1fr)]">
-        <div className="min-w-0 space-y-4 lg:col-start-2 lg:row-start-1">
-          <HqCard className="overflow-visible">
-            <div className="relative z-10 space-y-4 px-4 py-4 sm:px-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-[14px] font-semibold text-[#21344D]">완성 카드 미리보기</h3>
-                  <p className="mt-1 text-[11px] text-[#8492A4]">차량을 선택하면 카드가 바로 바뀌어요.</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <HqSegmentedTabs aria-label="배차카드 미리보기 규격" value={orientation}
-                    onValueChange={value => setOrientation(value as CardOrientation)}
-                    tabs={[
-                      { id: 'pc', label: 'PC' },
-                      { id: 'mobile', label: '모바일' },
-                    ]} />
-                  <div className="hidden lg:block">
-                    <HqButton variant="secondary" size="sm"
-                      disabled={!isComplete || busy || portraitSaving || photoUploading}
-                      onClick={openComparison}>
-                      <Columns2 className="size-4" /> 동시 비교
-                    </HqButton>
+        }
+      >
+        <div className="grid min-w-0 gap-5 lg:grid-cols-[340px_minmax(0,1fr)]">
+          <div className="min-w-0 space-y-4 lg:col-start-2 lg:row-start-1">
+            <HqCard className="overflow-visible">
+              <div className="relative z-10 space-y-4 px-4 py-4 sm:px-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-[14px] font-semibold text-[#21344D]">완성 카드 미리보기</h3>
+                    <p className="mt-1 text-[11px] text-[#8492A4]">차량을 선택하면 카드가 바로 바뀌어요.</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <HqSegmentedTabs aria-label="배차카드 미리보기 규격" value={orientation}
+                      onValueChange={value => setOrientation(value as CardOrientation)}
+                      tabs={[
+                        { id: 'pc', label: 'PC' },
+                        { id: 'mobile', label: '모바일' },
+                      ]} />
+                    <div className="hidden lg:block">
+                      <HqButton variant="secondary" size="sm"
+                        disabled={!isComplete || busy || portraitSaving || photoUploading}
+                        onClick={openComparison}>
+                        <Columns2 className="size-4" /> 동시 비교
+                      </HqButton>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="space-y-2 rounded-[14px] bg-[#F7F9FC] p-3 sm:p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[12px] font-semibold text-[#526680]">미리보기 차량 선택</span>
-                  <span className="text-[11px] text-[#7B8AA0]">사진 준비 {availableVehicles.length}대</span>
-                </div>
-                <HqSearchSelect
-                  label="미리보기 차량 선택"
-                  value={vehicle?.uuid || ''}
-                  onChange={setSelectedVehicleId}
-                  disabled={!availableVehicles.length || busy}
-                  placeholder="이미지가 준비된 차량 없음"
-                  size="md"
-                  imageShape="vehicle"
-                  options={availableVehicles.map(item => ({
-                    value: item.uuid,
-                    label: item.plate,
-                    subtitle: dispatchCardVehicleLabel(item),
-                  }))}
-                />
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[#7B8AA0]">
-                  <span>외관 1장 · 실내 2장이 준비된 차량만 표시</span>
-                  {summaryLoaded && vehicle && (
-                    <span aria-live="polite">
-                      PC {currentCardStatus?.pc ? '최신' : currentCardStatus?.stalePc ? '갱신 필요' : '미등록'} · 모바일 {currentCardStatus?.mobile ? '최신' : currentCardStatus?.staleMobile ? '갱신 필요' : '미등록'}
-                    </span>
-                  )}
-                </div>
-                <p className="text-[11px] text-[#7B8AA0]">
-                  {summaryLoaded
-                    ? '전체 미생성 차량 ' + missingVehicles.length + '대'
-                    : '저장된 배차카드 확인 중…'}
-                </p>
-                {!dbReady && (
-                  <HqInlineFeedback tone="error" message="배차카드 DB 준비가 필요합니다. 미리보기·다운로드는 가능하지만 서버 등록은 차단됩니다." />
-                )}
-              </div>
-            </div>
-            <div className="border-t border-[#EEF1F5] px-3 pb-3 pt-3 sm:px-5">
-              <HqDispatchCardLiveEditor
-                mode={editMode}
-                onModeChange={setEditMode}
-                portraitPhotoUrl={photoUrl}
-                portraitPlacement={portraitPlacement}
-                onPortraitChange={setPortraitPlacement}
-                portraitDisabled={!portraitSettingsLoaded || busy || portraitSaving}
-                portraitDirty={portraitDirty}
-                vehiclePhotoSrc={photos?.[photoKind] || ''}
-                vehiclePlacement={currentPlacement}
-                vehicleKind={photoKind}
-                onVehicleKindChange={setPhotoKind}
-                onVehicleChange={updatePlacement}
-                onVehicleReset={() => {
-                  if (!vehicle) return;
-                  setPerVehiclePlacements(previous => ({
-                    ...previous,
-                    [vehicle.uuid]: { ...previous[vehicle.uuid], [photoKind]: DEFAULT_PLACEMENT },
-                  }));
-                }}
-                vehicleDisabled={!vehicle || busy}
-                orientation={orientation}
-              />
-            </div>
-            <div className="relative flex min-h-[280px] items-center justify-center rounded-b-[18px] bg-[#F5F7FA] p-4 sm:min-h-[370px] sm:p-6">
-              {previewLoading && (
-                <div role="status" aria-live="polite"
-                  className={previewUrl ? 'absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-[11px] bg-white/95 px-3 py-2 text-[11px] font-medium text-[#60728C] shadow-sm' : 'flex items-center gap-2 text-[12px] text-[#66778B]'}>
-                  <Loader2 className="size-4 animate-spin" /> {previewUrl ? '미리보기 갱신 중…' : '카드 생성 중…'}
-                </div>
-              )}
-              {previewUrl && isComplete && (
-                <img src={previewUrl} alt={vehicle?.plate + ' 배차카드 ' + orientation + ' 미리보기'}
-                  className="max-h-[55vh] max-w-full object-contain shadow-[0_12px_32px_rgba(15,25,45,.14)]" />
-              )}
-              {!previewLoading && (!isComplete || !previewUrl) && (
-                <div className="space-y-2 px-2 text-center text-[#8492A4]">
-                  <ImagePlus className="mx-auto size-8" strokeWidth={1.5} />
-                  <p className="text-[13px] font-semibold text-[#54657A]">기사 사진·한국어/영문 성명·직책·전화번호를 입력해 주세요.</p>
-                  <p className="text-[12px]">입력이 완료되면 선택한 차량 카드가 미리보기로 표시됩니다.</p>
-                </div>
-              )}
-            </div>
-          </HqCard>
-
-          {(error || message) && (
-            <HqInlineFeedback tone={error ? 'error' : 'success'} message={error || message} />
-          )}
-
-          <HqCard className="p-4 sm:p-5">
-            <button type="button" className="flex min-h-10 w-full items-center justify-between text-left"
-              onClick={() => setAdvancedOpen(value => !value)} aria-expanded={advancedOpen}>
-              <span className="text-[13px] font-semibold text-[#526680]">
-                {generationMode === 'missing' ? '미생성 카드만 추가' : generationMode === 'selected' ? '저장 범위 · 선택 차량' : '저장 범위 · 전체 재생성'}
-              </span>
-              <ChevronDown className={'size-4 text-[#8492A4] transition-transform ' + (advancedOpen ? 'rotate-180' : '')} />
-            </button>
-            <p className="mt-1 text-[11px] leading-relaxed text-[#8492A4]">
-              {generationMode === 'missing'
-                ? '기존 카드는 유지하고 비어 있는 카드만 채워요.'
-                : generationMode === 'selected'
-                  ? '선택한 차량의 PC·모바일 카드를 새 버전으로 저장합니다.'
-                  : '이미지 준비된 모든 차량의 카드를 새 버전으로 다시 생성합니다.'}
-            </p>
-            {advancedOpen && (
-              <div className="mt-4 border-t border-[#EEF1F6] pt-4">
-                <HqSegmentedTabs aria-label="배차카드 저장 범위" value={generationMode}
-                  onValueChange={value => setGenerationMode(value as GenerationMode)}
-                  tabs={[
-                    { id: 'missing', label: '미생성만 추가' },
-                    { id: 'selected', label: '선택 차량' },
-                    { id: 'all', label: '전체 재생성' },
-                  ]} />
-                {generationMode === 'all' && (
-                  <HqInlineFeedback tone="error" message="전체 재생성은 기존 카드의 활성 버전을 교체합니다. 저장 전에 한 번 더 확인합니다." className="mt-3" />
-                )}
-              </div>
-            )}
-          </HqCard>
-
-          {downloadsOpen && (
-            <HqCard className="p-4 sm:p-5">
-              <h3 className="mb-3 text-[13px] font-semibold text-[#526680]">파일 다운로드</h3>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <HqButton variant="secondary" onClick={() => void downloadSingle()}
-                  disabled={!isComplete || busy || portraitSaving || photoUploading || previewLoading || needsCardRefresh} className="w-full sm:w-auto">
-                  <Download className="size-4" /> 선택한 {orientation === 'pc' ? 'PC' : '모바일'} 카드 PNG
-                </HqButton>
-                <HqButton variant="secondary" onClick={() => void downloadAll()}
-                  disabled={!isComplete || busy || portraitSaving || photoUploading || previewLoading || needsCardRefresh} className="w-full sm:w-auto">
-                  <Download className="size-4" /> 준비된 차량 전체 ZIP
-                </HqButton>
-              </div>
-            </HqCard>
-          )}
-        </div>
-        <div className="min-w-0 space-y-4 lg:col-start-1 lg:row-start-1">
-          <HqCard className="p-4 sm:p-5">
-            <h3 className="mb-4 text-[14px] font-semibold text-[#21344D]">기사 정보</h3>
-            <div className="mb-5 flex items-center gap-3">
-              <div className="flex size-[92px] shrink-0 items-center justify-center overflow-hidden rounded-[15px] bg-[#F5F7FA]">
-                {photoUrl ? <img src={photoUrl} alt="기사 프로필" className="size-full object-contain" /> :
-                  <ImagePlus className="size-8 text-[#94A1B2]" strokeWidth={1.6} aria-hidden="true" />}
-              </div>
-              <div className="min-w-0 space-y-2">
-                <p className="text-[12px] leading-relaxed text-[#73839A]">정면 상반신 · 투명 배경(PNG) 권장</p>
-                <input ref={fileRef} className="hidden" type="file" accept="image/png,image/jpeg,image/webp"
-                  onChange={event => {
-                    const file = event.target.files?.[0];
-                    if (file) void handleProfileFile(file);
-                    event.target.value = '';
-                  }} />
-                <HqButton variant="secondary" size="sm" disabled={photoUploading || photoLoading || busy}
-                  onClick={() => fileRef.current?.click()}>
-                  {photoUploading || photoLoading ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
-                  {photoUrl ? '사진 변경' : '사진 업로드'}
-                </HqButton>
-              </div>
-            </div>
-            <div className="space-y-3">
-              {([
-                { label: '한국어 성명', value: name, onChange: updateKoreanName, placeholder: '윤태준', id: 'dispatch-card-korean-name' },
-                { label: '영문 성명', value: englishName, onChange: setEnglishName, placeholder: suggestedEnglishName || 'Tae-jun Yun', id: 'dispatch-card-english-name' },
-                { label: '전화번호', value: phone, onChange: setPhone, placeholder: '+82-10-1234-5678', id: 'dispatch-card-phone' },
-              ] as const).map(field => (
-                <div key={field.id} className="space-y-1.5">
-                  <label htmlFor={field.id} className="block text-[12px] font-medium text-[#526680]">
-                    {field.label}
-                  </label>
-                  <div className="relative">
-                    <HqInput
-                      id={field.id}
-                      value={field.value}
-                      onChange={event => field.onChange(field.label === '전화번호'
-                        ? formatKoreanMobileInternationalInput(event.target.value) : event.target.value)}
-                      onFocus={field.label === '영문 성명' ? applySuggestedEnglishName : undefined}
-                      onClick={field.label === '영문 성명' ? applySuggestedEnglishName : undefined}
-                      placeholder={field.placeholder}
-                      maxLength={field.label === '전화번호' ? 24 : 90}
-                      inputMode={field.label === '전화번호' ? 'tel' : 'text'}
-                      style={field.label === '영문 성명' && suggestedEnglishName && englishName !== suggestedEnglishName
-                        ? { paddingRight: '108px' } : undefined}
-                    />
-                    {field.label === '영문 성명' && suggestedEnglishName && englishName !== suggestedEnglishName && (
-                      <button
-                        type="button"
-                        disabled={busy || portraitSaving}
-                        onClick={() => setEnglishName(suggestedEnglishName)}
-                        className="absolute right-1 top-1/2 min-h-10 -translate-y-1/2 rounded-[10px] bg-[#F1F5FB] px-3 text-[12px] font-semibold text-[#1E60F3] disabled:opacity-50"
-                        aria-label={'추천 영문 성명 ' + suggestedEnglishName + ' 적용'}
-                      >
-                        {englishName ? '표준 적용' : '추천 적용'}
-                      </button>
+                <div className="space-y-2 rounded-[14px] bg-[#F7F9FC] p-3 sm:p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[12px] font-semibold text-[#526680]">미리보기 차량 선택</span>
+                    <span className="text-[11px] text-[#7B8AA0]">사진 준비 {availableVehicles.length}대</span>
+                  </div>
+                  <HqSearchSelect
+                    label="미리보기 차량 선택"
+                    value={vehicle?.uuid || ''}
+                    onChange={setSelectedVehicleId}
+                    disabled={!availableVehicles.length || busy}
+                    placeholder="이미지가 준비된 차량 없음"
+                    size="md"
+                    imageShape="vehicle"
+                    options={availableVehicles.map(item => ({
+                      value: item.uuid,
+                      label: item.plate,
+                      subtitle: dispatchCardVehicleLabel(item),
+                    }))}
+                  />
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[#7B8AA0]">
+                    <span>외관 1장 · 실내 2장이 준비된 차량만 표시</span>
+                    {summaryLoaded && vehicle && (
+                      <span aria-live="polite">
+                        PC {currentCardStatus?.pc ? '최신' : currentCardStatus?.stalePc ? '갱신 필요' : '미등록'} · 모바일 {currentCardStatus?.mobile ? '최신' : currentCardStatus?.staleMobile ? '갱신 필요' : '미등록'}
+                      </span>
                     )}
                   </div>
+                  <p className="text-[11px] text-[#7B8AA0]">
+                    {summaryLoaded
+                      ? '전체 미생성 차량 ' + missingVehicles.length + '대'
+                      : '저장된 배차카드 확인 중…'}
+                  </p>
+                  {!dbReady && (
+                    <HqInlineFeedback tone="error" message="배차카드 DB 준비가 필요합니다. 미리보기·다운로드는 가능하지만 서버 등록은 차단됩니다." />
+                  )}
                 </div>
-              ))}
-              <p className="rounded-[12px] bg-[#F7F9FC] px-3 py-2.5 text-[11px] leading-relaxed text-[#718198]">
-                영문 성명 입력창에 추천 이름이 표시돼요. 입력창을 한 번 누르거나 ‘추천 적용’을 누르면 채워집니다.
-                이미 저장된 영문 이름은 그대로 유지하고, 한국어 성명을 바꾸면 추천도 함께 바뀌어요.
-              </p>
-              <div className="space-y-1.5">
-                <span className="block text-[12px] font-medium text-[#526680]">직책</span>
-                <HqSearchSelect
-                  label="기사 직책 선택"
-                  value={positionCode}
-                  onChange={next => setPositionCode(next as ChauffeurPositionCode | '')}
-                  placeholder="직책 선택"
-                  emptyLabel="선택하지 않음"
-                  searchable={false}
-                  size="md"
-                  options={CHAUFFEUR_POSITION_OPTIONS.map(option => ({
-                    value: option.value,
-                    label: option.label,
-                    subtitle: option.english,
-                  }))}
-                  disabled={busy || portraitSaving}
+              </div>
+              <div className="border-t border-[#EEF1F5] px-3 pb-3 pt-3 sm:px-5">
+                <HqDispatchCardLiveEditor
+                  mode={editMode}
+                  onModeChange={setEditMode}
+                  portraitPhotoUrl={photoUrl}
+                  portraitPlacement={portraitPlacement}
+                  onPortraitChange={setPortraitPlacement}
+                  portraitDisabled={!portraitSettingsLoaded || busy || portraitSaving}
+                  portraitDirty={portraitDirty}
+                  vehiclePhotoSrc={photos?.[photoKind] || ''}
+                  vehiclePlacement={currentPlacement}
+                  vehicleKind={photoKind}
+                  onVehicleKindChange={setPhotoKind}
+                  onVehicleChange={updatePlacement}
+                  onVehicleReset={() => {
+                    if (!vehicle) return;
+                    setPerVehiclePlacements(previous => ({
+                      ...previous,
+                      [vehicle.uuid]: { ...previous[vehicle.uuid], [photoKind]: DEFAULT_PLACEMENT },
+                    }));
+                  }}
+                  vehicleDisabled={!vehicle || busy}
+                  orientation={orientation}
                 />
               </div>
-            </div>
-            <p className="mt-3 text-[11px] leading-relaxed text-[#8492A4]">
-              카드엔 영문 직책만 표시되며, 원본 프로필은 유지돼요.
-            </p>
-          </HqCard>
+              <div className="relative flex min-h-[280px] items-center justify-center rounded-b-[18px] bg-[#F5F7FA] p-4 sm:min-h-[370px] sm:p-6">
+                {previewLoading && (
+                  <div role="status" aria-live="polite"
+                    className={previewUrl ? 'absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-[11px] bg-white/95 px-3 py-2 text-[11px] font-medium text-[#60728C] shadow-sm' : 'flex items-center gap-2 text-[12px] text-[#66778B]'}>
+                    <Loader2 className="size-4 animate-spin" /> {previewUrl ? '미리보기 갱신 중…' : '카드 생성 중…'}
+                  </div>
+                )}
+                {previewUrl && isComplete && (
+                  <img src={previewUrl} alt={vehicle?.plate + ' 배차카드 ' + orientation + ' 미리보기'}
+                    className="max-h-[55vh] max-w-full object-contain shadow-[0_12px_32px_rgba(15,25,45,.14)]" />
+                )}
+                {!previewLoading && (!isComplete || !previewUrl) && (
+                  <div className="space-y-2 px-2 text-center text-[#8492A4]">
+                    <ImagePlus className="mx-auto size-8" strokeWidth={1.5} />
+                    <p className="text-[13px] font-semibold text-[#54657A]">기사 사진·한국어/영문 성명·직책·전화번호를 입력해 주세요.</p>
+                    <p className="text-[12px]">입력이 완료되면 선택한 차량 카드가 미리보기로 표시됩니다.</p>
+                  </div>
+                )}
+              </div>
+            </HqCard>
+
+            {(error || message) && (
+              <HqInlineFeedback tone={error ? 'error' : 'success'} message={error || message} />
+            )}
+
+            <HqCard className="p-4 sm:p-5">
+              <button type="button" className="flex min-h-10 w-full items-center justify-between text-left"
+                onClick={() => setAdvancedOpen(value => !value)} aria-expanded={advancedOpen}>
+                <span className="text-[13px] font-semibold text-[#526680]">
+                  {generationMode === 'missing' ? '미생성 카드만 추가' : generationMode === 'selected' ? '저장 범위 · 선택 차량' : '저장 범위 · 전체 재생성'}
+                </span>
+                <ChevronDown className={'size-4 text-[#8492A4] transition-transform ' + (advancedOpen ? 'rotate-180' : '')} />
+              </button>
+              <p className="mt-1 text-[11px] leading-relaxed text-[#8492A4]">
+                {generationMode === 'missing'
+                  ? '기존 카드는 유지하고 비어 있는 카드만 채워요.'
+                  : generationMode === 'selected'
+                    ? '선택한 차량의 PC·모바일 카드를 새 버전으로 저장합니다.'
+                    : '이미지 준비된 모든 차량의 카드를 새 버전으로 다시 생성합니다.'}
+              </p>
+              {advancedOpen && (
+                <div className="mt-4 border-t border-[#EEF1F6] pt-4">
+                  <HqSegmentedTabs aria-label="배차카드 저장 범위" value={generationMode}
+                    onValueChange={value => setGenerationMode(value as GenerationMode)}
+                    tabs={[
+                      { id: 'missing', label: '미생성만 추가' },
+                      { id: 'selected', label: '선택 차량' },
+                      { id: 'all', label: '전체 재생성' },
+                    ]} />
+                  {generationMode === 'all' && (
+                    <HqInlineFeedback tone="error" message="전체 재생성은 기존 카드의 활성 버전을 교체합니다. 저장 전에 한 번 더 확인합니다." className="mt-3" />
+                  )}
+                </div>
+              )}
+            </HqCard>
+
+            {downloadsOpen && (
+              <HqCard className="p-4 sm:p-5">
+                <h3 className="mb-3 text-[13px] font-semibold text-[#526680]">파일 다운로드</h3>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <HqButton variant="secondary" onClick={() => void downloadSingle()}
+                    disabled={!isComplete || busy || portraitSaving || photoUploading || previewLoading || needsCardRefresh} className="w-full sm:w-auto">
+                    <Download className="size-4" /> 선택한 {orientation === 'pc' ? 'PC' : '모바일'} 카드 PNG
+                  </HqButton>
+                  <HqButton variant="secondary" onClick={() => void downloadAll()}
+                    disabled={!isComplete || busy || portraitSaving || photoUploading || previewLoading || needsCardRefresh} className="w-full sm:w-auto">
+                    <Download className="size-4" /> 준비된 차량 전체 ZIP
+                  </HqButton>
+                </div>
+              </HqCard>
+            )}
+          </div>
+          <div className="min-w-0 space-y-4 lg:col-start-1 lg:row-start-1">
+            <HqCard className="p-4 sm:p-5">
+              <h3 className="mb-4 text-[14px] font-semibold text-[#21344D]">기사 정보</h3>
+              <div className="mb-5 flex items-center gap-3">
+                <div className="flex size-[92px] shrink-0 items-center justify-center overflow-hidden rounded-[15px] bg-[#F5F7FA]">
+                  {photoUrl ? <img src={photoUrl} alt="기사 프로필" className="size-full object-contain" /> :
+                    <ImagePlus className="size-8 text-[#94A1B2]" strokeWidth={1.6} aria-hidden="true" />}
+                </div>
+                <div className="min-w-0 space-y-2">
+                  <p className="text-[12px] leading-relaxed text-[#73839A]">정면 상반신 · 투명 배경(PNG) 권장</p>
+                  <input ref={fileRef} className="hidden" type="file" accept="image/png,image/jpeg,image/webp"
+                    onChange={event => {
+                      const file = event.target.files?.[0];
+                      if (file) void handleProfileFile(file);
+                      event.target.value = '';
+                    }} />
+                  <HqButton variant="secondary" size="sm" disabled={photoUploading || photoLoading || busy}
+                    onClick={() => fileRef.current?.click()}>
+                    {photoUploading || photoLoading ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
+                    {photoUrl ? '사진 변경' : '사진 업로드'}
+                  </HqButton>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {([
+                  { label: '한국어 성명', value: name, onChange: updateKoreanName, placeholder: '윤태준', id: 'dispatch-card-korean-name' },
+                  { label: '영문 성명', value: englishName, onChange: setEnglishName, placeholder: suggestedEnglishName || 'Tae-jun Yun', id: 'dispatch-card-english-name' },
+                  { label: '전화번호', value: phone, onChange: setPhone, placeholder: '+82-10-1234-5678', id: 'dispatch-card-phone' },
+                ] as const).map(field => (
+                  <div key={field.id} className="space-y-1.5">
+                    <label htmlFor={field.id} className="block text-[12px] font-medium text-[#526680]">
+                      {field.label}
+                    </label>
+                    <div className="relative">
+                      <HqInput
+                        id={field.id}
+                        value={field.value}
+                        onChange={event => field.onChange(field.label === '전화번호'
+                          ? formatKoreanMobileInternationalInput(event.target.value) : event.target.value)}
+                        onFocus={field.label === '영문 성명' ? applySuggestedEnglishName : undefined}
+                        onClick={field.label === '영문 성명' ? applySuggestedEnglishName : undefined}
+                        placeholder={field.placeholder}
+                        maxLength={field.label === '전화번호' ? 24 : 90}
+                        inputMode={field.label === '전화번호' ? 'tel' : 'text'}
+                        style={field.label === '영문 성명' && suggestedEnglishName && englishName !== suggestedEnglishName
+                          ? { paddingRight: '108px' } : undefined}
+                      />
+                      {field.label === '영문 성명' && suggestedEnglishName && englishName !== suggestedEnglishName && (
+                        <button
+                          type="button"
+                          disabled={busy || portraitSaving}
+                          onClick={() => setEnglishName(suggestedEnglishName)}
+                          className="absolute right-1 top-1/2 min-h-10 -translate-y-1/2 rounded-[10px] bg-[#F1F5FB] px-3 text-[12px] font-semibold text-[#1E60F3] disabled:opacity-50"
+                          aria-label={'추천 영문 성명 ' + suggestedEnglishName + ' 적용'}
+                        >
+                          {englishName ? '표준 적용' : '추천 적용'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <p className="rounded-[12px] bg-[#F7F9FC] px-3 py-2.5 text-[11px] leading-relaxed text-[#718198]">
+                  영문 성명 입력창에 추천 이름이 표시돼요. 입력창을 한 번 누르거나 ‘추천 적용’을 누르면 채워집니다.
+                  이미 저장된 영문 이름은 그대로 유지하고, 한국어 성명을 바꾸면 추천도 함께 바뀌어요.
+                </p>
+                <div className="space-y-1.5">
+                  <span className="block text-[12px] font-medium text-[#526680]">직책</span>
+                  <HqSearchSelect
+                    label="기사 직책 선택"
+                    value={positionCode}
+                    onChange={next => setPositionCode(next as ChauffeurPositionCode | '')}
+                    placeholder="직책 선택"
+                    emptyLabel="선택하지 않음"
+                    searchable={false}
+                    size="md"
+                    options={CHAUFFEUR_POSITION_OPTIONS.map(option => ({
+                      value: option.value,
+                      label: option.label,
+                      subtitle: option.english,
+                    }))}
+                    disabled={busy || portraitSaving}
+                  />
+                </div>
+              </div>
+              <p className="mt-3 text-[11px] leading-relaxed text-[#8492A4]">
+                카드엔 영문 직책만 표시되며, 원본 프로필은 유지돼요.
+              </p>
+            </HqCard>
+
+          </div>
 
         </div>
-
-      </div>
-    </HqModal>
-    {compareInputs && vehicle && (
-      <HqDispatchCardCompareModal
-        isOpen={isOpen && compareOpen}
-        onClose={closeComparison}
-        vehiclePlate={vehicle.plate}
-        vehicleModel={dispatchCardVehicleLabel(vehicle)}
-        inputs={compareInputs}
-      />
-    )}
+      </HqModal>
+      {compareInputs && vehicle && (
+        <HqDispatchCardCompareModal
+          isOpen={isOpen && compareOpen}
+          onClose={closeComparison}
+          vehiclePlate={vehicle.plate}
+          vehicleModel={dispatchCardVehicleLabel(vehicle)}
+          inputs={compareInputs}
+        />
+      )}
     </>
   );
 };

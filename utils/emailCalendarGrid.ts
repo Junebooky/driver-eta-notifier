@@ -125,25 +125,34 @@ export function flightFromOriginal(text: string): ExcelExtractedFlight | undefin
   let originAirport = pair?.[1] || text.toUpperCase().match(/\bFROM\s+([A-Z]{3})\b/)?.[1];
   let destinationAirport = pair?.[2] || text.toUpperCase().match(/\b(?:INTO|TO)\s+([A-Z]{3})\b/)?.[1];
 
-  if (!destinationAirport && originAirport !== 'GMP' && /(?:\bGMP\b|gimpo|김포)/i.test(text)) {
-    destinationAirport = 'GMP';
-  } else if (!destinationAirport && originAirport !== 'ICN' && /(?:\bICN\b|incheon|인천)/i.test(text)) {
-    destinationAirport = 'ICN';
-  }
-  if (!originAirport && destinationAirport !== 'GMP' && /\bfrom\s+(?:gimpo|김포)/i.test(text)) {
-    originAirport = 'GMP';
-  } else if (!originAirport && destinationAirport !== 'ICN' && /\bfrom\s+(?:incheon|인천)/i.test(text)) {
-    originAirport = 'ICN';
+  const hasDepartureCue = /\b(?:depart(?:ing|ure)?|leave\s+for|flight\s+out)\b|출발|출국/i.test(text);
+  const hasArrivalCue = /\b(?:arriving|arrive|arrival)\b|도착|입국/i.test(text);
+  const mentionedGmp = /(?:\bGMP\b|gimpo|김포)/i.test(text);
+  const mentionedIcn = /(?:\bICN\b|incheon|인천)/i.test(text);
+
+  if (hasDepartureCue && !hasArrivalCue) {
+    if (!originAirport && mentionedGmp && destinationAirport !== 'GMP') originAirport = 'GMP';
+    else if (!originAirport && mentionedIcn && destinationAirport !== 'ICN') originAirport = 'ICN';
+  } else {
+    if (!destinationAirport && originAirport !== 'GMP' && mentionedGmp) destinationAirport = 'GMP';
+    else if (!destinationAirport && originAirport !== 'ICN' && mentionedIcn) destinationAirport = 'ICN';
+    if (!originAirport && destinationAirport !== 'GMP' && /\bfrom\s+(?:gimpo|김포)/i.test(text)) {
+      originAirport = 'GMP';
+    } else if (!originAirport && destinationAirport !== 'ICN' && /\bfrom\s+(?:incheon|인천)/i.test(text)) {
+      originAirport = 'ICN';
+    }
   }
 
   let role: ExcelExtractedFlight['role'];
-  if (destinationAirport && KOREAN_AIRPORT_CODES.has(destinationAirport)) {
+  if (hasDepartureCue && !hasArrivalCue && (!destinationAirport || !KOREAN_AIRPORT_CODES.has(destinationAirport))) {
+    role = 'departure';
+  } else if (destinationAirport && KOREAN_AIRPORT_CODES.has(destinationAirport)) {
     role = 'arrival';
   } else if (originAirport && KOREAN_AIRPORT_CODES.has(originAirport)) {
     role = 'departure';
-  } else if (/\b(?:arriving|arrive|arrival)\b|도착|입국/i.test(text)) {
+  } else if (hasArrivalCue) {
     role = 'arrival';
-  } else if (/\b(?:departing|depart|departure)\b|출발|출국/i.test(text)) {
+  } else if (hasDepartureCue) {
     role = 'departure';
   }
 

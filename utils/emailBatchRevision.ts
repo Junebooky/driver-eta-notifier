@@ -213,8 +213,6 @@ export function buildEmailBatchRevisionApproval(
     if(issues.length)throw new Error(issues[0]);
   }
   if (draft.tripType === 'cancellation') throw new Error('전체 취소 요청은 별도로 확인해 주세요.');
-  if (draft.tripType === 'group' && draft.groupTrips?.length)
-    throw new Error('승객별 개별 출발 경로가 있는 예약은 차량별 TMAP 경로를 먼저 확정해 주세요.');
   const rows = emailBatchRows(draft, slots, candidates, decisions, assignments);
   if (!rows.length || rows.length > 80) throw new Error('일괄 배차는 1~80건까지 검토할 수 있습니다.');
   const selected = new Set<string>();
