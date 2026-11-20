@@ -89,8 +89,13 @@ export async function GET(req: NextRequest) {
           { status: 400 }
         );
       }
+      // Only expose current version assets; static images older than
+      // this driver's latest identity / photo edit are not distributable.
+      const currentBundle = await getDriverVehicleBundle(
+        driverId, resolvedVehicle.uuid, undefined, org, resolvedVehicle,
+      );
       if (variant) {
-        const info = await getDriverVehicleInfoAsset(driverId, resolvedVehicle.uuid, variant, org);
+        const info = variant === 'pc' ? currentBundle.pcInfo : currentBundle.mobileInfo;
         return NextResponse.json({
           ok: true,
           isDbReady: dbCheck.isReady,
@@ -98,10 +103,7 @@ export async function GET(req: NextRequest) {
           info,
         });
       }
-      const [pcInfo, mobileInfo] = await Promise.all([
-        getDriverVehicleInfoAsset(driverId, resolvedVehicle.uuid, 'pc', org),
-        getDriverVehicleInfoAsset(driverId, resolvedVehicle.uuid, 'mobile', org),
-      ]);
+      const { pcInfo, mobileInfo } = currentBundle;
       return NextResponse.json({
         ok: true,
         isDbReady: dbCheck.isReady,

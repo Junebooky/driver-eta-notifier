@@ -7,6 +7,7 @@ import {
   createSignedAssetUrl,
   getDriverProfileStoragePath,
   getDriverVehicleInfoAsset,
+  getDriverProfileAsset,
   getDriverVehicleInfoStoragePath,
   normalizeExtension,
   saveDriverProfileAsset,
@@ -14,6 +15,7 @@ import {
   validateAssetUpload,
 } from '@/lib/assets/driverAssetServerStore';
 import { resolveRegisteredFleetVehicle } from '@/lib/fleet/resolveRegisteredVehicle';
+import { isDispatchCardAssetStale } from '@/lib/dispatchCards/cardRevision';
 
 export const dynamic = 'force-dynamic';
 
@@ -189,7 +191,19 @@ export async function POST(req: NextRequest) {
       if (formData.get('skipIfExists') === 'true') {
         const existing = await getDriverVehicleInfoAsset(driverId, effVehicle.uuid, variant, org);
         if (existing) {
-          return NextResponse.json({ ok: true, skipped: true, asset: existing });
+          const { data: driver, error: driverError } = await supabaseAdmin
+            .from('drivers').select('driver_meta').eq('id', driverId).maybeSingle();
+          if (driverError || !driver) {
+            return NextResponse.json({ ok: false, error: '기사 카드 최신 상태를 확인하지 못했습니다.' }, { status: 503 });
+          }
+          const meta = driver.driver_meta && typeof driver.driver_meta === 'object'
+            ? driver.driver_meta as Record<string, unknown> : {};
+          const currentPhoto = await getDriverProfileAsset(driverId, org);
+          const stale = isDispatchCardAssetStale(meta.dispatch_card_revision_at, existing.createdAt) ||
+            isDispatchCardAssetStale(currentPhoto?.createdAt, existing.createdAt);
+          if (!stale) {
+            return NextResponse.json({ ok: true, skipped: true, asset: existing });
+          }
         }
       }
 
@@ -297,6 +311,7 @@ export async function POST(req: NextRequest) {
               ...currentMeta,
               avatar_url: avatarUrl,
               avatar_storage_path: storagePath,
+              dispatch_card_revision_at: new Date().toISOString(),
             },
           })
           .eq('id', driverId);
