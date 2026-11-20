@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CheckCircle2, Download, ImagePlus, Loader2,
-  UserRound, ChevronDown, Columns2,
+  ChevronDown, Columns2,
 } from 'lucide-react';
 import type { HqDriverSummary } from '@/types/driverHq';
 import type { VipRealVehicle } from '@/utils/vehicleData';
@@ -782,7 +782,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
             <div className="mb-5 flex items-center gap-3">
               <div className="flex size-[92px] shrink-0 items-center justify-center overflow-hidden rounded-[15px] bg-[#F5F7FA]">
                 {photoUrl ? <img src={photoUrl} alt="기사 프로필" className="size-full object-contain" /> :
-                  <UserRound className="size-7 text-[#A0ACBB]" />}
+                  <img src="/images/icons/drivers/icon_driver.png" alt="기사 목록 아이콘" draggable={false} className="size-12 object-contain" />}
               </div>
               <div className="min-w-0 space-y-2">
                 <p className="text-[12px] leading-relaxed text-[#73839A]">정면 상반신 · 투명 배경(PNG) 권장</p>
