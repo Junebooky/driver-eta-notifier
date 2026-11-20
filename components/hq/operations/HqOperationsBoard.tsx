@@ -1005,70 +1005,54 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               : group.schedules;
 
           return (
-            <div
-              key={group.id}
-              className="overflow-hidden rounded-[24px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] transition-all duration-200"
-            >
+            <HqCard key={group.id} className="overflow-hidden rounded-[20px] bg-white sm:rounded-[24px]">
               {/* Event Header */}
-              <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col gap-3 bg-white">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-col gap-2.5 bg-white p-3 sm:gap-3 sm:border-b sm:border-[#F0F3F6] sm:p-5">
+                <div className="flex items-start justify-between gap-2 sm:items-center">
                   {/* Left: Customer Tag & Event Name */}
-                  <div className="flex items-center gap-2.5">
-                    <span className="rounded-full bg-[#F7F9FC] px-3 py-1.5 text-[12px] font-medium text-[#73839D]">
-                      {group.customerTag}
-                    </span>
-                    <h2 className="text-[18px] font-bold tracking-[-0.03em] text-[#17233B] sm:text-[20px]">
+                  <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:gap-2.5">
+                    <HqBadge tone="neutral" className="max-w-full shrink-0 truncate">{group.customerTag}</HqBadge>
+                    <h2 className="min-w-0 break-words text-[16px] font-bold leading-snug tracking-[-0.03em] text-[#17233B] sm:text-[20px]">
                       {group.eventName}
                     </h2>
                   </div>
 
-                  {/* Right Actions: Event Info & Accordion Toggle */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        haptics.lightTap();
-                        setDeleteError(null);
-                        // Search may show only one matching driver; the action must
-                        // still target the complete unfiltered customer card.
-                        setEventToDelete(eventGroups.find(item => item.id === group.id) || group);
-                      }}
-                      aria-label={`${group.customerTag} 행사 삭제`}
-                      className="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[13px] bg-[#F7F9FC] px-3 text-[12px] font-medium text-[#73839D] transition-colors hover:bg-[#FFF4F2] hover:text-[#A34E45]"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" strokeWidth={1.7} />
-                      <span>행사 삭제</span>
-                    </button>
-                    <button
-                      type="button"
+                  {/* Compact actions: trash sits in the card's top-right corner. */}
+                  <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+                    <HqButton variant="subtle" size="sm"
+                      aria-label={`${group.eventName} 행사 정보`} title="행사 정보"
+                      className="min-w-10 px-2 sm:px-3"
                       onClick={() => {
                         haptics.lightTap();
                         setSelectedEventInfo(group);
-                      }}
-                      className="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[13px] bg-white px-3.5 text-[12px] font-semibold text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.05)] transition-colors hover:bg-[#F5F8FF]"
-                    >
-                      <span>행사 정보</span>
-                      <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => toggleEventAccordion(group.id)}
-                      className="flex size-10 cursor-pointer items-center justify-center rounded-[13px] bg-[#F7F9FC] text-[#73839D] transition-colors hover:bg-[#EDF1F6]"
-                      aria-label="아코디언 토글"
-                    >
-                      {isExpanded ? (
-                        <ChevronUp className="w-4 h-4 text-slate-600" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-slate-600" />
-                      )}
-                    </button>
+                      }}>
+                      <span className="hidden sm:inline">행사 정보</span>
+                      <ExternalLink className="size-4" aria-hidden="true"/>
+                    </HqButton>
+                    <HqIconButton variant="subtle" size="sm"
+                      aria-label={isExpanded?'배차 목록 접기':'배차 목록 펼치기'}
+                      aria-expanded={isExpanded}
+                      onClick={() => toggleEventAccordion(group.id)}>
+                      {isExpanded?<ChevronUp className="size-4" aria-hidden="true"/>:
+                        <ChevronDown className="size-4" aria-hidden="true"/>}
+                    </HqIconButton>
+                    <HqIconButton variant="subtle" size="sm"
+                      aria-label={`${group.customerTag} 행사 삭제`} title="행사 삭제"
+                      className="hover:!bg-[#FFF4F2] hover:!text-[#A34E45]"
+                      onClick={() => {
+                        haptics.lightTap();
+                        setDeleteError(null);
+                        // Filtered cards still delete the entire original event.
+                        setEventToDelete(eventGroups.find(item => item.id === group.id) || group);
+                      }}>
+                      <Trash2 className="size-4" aria-hidden="true"/>
+                    </HqIconButton>
                   </div>
                 </div>
 
                 {/* Event Meta Row (Pill Cards) */}
-                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 font-medium">
-                  <div className="inline-flex items-center gap-1.5 rounded-[12px] bg-[#F7F9FC] px-3 py-1.5 text-[12px] font-medium text-[#4D607C]">
+                <div className="grid grid-cols-2 gap-1.5 text-xs font-medium text-[#73839D] sm:flex sm:flex-wrap sm:items-center sm:gap-2">
+                  <div className="inline-flex min-w-0 items-center gap-1.5 rounded-[11px] bg-[#F7F9FC] px-2 py-2 text-[11px] font-medium text-[#4D607C] sm:rounded-[12px] sm:px-3 sm:py-1.5 sm:text-[12px]">
                     <img
                       src="/images/icons/driver_ui/icon_calendar.png"
                       alt="일정"
@@ -1079,12 +1063,12 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                     </span>
                   </div>
 
-                  <div className="inline-flex items-center gap-1.5 rounded-[12px] bg-[#F7F9FC] px-3 py-1.5 text-[12px] font-medium text-[#4D607C]">
+                  <div className="inline-flex min-w-0 items-center gap-1.5 rounded-[11px] bg-[#F7F9FC] px-2 py-2 text-[11px] font-medium text-[#4D607C] sm:rounded-[12px] sm:px-3 sm:py-1.5 sm:text-[12px]">
                     <Car className="w-3.5 h-3.5 text-blue-600" />
                     <span>총 {totalVehiclesCount}대 배차</span>
                   </div>
 
-                  <div className="inline-flex max-w-full items-center gap-1.5 truncate rounded-[12px] bg-[#F7F9FC] px-3 py-1.5 text-[12px] font-medium text-[#4D607C]">
+                  <div className="col-span-2 inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-[11px] bg-[#F7F9FC] px-2 py-2 text-[11px] font-medium text-[#4D607C] sm:rounded-[12px] sm:px-3 sm:py-1.5 sm:text-[12px]">
                     <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <span className="truncate">{group.routeSummary}</span>
                   </div>
@@ -1095,7 +1079,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               {isExpanded && (
                 <div>
                   {/* Inner Sub-header: Count & Status Chips */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 bg-[#FAFBFD] px-5 py-3.5 text-[12px]">
+                  <div className="flex flex-col gap-2 bg-[#FAFBFD] px-3 py-2.5 text-[12px] sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3 sm:px-5 sm:py-3.5">
                     <div className="font-black text-slate-900 flex items-center gap-2">
                       <span>배차 목록</span>
                       <span className="rounded-full bg-[#F7F9FC] px-2.5 py-1 text-[11px] font-medium text-[#73839D]">
@@ -1402,7 +1386,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                   )}
                 </div>
               )}
-            </div>
+            </HqCard>
           );
         })}
 
