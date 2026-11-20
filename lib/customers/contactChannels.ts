@@ -48,7 +48,7 @@ export function normalizeContactChannels(value:unknown):ContactChannelValidation
   };
   const phones=parse('phones'),emails=parse('emails');
   if(!phones||!emails)return {ok:false,error:'연락처와 이메일은 각각 최대 10개까지 입력할 수 있습니다.'};
-  if(phones.some(v=>!^[+\d()\s.\-]+$/.test(v)||!/\d/.test(v)))
+  if(phones.some(v=>!/^[+\d()\s.\-]+$/.test(v)||!/\d/.test(v)))
     return {ok:false,error:'전화번호는 숫자와 +, -, 괄호 등만 입력해 주세요.'};
   if(emails.some(v=>!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)))
     return {ok:false,error:'이메일 주소를 확인해 주세요.'};
