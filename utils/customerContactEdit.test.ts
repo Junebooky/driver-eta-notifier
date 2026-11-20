@@ -5,6 +5,7 @@ import {join} from 'node:path';
 import {NextRequest} from 'next/server';
 import {supabaseAdmin} from '@/lib/supabase/server';
 import {signCockpitSession} from '@/lib/auth/serverAuth';
+import {formatPhoneNumber} from '@/utils/formatters';
 import {PATCH} from '@/app/api/hq/customers/route';
 import {
   contactPhones,contactEmails,draftFromContact,normalizeContactChannels,updateContactDetails,
@@ -36,6 +37,28 @@ test('legacy single phone and email are editable; ordered multiple channels reta
   assert.equal(updated.contacts[1].name,'다른 담당자');
   assert.equal(updated.contacts[1].email,'');
   assert.equal(legacy.email,'');
+});
+
+test('add and edit contact phone inputs automatically insert Korean hyphens',()=>{
+  const fields=src('components/hq/customers/HqContactChannelFields.tsx');
+  const add=src('components/hq/customers/HqCustomerAddContactModal.tsx');
+  const edit=src('components/hq/customers/HqCustomerEditContactModal.tsx');
+  assert.match(fields,/formatPhoneNumber\(entered\)/);
+  assert.match(fields,/onChange=\{event=>isPhone\?handlePhoneChange\(event,index\):setItem\('emails',index,event\.target\.value\)\}/);
+  assert.match(fields,/setItem\('phones',index,formatted\)/);
+  assert.match(fields,/inputMode=\{isPhone\?'tel':'email'\}/);
+  assert.match(add,/<HqContactChannelFields/);
+  assert.match(edit,/<HqContactChannelFields/);
+  assert.equal(formatPhoneNumber('01012345678'),'010-1234-5678');
+  assert.equal(formatPhoneNumber('0101234'),'010-1234');
+  assert.equal(formatPhoneNumber('010-1234-5678'),'010-1234-5678');
+  assert.equal(formatPhoneNumber('0212345678'),'02-1234-5678');
+  assert.equal(formatPhoneNumber('0319876543'),'031-987-6543');
+  assert.equal(formatPhoneNumber('+82 10 1234 5678'),'+82 10 1234 5678');
+  assert.equal(normalizeContactChannels({
+    name:'담당자',role:'부장',department:'',
+    phones:[formatPhoneNumber('01012345678')],emails:[],
+  }).ok,true);
 });
 
 test('input validation rejects invalid emails, phone injection, and overflowing arrays',()=>{

@@ -5,7 +5,7 @@ import {join} from 'node:path';
 import {unzipSync} from 'fflate';
 import {
   createDispatchCardPairZip,shareDispatchCardPngPair,supportsDispatchCardPairShare,
-  DISPATCH_CARD_SHARE_TITLE,DISPATCH_CARD_PAIR_SHARE_TEXT,
+  DISPATCH_CARD_PAIR_SHARE_TEXT,DISPATCH_CARD_SINGLE_SHARE_TEXT,
 } from '@/utils/shareDispatchCardPng';
 
 const read=(p:string)=>readFileSync(join(process.cwd(),p),'utf8');
@@ -48,9 +48,12 @@ test('native share receives two different PNG attachments in one call',async()=>
     assert.equal(captured.shared?.files?.length,2);
     assert.equal(captured.shared?.files?.[0],files[0]);
     assert.equal(captured.shared?.files?.[1],files[1]);
-    assert.equal(captured.shared?.title,DISPATCH_CARD_SHARE_TITLE);
+    assert.equal(captured.shared?.title,undefined);
     assert.equal(captured.shared?.text,DISPATCH_CARD_PAIR_SHARE_TEXT);
-    assert.doesNotMatch(captured.shared?.title||'',/VIP LIMOUSINE KOREA 배차카드/);
+    assert.equal(captured.shared?.text,
+      '안녕하세요 VIP리무진코리아입니다. 기사 인포카드 전달드립니다. 보기 편하시도록 PC용과 모바일용 함께 보내드려요.');
+    assert.doesNotMatch(captured.shared?.text||'',/\:\)|기사 인포카드 보내드립니다/);
+    assert.equal(DISPATCH_CARD_SINGLE_SHARE_TEXT,'안녕하세요 VIP리무진코리아입니다. 기사 인포카드 전달드립니다.');
   }finally{
     if(previous)Object.defineProperty(globalThis,'navigator',previous);
     else Reflect.deleteProperty(globalThis,'navigator');
