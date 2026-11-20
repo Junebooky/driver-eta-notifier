@@ -108,13 +108,20 @@ test('driver dispatch card manager prioritizes registered vehicles, separates un
   const manager=source('components/hq/drivers/HqDriverAssetManagerModal.tsx');
   for(const phrase of [
     '기사와 차량을 선택해 최신 배차카드를 확인하고 수정해요.',
-    'PC·모바일 사용 가능',
     '카드 만들기·수정',
     '원본 보기',
     '등록된 차량',
     '미등록 차량',
-    '기사 정보(이름·직책·연락처)나 사진이 바뀌면 카드 만들기·수정에서 모든 차량 카드를 최신 버전으로 업데이트해 주세요.',
+    '기사 정보·사진 변경 시, 배차카드를 다시 갱신해 주세요.',
   ])assert.ok(manager.includes(phrase),phrase);
+  assert.doesNotMatch(manager,/PC·모바일 사용 가능/);
+  assert.doesNotMatch(manager,/PNG 이미지 공유|onClick=\{\(\)=>\{void handleShare\(variant\)/);
+  assert.match(manager,/shareDispatchCardPngPair/);
+  assert.match(manager,/PC·모바일 함께 공유/);
+  assert.match(manager,/PC·모바일 ZIP 저장/);
+  assert.match(manager,/prepared\.pc\?\.path===bundle\?\.pcInfo\?\.filePath/);
+  assert.match(manager,/prepared\.mobile\?\.path===bundle\?\.mobileInfo\?\.filePath/);
+  assert.match(manager,/!bothFilesPrepared/);
 });
 
 test('driver table surfaces inline per-driver dispatch card coverage with registered/unregistered vehicle slots',()=>{

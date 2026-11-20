@@ -1,3 +1,5 @@
+import {zipSync} from 'fflate';
+
 /**
  * Convert a saved, server-authenticated card to an actual PNG attachment.
  * Never share expiring signed URLs: the recipient receives image bytes.
@@ -59,4 +61,69 @@ export async function shareDispatchCardPng(file:File):Promise<'shared'|'download
     if(error instanceof Error&&error.name==='AbortError')return 'cancelled';
     throw error;
   }
+}
+
+
+/**
+ * Native share sends BOTH image files as independent attachments in one share
+ * sheet. The fallback produces one ZIP containing both exact PNG bytes.
+ */
+export function supportsDispatchCardPairShare(files:readonly [File,File]):boolean{
+  return typeof navigator!=='undefined'&&typeof navigator.share==='function'&&
+    typeof navigator.canShare==='function'&&navigator.canShare({files:[...files]});
+}
+
+function validateDispatchCardPair(files:readonly [File,File]):void{
+  if(files.length!==2||files.some(f=>!(f instanceof File)||f.type!=='image/png'||f.size<1)||
+     files[0].name===files[1].name){
+    throw new Error('PC·모바일 PNG 두 장이 모두 준비되어야 공유할 수 있습니다.');
+  }
+}
+
+/** Stored ZIP uses level 0: PNGs are already compressed. */
+export async function createDispatchCardPairZip(files:readonly [File,File]):Promise<Blob>{
+  validateDispatchCardPair(files);
+  const [pc,mobile]=await Promise.all(files.map(async file=>new Uint8Array(await file.arrayBuffer())));
+  const zip=zipSync({[files[0].name]:pc,[files[1].name]:mobile},{level:0});
+  // Explicit ArrayBuffer copy is compatible with strict DOM BlobPart typing.
+  const binary=new Uint8Array(zip.byteLength);
+  binary.set(zip);
+  return new Blob([binary.buffer as ArrayBuffer],{type:'application/zip'});
+}
+
+export function downloadDispatchCardPairZip(blob:Blob,filename:string):void{
+  const url=URL.createObjectURL(blob);
+  const link=document.createElement('a');
+  link.href=url;
+  link.download=filename.replace(/[^a-zA-Z0-9가-힣_().-]/g,'_')+'.zip';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(()=>URL.revokeObjectURL(url),1200);
+}
+
+/**
+ * Must be invoked directly by a user click with prebuilt PNG File objects,
+ * without awaiting anything before navigator.share() on the native path.
+ */
+export async function shareDispatchCardPngPair(
+  files:readonly [File,File],
+  zipName:string,
+):Promise<'shared'|'downloaded'|'cancelled'>{
+  validateDispatchCardPair(files);
+  if(supportsDispatchCardPairShare(files)){
+    try{
+      await navigator.share({
+        files:[...files],
+        title:'VIP LIMOUSINE KOREA 배차카드 · PC / 모바일',
+      });
+      return 'shared';
+    }catch(error){
+      if(error instanceof Error&&error.name==='AbortError')return 'cancelled';
+      throw error;
+    }
+  }
+  const zip=await createDispatchCardPairZip(files);
+  downloadDispatchCardPairZip(zip,zipName);
+  return 'downloaded';
 }
