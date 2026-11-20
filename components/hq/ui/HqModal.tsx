@@ -25,17 +25,24 @@ const FOCUSABLE = 'button:not(:disabled), a[href], input:not(:disabled), select:
 export function HqModal({ isOpen, title, subtitle, icon, children, footer, onClose, className = '' }: HqModalProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
+  // Callers often pass an inline onClose callback which changes while typing.
+  // Keep the latest callback without restarting the focus trap on each edit.
+  const onCloseRef = useRef(onClose);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
   useEffect(() => {
     if (!isOpen || !mounted) return;
     const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    panelRef.current?.focus();
+    // Respect an input that already received autofocus during the portal commit.
+    if (panelRef.current && !panelRef.current.contains(document.activeElement)) {
+      panelRef.current.focus();
+    }
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== 'Tab' || !panelRef.current) return;
@@ -59,7 +66,7 @@ export function HqModal({ isOpen, title, subtitle, icon, children, footer, onClo
       document.removeEventListener('keydown', handleKey);
       previouslyFocused?.focus();
     };
-  }, [isOpen, mounted, onClose]);
+  }, [isOpen, mounted]);
 
   if (!mounted || !isOpen) return null;
   return createPortal(
