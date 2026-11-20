@@ -23,5 +23,6 @@ export function HqBookingCardManagerLauncher({
   </div>;
   return <HqDriverAssetManagerModal isOpen onClose={onClose} drivers={drivers}
     initialDriverId={driverId} initialVehiclePlate={vehiclePlate}
+    preferRegisteredVehicle={false}
     onAssetUpdated={()=>{void refetch();onSaved?.();}}/>;
 }

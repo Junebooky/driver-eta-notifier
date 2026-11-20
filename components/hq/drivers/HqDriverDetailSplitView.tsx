@@ -24,6 +24,7 @@ import { haptics } from '@/utils/haptics';
 import { formatPhoneNumber } from '@/utils/formatters';
 import { formatKoreanMobileForDisplay, getDialablePhoneHref } from '@/utils/koreanInternationalPhone';
 import { HqDriverAssetManagerModal } from './HqDriverAssetManagerModal';
+import { sanitizeInitialDispatchCardPlate } from '@/utils/driverDispatchCardVehicles';
 import { HqDriverEditModal } from './HqDriverEditModal';
 import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
 import { HqTextarea } from '@/components/hq/ui';
@@ -920,7 +921,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
           onClose={() => setIsAssetModalOpen(false)}
           drivers={drivers}
           initialDriverId={activeDriver.id}
-          initialVehiclePlate={activeDriver.plate || activeDriver.carNumber}
+          initialVehiclePlate={sanitizeInitialDispatchCardPlate(activeDriver.plate || activeDriver.carNumber)}
           onAssetUpdated={async () => {
             // 1. Immediately refresh active driver's profile asset
             try {

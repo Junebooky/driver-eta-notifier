@@ -6,6 +6,12 @@ import type {HqDriverSummary} from '@/types/driverHq';
 import type {DriverVehicleAssetBundle} from '@/types/driverVehicleAsset';
 import {resolveDispatchCardPhotos} from '@/lib/dispatchCards/dispatchCardAssets';
 import {useHqFleetRegistry} from '@/hooks/useHqFleetRegistry';
+import {
+  type DriverCardSummary,
+  getVehicleCardStatusMeta,
+  partitionDispatchCardVehicles,
+  pickDefaultDispatchCardVehicle,
+} from '@/utils/driverDispatchCardVehicles';
 import {HqButton,HqBadge,HqCard} from '@/components/hq/ui';
 import {HqModal} from '@/components/hq/ui/HqModal';
 import {HqSearchSelect} from '@/components/hq/ui/HqSearchSelect';
@@ -17,6 +23,7 @@ export interface HqDriverAssetManagerModalProps {
   drivers:HqDriverSummary[];
   initialDriverId?:string;
   initialVehiclePlate?:string;
+  preferRegisteredVehicle?:boolean;
   onAssetUpdated?:()=>void;
 }
 
@@ -26,13 +33,17 @@ export interface HqDriverAssetManagerModalProps {
  * absent. Existing historic files and immutable dispatch logs are untouched.
  */
 export function HqDriverAssetManagerModal({
-  isOpen,onClose,drivers,initialDriverId,initialVehiclePlate,onAssetUpdated,
+  isOpen,onClose,drivers,initialDriverId,initialVehiclePlate,preferRegisteredVehicle=true,onAssetUpdated,
 }:HqDriverAssetManagerModalProps) {
   const fleet=useHqFleetRegistry(isOpen);
   const [selectedDriverId,setSelectedDriverId]=useState(initialDriverId||'');
-  const [selectedVehiclePlate,setSelectedVehiclePlate]=useState(initialVehiclePlate||'');
+  const [selectedVehiclePlate,setSelectedVehiclePlate]=useState('');
   const [builderOpen,setBuilderOpen]=useState(false);
   const [bundle,setBundle]=useState<DriverVehicleAssetBundle|null>(null);
+  const [vehicleSummary,setVehicleSummary]=useState<DriverCardSummary>({});
+  const [summaryResolvedDriverId,setSummaryResolvedDriverId]=useState<string|null>(null);
+  const [summaryLoading,setSummaryLoading]=useState(false);
+  const [hasUserPickedVehicle,setHasUserPickedVehicle]=useState(false);
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState('');
   const [revision,setRevision]=useState(0);
@@ -44,7 +55,10 @@ export function HqDriverAssetManagerModal({
   useEffect(()=>{
     if(!isOpen)return;
     setSelectedDriverId(initialDriverId||drivers[0]?.id||'');
-    setSelectedVehiclePlate(initialVehiclePlate||'');
+    setSelectedVehiclePlate('');
+    setVehicleSummary({});
+    setSummaryResolvedDriverId(null);
+    setHasUserPickedVehicle(false);
     setBuilderOpen(false);
     setError('');
   // Only reset when opened for a new booking / driver.
@@ -52,10 +66,81 @@ export function HqDriverAssetManagerModal({
   },[isOpen,initialDriverId,initialVehiclePlate]);
   const driver=drivers.find(item=>item.id===selectedDriverId)||null;
   const selectedVehicle=imageVehicles.find(v=>v.plate===selectedVehiclePlate)||null;
+  const partitionedVehicles=useMemo(
+    ()=>partitionDispatchCardVehicles(imageVehicles,vehicleSummary),
+    [imageVehicles,vehicleSummary],
+  );
+  const vehicleSelectOptions=useMemo(()=>[
+    ...partitionedVehicles.registered.map(item=>({
+      value:item.plate,
+      label:item.plate,
+      subtitle:item.model,
+      group:'등록된 차량',
+      status:getVehicleCardStatusMeta(vehicleSummary[item.uuid]).optionStatus,
+    })),
+    ...partitionedVehicles.unregistered.map(item=>({
+      value:item.plate,
+      label:item.plate,
+      subtitle:item.model,
+      group:'미등록 차량',
+      status:getVehicleCardStatusMeta(vehicleSummary[item.uuid]).optionStatus,
+    })),
+  ],[partitionedVehicles,vehicleSummary]);
+
+  const handleSelectDriver=(nextDriverId:string)=>{
+    setSelectedDriverId(nextDriverId);
+    setSelectedVehiclePlate('');
+    setBundle(null);
+    setVehicleSummary({});
+    setSummaryResolvedDriverId(null);
+    setHasUserPickedVehicle(false);
+  };
+  const handleSelectVehicle=(nextPlate:string)=>{
+    setSelectedVehiclePlate(nextPlate);
+    setHasUserPickedVehicle(true);
+  };
+
   useEffect(()=>{
-    if(!isOpen||fleet.loading||fleet.error||selectedVehicle||!imageVehicles.length)return;
-    if(!initialVehiclePlate) setSelectedVehiclePlate(imageVehicles[0].plate);
-  },[isOpen,fleet.loading,fleet.error,selectedVehicle,imageVehicles,initialVehiclePlate]);
+    if(!isOpen||builderOpen||!driver){
+      setSummaryLoading(false);
+      return;
+    }
+    let cancelled=false;
+    setSummaryLoading(true);
+    const query=new URLSearchParams({
+      driverId:driver.id,type:'summary',
+    });
+    fetch('/api/hq/drivers/assets?'+query.toString(),{cache:'no-store'})
+      .then(async response=>{
+        const result=await response.json().catch(()=>({}));
+        if(!cancelled&&response.ok&&result.ok){
+          setVehicleSummary(result.vehicleAssetSummary||{});
+        }
+      })
+      .catch(()=>{})
+      .finally(()=>{
+        if(!cancelled){
+          setSummaryLoading(false);
+          setSummaryResolvedDriverId(driver.id);
+        }
+      });
+    return ()=>{cancelled=true;};
+  },[isOpen,builderOpen,driver?.id,revision]);
+
+  useEffect(()=>{
+    if(!isOpen||fleet.loading||fleet.error||!driver||summaryResolvedDriverId!==driver.id||hasUserPickedVehicle||selectedVehicle||!imageVehicles.length)return;
+    const initialDriver=initialDriverId||drivers[0]?.id||'';
+    const nextVehicle=pickDefaultDispatchCardVehicle({
+      vehicles:imageVehicles,
+      summary:vehicleSummary,
+      initialVehiclePlate:driver.id===initialDriver?initialVehiclePlate:undefined,
+      preferRegistered:preferRegisteredVehicle,
+    });
+    if(nextVehicle&&nextVehicle.plate!==selectedVehiclePlate){
+      setSelectedVehiclePlate(nextVehicle.plate);
+    }
+  },[isOpen,fleet.loading,fleet.error,driver,summaryResolvedDriverId,hasUserPickedVehicle,selectedVehicle,imageVehicles,vehicleSummary,initialDriverId,drivers,initialVehiclePlate,preferRegisteredVehicle,selectedVehiclePlate]);
+
   useEffect(()=>{
     if(!isOpen||builderOpen||!driver||!selectedVehicle){
       setBundle(null);return;
@@ -70,7 +155,10 @@ export function HqDriverAssetManagerModal({
       .then(async response=>{
         const result=await response.json().catch(()=>({}));
         if(!response.ok||!result.ok)throw new Error(result.error||'배차카드를 확인할 수 없습니다.');
-        if(!cancelled)setBundle(result.bundle||null);
+        if(!cancelled){
+          setBundle(result.bundle||null);
+          if(result.vehicleAssetSummary)setVehicleSummary(result.vehicleAssetSummary);
+        }
       })
       .catch(err=>{if(!cancelled){setBundle(null);setError(err instanceof Error?err.message:'배차카드 조회 오류');}})
       .finally(()=>{if(!cancelled)setLoading(false);});
@@ -81,31 +169,43 @@ export function HqDriverAssetManagerModal({
     setRevision(i=>i+1);
     onAssetUpdated?.();
   };
+  const selectedSummary=selectedVehicle?vehicleSummary[selectedVehicle.uuid]:undefined;
+  const statusText=bundle?.isFullyComplete
+    ?'PC·모바일 사용 가능'
+    :bundle?.isReadyForCustomerDispatch
+      ?'일부 카드 사용 가능'
+      :(selectedSummary?.stalePc||selectedSummary?.staleMobile)
+        ?'갱신 필요'
+        :'미등록';
+  const statusBadgeText=selectedVehicle
+    ?`${selectedVehicle.plate} · ${statusText}`
+    :(fleet.loading||summaryLoading?'차량 확인 중…':'선택된 차량 없음');
+
   return <>
     <HqModal isOpen={isOpen&&!builderOpen} onClose={onClose}
-      title="기사 배차카드" subtitle="새 제작기에서 생성한 카드만 사용합니다"
+      title="기사 배차카드" subtitle="기사와 차량을 선택해 최신 배차카드를 확인하고 수정해요."
       className="max-w-[920px]"
       footer={<HqButton variant="secondary" onClick={onClose}>닫기</HqButton>}>
       <div className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className="mb-1.5 block text-[12px] font-medium text-[#526680]">기사 선택</label>
+        <div className="grid gap-3 rounded-[16px] bg-[#F7F9FC]/70 p-3 sm:grid-cols-2 sm:gap-0 sm:divide-x sm:divide-[#EDF1F6]">
+          <div className="sm:pr-3.5">
+            <label className="mb-1.5 block text-[12px] font-medium text-[#526680]">기사</label>
             <HqSearchSelect
               label="배차카드 관리 기사"
               value={selectedDriverId}
-              onChange={setSelectedDriverId}
+              onChange={handleSelectDriver}
               placeholder="기사 선택"
               options={drivers.map(item=>({value:item.id,label:item.name,subtitle:item.phone||'연락처 없음'}))}
             />
           </div>
-          <div>
-            <label className="mb-1.5 block text-[12px] font-medium text-[#526680]">차량 선택</label>
+          <div className="sm:pl-3.5">
+            <label className="mb-1.5 block text-[12px] font-medium text-[#526680]">차량</label>
             <HqSearchSelect
               label="배차카드 관리 차량"
               value={selectedVehiclePlate}
-              onChange={setSelectedVehiclePlate}
-              placeholder="차량번호로 검색"
-              options={imageVehicles.map(item=>({value:item.plate,label:item.plate,subtitle:item.model}))}
+              onChange={handleSelectVehicle}
+              placeholder={fleet.loading||summaryLoading?'차량 불러오는 중…':'차량 선택'}
+              options={vehicleSelectOptions}
             />
           </div>
         </div>
@@ -113,28 +213,42 @@ export function HqDriverAssetManagerModal({
         {error&&<p role="alert" className="text-[12px] text-[#B05B57]">{error}</p>}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <HqBadge>{bundle?.isFullyComplete?'PC·모바일 준비 완료':bundle?.isReadyForCustomerDispatch?'일부 카드 준비':'카드 생성·갱신 필요'}</HqBadge>
-            {selectedVehicle&&<span className="text-[12px] text-[#73839D]">{selectedVehicle.plate}</span>}
+            <HqBadge tone={bundle?.isFullyComplete?'selected':bundle?.isReadyForCustomerDispatch?'warning':'neutral'}>
+              {statusBadgeText}
+            </HqBadge>
           </div>
           <div className="flex items-center gap-2">
-            <HqButton variant="subtle" size="sm" onClick={()=>setRevision(v=>v+1)} disabled={loading}>
+            <HqButton variant="subtle" size="sm" onClick={()=>setRevision(v=>v+1)} disabled={loading||summaryLoading}>
               <RefreshCw className="size-4"/> 새로고침
             </HqButton>
             <HqButton variant="primary" size="sm" disabled={!driver||!selectedVehicle||fleet.loading}
               onClick={()=>setBuilderOpen(true)}>
-              <ImageIcon className="size-4"/> 배차카드 만들기·수정
+              <ImageIcon className="size-4"/> 카드 만들기·수정
             </HqButton>
           </div>
         </div>
-        {loading?<div role="status" className="flex min-h-40 items-center justify-center gap-2 text-[12px] text-[#73839D]">
+        {(loading||summaryLoading&&!selectedVehicle)?<div role="status" className="flex min-h-40 items-center justify-center gap-2 text-[12px] text-[#73839D]">
           <Loader2 className="size-4 animate-spin"/> 카드 불러오는 중…
         </div>:<div className="grid gap-3 sm:grid-cols-2">
           {(['pc','mobile'] as const).map(variant=>{
             const asset=variant==='pc'?bundle?.pcInfo:bundle?.mobileInfo;
+            const isStale=variant==='pc'?selectedSummary?.stalePc:selectedSummary?.staleMobile;
             return <HqCard key={variant} className="p-3 sm:p-4">
               <div className="mb-3 flex items-center justify-between gap-2">
                 <h3 className="text-[13px] font-semibold text-[#243750]">{variant==='pc'?'PC 가로형':'모바일 세로형'}</h3>
-                <HqBadge>{asset?'최신 카드':'미생성·갱신 필요'}</HqBadge>
+                {asset?.signedUrl?(
+                  <div className="flex items-center gap-1.5 text-[12px]">
+                    <HqBadge tone="selected">최신</HqBadge>
+                    <span className="text-[#CBD5E1]" aria-hidden="true">·</span>
+                    <a href={asset.signedUrl} target="_blank" rel="noreferrer"
+                      className="inline-flex items-center gap-1 font-medium text-[#526680] transition-colors hover:text-[#1E60F3]">
+                      원본 보기
+                      <ExternalLink className="size-3.5"/>
+                    </a>
+                  </div>
+                ):(
+                  <HqBadge tone="neutral">{isStale?'갱신 필요':'미등록'}</HqBadge>
+                )}
               </div>
               <div className="flex h-[240px] items-center justify-center rounded-[13px] bg-[#F7F9FC] p-3">
                 {asset?.signedUrl?<img src={asset.signedUrl}
@@ -142,20 +256,17 @@ export function HqDriverAssetManagerModal({
                   className="max-h-full max-w-full object-contain"/>:
                   <div className="flex flex-col items-center gap-2 text-center text-[12px] text-[#7C8AA0]">
                     <AlertTriangle className="size-5"/>
-                    <span>신규 제작기에서 카드를 만들어 주세요.</span>
+                    <span>{isStale?'기사 정보가 바뀌어 최신 버전으로 업데이트가 필요해요.':'카드 만들기·수정에서 배차카드를 만들어 주세요.'}</span>
                   </div>}
               </div>
-              {asset?.signedUrl&&<a href={asset.signedUrl} target="_blank" rel="noreferrer"
-                className="mt-2 inline-flex min-h-10 items-center gap-1 text-[12px] font-medium text-[#526680]">
-                <ExternalLink className="size-4"/> 원본 보기
-              </a>}
             </HqCard>;
           })}
         </div>}
-        <p className="text-[11px] leading-relaxed text-[#8391A3]">
-          예전 수동 업로드 기능은 제거했어요. 이름·직책·전화번호 또는 사진이 변경되면
-          ‘배차카드 만들기·수정’에서 이 기사의 모든 차량 카드에 새 버전을 반영하세요.
-        </p>
+        <HqCard tone="muted" className="px-3.5 py-3">
+          <p className="text-[12px] leading-relaxed text-[#60728A]">
+            기사 정보(이름·직책·연락처)나 사진이 바뀌면 카드 만들기·수정에서 모든 차량 카드를 최신 버전으로 업데이트해 주세요.
+          </p>
+        </HqCard>
       </div>
     </HqModal>
     {builderOpen&&driver&&(

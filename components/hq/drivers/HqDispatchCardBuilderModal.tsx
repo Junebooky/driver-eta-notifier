@@ -782,7 +782,7 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
             <div className="mb-5 flex items-center gap-3">
               <div className="flex size-[92px] shrink-0 items-center justify-center overflow-hidden rounded-[15px] bg-[#F5F7FA]">
                 {photoUrl ? <img src={photoUrl} alt="기사 프로필" className="size-full object-contain" /> :
-                  <img src="/images/icons/drivers/icon_driver.png" alt="기사 목록 아이콘" draggable={false} className="size-12 object-contain" />}
+                  <ImagePlus className="size-8 text-[#94A1B2]" strokeWidth={1.6} aria-hidden="true" />}
               </div>
               <div className="min-w-0 space-y-2">
                 <p className="text-[12px] leading-relaxed text-[#73839A]">정면 상반신 · 투명 배경(PNG) 권장</p>

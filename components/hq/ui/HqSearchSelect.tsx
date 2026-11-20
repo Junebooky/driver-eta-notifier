@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Search, X } from 'lucide-react';
 
 export interface HqSearchSelectOption {
@@ -11,6 +11,7 @@ export interface HqSearchSelectOption {
   status?: string;
   disabled?: boolean;
   category?: string;
+  group?: string;
 }
 
 export interface HqSearchSelectProps {
@@ -49,6 +50,15 @@ export function HqSearchSelect({
     return text.includes(search.trim().toLowerCase()) &&
       (category === 'all' || item.category === category);
   }), [options, search, category]);
+  const groupCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of filtered) {
+      if (item.group) {
+        counts.set(item.group, (counts.get(item.group) || 0) + 1);
+      }
+    }
+    return counts;
+  }, [filtered]);
 
   useEffect(() => {
     if (!open) return;
@@ -132,27 +142,41 @@ export function HqSearchSelect({
               </button>
             )}
             {filtered.length === 0 && <p className="p-4 text-center text-[12px] text-[#8D9BAD]">검색 결과가 없습니다.</p>}
-            {filtered.map(item => (
-              <button key={item.value} type="button" role="option" aria-selected={item.value === value}
-                disabled={item.disabled}
-                title={item.disabled ? item.status || '선택할 수 없습니다' : undefined}
-                onClick={() => choose(item.value)}
-                className={`flex min-h-11 w-full items-center justify-between gap-3 rounded-[11px] px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${item.value === value ? 'bg-[#EEF3FF]' : 'hover:bg-[#F7F9FC]'}`}>
-                <span className="flex min-w-0 items-center gap-2.5">
-                  {item.imageSrc && <img src={item.imageSrc} alt="" className={imageShape === 'vehicle'
-                    ? 'h-9 w-14 shrink-0 object-contain'
-                    : 'size-9 shrink-0 rounded-full object-cover'}/>}
-                  <span className="min-w-0">
-                    <span className="block truncate text-[12px] font-semibold text-[#253552]">{item.label}</span>
-                    {item.subtitle && <span className="mt-0.5 block truncate text-[11px] text-[#8492A4]">{item.subtitle}</span>}
-                  </span>
-                </span>
-                <span className="flex shrink-0 items-center gap-1">
-                  {item.status && <span className="text-[10px] text-[#8290A3]">{item.status}</span>}
-                  {item.value === value && <Check size={15} className="text-[#1E60F3]"/>}
-                </span>
-              </button>
-            ))}
+            {filtered.map((item, idx) => {
+              const showGroupHeader = Boolean(item.group) && (idx === 0 || filtered[idx - 1].group !== item.group);
+              return (
+                <Fragment key={item.value}>
+                  {showGroupHeader && (
+                    <div
+                      role="presentation"
+                      className={`flex items-center justify-between px-3 pb-1 text-[11px] font-semibold text-[#73839D] ${idx > 0 ? 'mt-2 border-t border-[#EDF1F6] pt-2.5' : 'pt-1.5'}`}
+                    >
+                      <span>{item.group}</span>
+                      <span className="text-[10px] font-medium text-[#94A1B2]">{groupCounts.get(item.group!)}</span>
+                    </div>
+                  )}
+                  <button type="button" role="option" aria-selected={item.value === value}
+                    disabled={item.disabled}
+                    title={item.disabled ? item.status || '선택할 수 없습니다' : undefined}
+                    onClick={() => choose(item.value)}
+                    className={`flex min-h-11 w-full items-center justify-between gap-3 rounded-[11px] px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${item.value === value ? 'bg-[#EEF3FF]' : 'hover:bg-[#F7F9FC]'}`}>
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      {item.imageSrc && <img src={item.imageSrc} alt="" className={imageShape === 'vehicle'
+                        ? 'h-9 w-14 shrink-0 object-contain'
+                        : 'size-9 shrink-0 rounded-full object-cover'}/>}
+                      <span className="min-w-0">
+                        <span className="block truncate text-[12px] font-semibold text-[#253552]">{item.label}</span>
+                        {item.subtitle && <span className="mt-0.5 block truncate text-[11px] text-[#8492A4]">{item.subtitle}</span>}
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1">
+                      {item.status && <span className="text-[10px] text-[#8290A3]">{item.status}</span>}
+                      {item.value === value && <Check size={15} className="text-[#1E60F3]"/>}
+                    </span>
+                  </button>
+                </Fragment>
+              );
+            })}
           </div>
         </div>
       )}

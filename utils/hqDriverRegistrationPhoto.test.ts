@@ -41,12 +41,13 @@ test('registering a driver optionally uploads selected portrait to exact same as
   assert.match(uploadRoute,/dispatch_card_revision_at/);
 });
 
-test('registration and card builder use driver-list icon when no profile is selected',()=>{
+test('registration and edit keep driver-list icon while card builder uses a standard photo placeholder icon',()=>{
   const view=source('components/hq/drivers/HqDriversView.tsx');
   const builder=source('components/hq/drivers/HqDispatchCardBuilderModal.tsx');
   const editor=source('components/hq/drivers/HqDriverEditModal.tsx');
   assert.ok(view.split('/images/icons/drivers/icon_driver.png').length>=3);
-  assert.match(builder,/src="\/images\/icons\/drivers\/icon_driver\.png"/);
+  assert.match(builder,/<ImagePlus className="size-8 text-\[#94A1B2\]"/);
+  assert.doesNotMatch(builder,/\/images\/icons\/drivers\/icon_driver\.png/);
   assert.match(editor,/src="\/images\/icons\/drivers\/icon_driver\.png"/);
   assert.doesNotMatch(view,/<User className="w-4 h-4"/);
 });

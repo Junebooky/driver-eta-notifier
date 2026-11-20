@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { Fragment, useCallback, useEffect, useState, useMemo } from 'react';
 import {
   Users,
   Search,
@@ -23,14 +23,19 @@ import {
   Trash2,
 } from 'lucide-react';
 import { HqDriverSummary } from '@/types/driverHq';
+import type { DispatchCardCoverage } from '@/lib/dispatchCards/dispatchCardCoverage';
 import { useHqDrivers } from '@/utils/useHqDrivers';
 import { haptics } from '@/utils/haptics';
 import { formatPhoneNumber } from '@/utils/formatters';
 import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
+import { summarizeDriverCardCoverage } from '@/utils/driverDispatchCardVehicles';
+import { HqButton, HqBadge, HqCard } from '@/components/hq/ui';
 import { HqDriverEditModal } from './HqDriverEditModal';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 import { HqModal } from '@/components/hq/ui/HqModal';
 import { HqDispatchCardCoveragePanel } from './HqDispatchCardCoveragePanel';
+import { HqDriverAssetManagerModal } from './HqDriverAssetManagerModal';
+import { HqDispatchCardBuilderModal } from './HqDispatchCardBuilderModal';
 
 export interface HqDriversTableViewProps {
   onSelectDriver: (driverId: string) => void;
@@ -96,7 +101,48 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
   const [driverToRemove, setDriverToRemove] = useState<HqDriverSummary | null>(null);
   const [removingDriver, setRemovingDriver] = useState(false);
   const [removeError, setRemoveError] = useState('');
+  const [coverage, setCoverage] = useState<DispatchCardCoverage | null>(null);
+  const [coverageLoading, setCoverageLoading] = useState(true);
+  const [coverageError, setCoverageError] = useState('');
+  const [expandedCardDriverIds, setExpandedCardDriverIds] = useState<Record<string, boolean>>({});
+  const [cardPreviewTarget, setCardPreviewTarget] = useState<{ driverId: string; vehiclePlate?: string } | null>(null);
+  const [cardBuilderTarget, setCardBuilderTarget] = useState<{ driver: HqDriverSummary; vehicleId?: string } | null>(null);
   const pageSize = 10;
+
+  const refreshCoverage = useCallback(async () => {
+    try {
+      setCoverageLoading(true);
+      const response = await fetch('/api/hq/drivers/assets/coverage', { cache: 'no-store' });
+      const json = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        coverage?: DispatchCardCoverage;
+        error?: string;
+      };
+      if (!response.ok || !json.ok || !json.coverage) {
+        throw new Error(json.error || '카드 매핑 조회 실패');
+      }
+      setCoverage(json.coverage);
+      setCoverageError('');
+    } catch (err) {
+      setCoverageError(err instanceof Error ? err.message : '카드 매핑 조회 실패');
+    } finally {
+      setCoverageLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshCoverage();
+  }, [refreshCoverage, drivers.length]);
+
+  const coverageByDriverId = useMemo(
+    () => new Map((coverage?.drivers || []).map((item) => [item.id, item])),
+    [coverage]
+  );
+
+  const handleCardAssetUpdated = useCallback(() => {
+    void refreshCoverage();
+    onCardAssetUpdated?.();
+  }, [refreshCoverage, onCardAssetUpdated]);
 
   // Helper to determine real-time operation status:
   // 'driving' (운행 중 - 파랑 칩) | 'available' (운행 가능 - 초록 칩) | 'off' (휴무 - 회색 칩)
@@ -222,12 +268,17 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
-        <button type="button" aria-expanded={cardToolsOpen}
-          onClick={() => setCardToolsOpen(value=>!value)}
-          className={'inline-flex min-h-11 items-center gap-1.5 rounded-[13px] px-3.5 text-[12px] font-semibold transition-colors '+
-            (cardToolsOpen?'bg-[#EEF3FF] text-[#1E60F3]':'bg-[#F7F9FC] text-[#526680] hover:bg-[#EEF2F8]')}>
-          <RefreshCw className="size-4"/> 배차카드 관리
-        </button>
+        <HqButton
+          variant={cardToolsOpen ? 'secondary' : 'subtle'}
+          aria-expanded={cardToolsOpen}
+          onClick={() => {
+            haptics.lightTap();
+            setCardToolsOpen(value => !value);
+          }}
+        >
+          <span>배차카드 관리</span>
+          <ChevronDown className={`size-4 transition-transform duration-150 ${cardToolsOpen ? 'rotate-180' : ''}`} />
+        </HqButton>
         {/* Quick Add Driver Action */}
         <button
           type="button"
@@ -240,8 +291,14 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
         </div>
       </div>
 
-      {cardToolsOpen && <HqDispatchCardCoveragePanel drivers={drivers}
-        onAssetUpdated={onCardAssetUpdated} embedded />}
+      {cardToolsOpen && <HqDispatchCardCoveragePanel
+        drivers={drivers}
+        sharedCoverage={coverage}
+        sharedLoading={coverageLoading}
+        sharedError={coverageError}
+        onRefreshCoverage={refreshCoverage}
+        onAssetUpdated={handleCardAssetUpdated}
+        embedded />}
 
       {/* 1. Control & Filter Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-5 text-[12px] sm:px-6">
@@ -365,6 +422,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
             <tr className="border-b border-slate-100 bg-slate-50/60 text-xs font-medium text-slate-400 select-none">
               <th className="py-3.5 px-5 font-medium">기사 정보</th>
               <th className="py-3.5 px-5 font-medium">운행 상태</th>
+              <th className="py-3.5 px-5 font-medium">배차카드</th>
               <th className="py-3.5 px-5 font-medium">연락처</th>
               <th className="py-3.5 px-5 font-medium">지원 언어</th>
               <th className="py-3.5 px-5 font-medium text-right w-24">더보기</th>
@@ -373,7 +431,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
           <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
             {isLoading ? (
               <tr>
-                <td colSpan={5} className="py-16 text-center text-slate-400">
+                <td colSpan={6} className="py-16 text-center text-slate-400">
                   <Loader2 className="w-8 h-8 mx-auto text-[#1E60F3] animate-spin mb-3" />
                   <p className="font-bold text-slate-600">실시간 기사 데이터 동기화 중...</p>
                 </td>
@@ -381,7 +439,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
             ) : error ? (
               statusCode === 401 || statusCode === 403 ? (
                 <tr>
-                  <td colSpan={5} className="py-12 px-4 text-center">
+                  <td colSpan={6} className="py-12 px-4 text-center">
                     <div className="max-w-md mx-auto p-6 bg-amber-50/80 border border-amber-200/90 rounded-3xl space-y-3 shadow-sm">
                       <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto shadow-xs">
                         <ShieldAlert className="w-6 h-6 text-amber-600" />
@@ -422,7 +480,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                 </tr>
               ) : (
                 <tr>
-                  <td colSpan={5} className="py-12 px-4 text-center">
+                  <td colSpan={6} className="py-12 px-4 text-center">
                     <div className="max-w-md mx-auto p-6 bg-rose-50/80 border border-rose-200/90 rounded-3xl space-y-3 shadow-sm">
                       <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center mx-auto shadow-xs">
                         <AlertTriangle className="w-6 h-6 text-rose-600" />
@@ -454,7 +512,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
               )
             ) : paginatedDrivers.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-12 text-center text-slate-400">
+                <td colSpan={6} className="py-12 text-center text-slate-400">
                   <Users className="w-8 h-8 mx-auto text-slate-300 mb-2" />
                   <p className="font-bold text-slate-600">
                     {drivers.length === 0
@@ -475,10 +533,13 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                     driver.englishAvailable && !(driver.languageLabels || []).includes('영어') ? ['영어'] : []
                   );
                 const hasForeignLanguage = foreignLanguages.length > 0;
+                const driverCoverage = coverageByDriverId.get(driver.id);
+                const cardSummary = summarizeDriverCardCoverage(driverCoverage);
+                const isCardExpanded = Boolean(expandedCardDriverIds[driver.id]);
 
                 return (
+                  <Fragment key={driver.id}>
                   <tr
-                    key={driver.id}
                     onClick={() => handleRowClick(driver.id)}
                     className="hover:bg-blue-50/40 transition-colors cursor-pointer group"
                   >
@@ -540,7 +601,30 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                       )}
                     </td>
 
-                    {/* 3열: 연락처 (전화 걸기 연동) */}
+                    {/* 3열: 배차카드 현황 토글 */}
+                    <td className="py-4 px-5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      {coverageLoading && !coverage ? (
+                        <HqBadge tone="neutral">확인 중…</HqBadge>
+                      ) : driverCoverage ? (
+                        <button
+                          type="button"
+                          aria-expanded={isCardExpanded}
+                          aria-label={`${driver.name} 배차카드 차량별 현황`}
+                          onClick={() => {
+                            haptics.lightTap();
+                            setExpandedCardDriverIds(prev => ({ ...prev, [driver.id]: !prev[driver.id] }));
+                          }}
+                          className={`inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-[12px] px-2 py-1 transition-colors ${isCardExpanded ? 'bg-[#EEF3FF]' : 'hover:bg-[#F3F6FB]'}`}
+                        >
+                          <HqBadge tone={cardSummary.tone}>{cardSummary.label}</HqBadge>
+                          <ChevronDown className={`size-3.5 text-[#73839D] transition-transform duration-150 ${isCardExpanded ? 'rotate-180 text-[#1E60F3]' : ''}`} />
+                        </button>
+                      ) : (
+                        <HqBadge tone="neutral">{coverageError ? '조회 실패' : '미확인'}</HqBadge>
+                      )}
+                    </td>
+
+                    {/* 4열: 연락처 (전화 걸기 연동) */}
                     <td className="py-4 px-5 whitespace-nowrap">
                       {driver.phone ? (
                         <a
@@ -699,6 +783,102 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                       </div>
                     </td>
                   </tr>
+                  {isCardExpanded && driverCoverage && (
+                    <tr className="bg-[#FAFBFD]">
+                      <td colSpan={6} className="px-5 py-3.5">
+                        <HqCard className="space-y-3 p-3.5 sm:p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="text-[12px] font-semibold text-[#17233B]">{driver.name} 배차카드 차량별 현황</span>
+                              <HqBadge tone="selected">등록 {cardSummary.registeredSlots.length}대</HqBadge>
+                              <HqBadge tone="neutral">미등록 {cardSummary.unregisteredSlots.length}대</HqBadge>
+                              {!cardSummary.identityReady && (
+                                <HqBadge tone="warning">
+                                  {(cardSummary.missingIdentityLabels.join(' · ') || '기사 정보') + ' 확인 필요'}
+                                </HqBadge>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <HqButton
+                                variant="subtle"
+                                size="sm"
+                                onClick={() => {
+                                  haptics.lightTap();
+                                  setCardPreviewTarget({ driverId: driver.id });
+                                }}
+                              >
+                                카드 보기
+                              </HqButton>
+                              <HqButton
+                                variant="primary"
+                                size="sm"
+                                onClick={() => {
+                                  haptics.lightTap();
+                                  setCardBuilderTarget({
+                                    driver,
+                                    vehicleId: cardSummary.unregisteredSlots[0]?.vehicleId || cardSummary.registeredSlots[0]?.vehicleId,
+                                  });
+                                }}
+                              >
+                                카드 만들기·수정
+                              </HqButton>
+                            </div>
+                          </div>
+
+                          {cardSummary.registeredSlots.length > 0 && (
+                            <div className="space-y-1.5">
+                              <p className="text-[11px] font-semibold text-[#526680]">
+                                등록된 차량 ({cardSummary.registeredSlots.length}대)
+                              </p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {cardSummary.registeredSlots.map(slot => (
+                                  <button
+                                    key={slot.vehicleId}
+                                    type="button"
+                                    onClick={() => {
+                                      haptics.lightTap();
+                                      setCardPreviewTarget({ driverId: driver.id, vehiclePlate: slot.plate });
+                                    }}
+                                    className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-[11px] bg-[#F7F9FC] px-2.5 py-1.5 text-[12px] font-semibold text-[#253552] transition-colors hover:bg-[#EEF3FF]"
+                                  >
+                                    <span>{slot.plate}</span>
+                                    <HqBadge tone={slot.pc && slot.mobile ? 'selected' : 'warning'}>
+                                      {slot.pc && slot.mobile ? 'PC·모바일' : slot.pc ? 'PC만' : '모바일만'}
+                                    </HqBadge>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {cardSummary.unregisteredSlots.length > 0 && (
+                            <div className={`space-y-1.5 ${cardSummary.registeredSlots.length > 0 ? 'border-t border-[#EDF1F6] pt-2.5' : ''}`}>
+                              <p className="text-[11px] font-semibold text-[#73839D]">
+                                미등록 차량 ({cardSummary.unregisteredSlots.length}대)
+                              </p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {cardSummary.unregisteredSlots.map(slot => (
+                                  <button
+                                    key={slot.vehicleId}
+                                    type="button"
+                                    onClick={() => {
+                                      haptics.lightTap();
+                                      setCardBuilderTarget({ driver, vehicleId: slot.vehicleId });
+                                    }}
+                                    className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-[11px] bg-[#F7F9FC] px-2.5 py-1.5 text-[12px] font-medium text-[#60728A] transition-colors hover:bg-[#EEF3FF] hover:text-[#1E60F3]"
+                                  >
+                                    <span>{slot.plate}</span>
+                                    <HqBadge tone="neutral">미등록</HqBadge>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </HqCard>
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 );
               })
             )}
@@ -831,6 +1011,30 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
             }
             return ok;
           }}
+        />
+      )}
+
+      {cardPreviewTarget && (
+        <HqDriverAssetManagerModal
+          isOpen
+          onClose={() => setCardPreviewTarget(null)}
+          drivers={drivers}
+          initialDriverId={cardPreviewTarget.driverId}
+          initialVehiclePlate={cardPreviewTarget.vehiclePlate}
+          preferRegisteredVehicle={!cardPreviewTarget.vehiclePlate}
+          onAssetUpdated={handleCardAssetUpdated}
+        />
+      )}
+
+      {cardBuilderTarget && coverage && (
+        <HqDispatchCardBuilderModal
+          isOpen
+          driver={cardBuilderTarget.driver}
+          vehicles={coverage.vehicles}
+          initialVehicleId={cardBuilderTarget.vehicleId}
+          onClose={() => setCardBuilderTarget(null)}
+          onAssetUpdated={handleCardAssetUpdated}
+          onProfileUpdated={handleCardAssetUpdated}
         />
       )}
     </div>

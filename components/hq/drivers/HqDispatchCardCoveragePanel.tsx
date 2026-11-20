@@ -9,12 +9,28 @@ import {validateDispatchCardProfile,getEnglishPosition,formatBilingualChauffeurN
 import {resolveDispatchCardEnglishName} from '@/utils/koreanNameRomanization';
 import {normalizePortraitPlacement} from '@/lib/dispatchCards/portraitCrop';
 import {renderDispatchCard} from '@/lib/dispatchCards/renderDispatchCard';
+import {HqButton,HqBadge,HqCard} from '@/components/hq/ui';
+import {HqInlineFeedback} from '@/components/hq/ui/HqInlineFeedback';
 import {HqDispatchCardBuilderModal} from './HqDispatchCardBuilderModal';
 
 type CoverageResponse={ok?:boolean;coverage?:DispatchCardCoverage;error?:string};
 
-export function HqDispatchCardCoveragePanel({drivers,onAssetUpdated,embedded=false}:{
-  drivers:HqDriverSummary[];onAssetUpdated?:()=>void;embedded?:boolean;
+export function HqDispatchCardCoveragePanel({
+  drivers,
+  onAssetUpdated,
+  embedded=false,
+  sharedCoverage,
+  sharedLoading,
+  sharedError,
+  onRefreshCoverage,
+}:{
+  drivers:HqDriverSummary[];
+  onAssetUpdated?:()=>void;
+  embedded?:boolean;
+  sharedCoverage?:DispatchCardCoverage|null;
+  sharedLoading?:boolean;
+  sharedError?:string;
+  onRefreshCoverage?:()=>Promise<void>|void;
 }) {
   const [coverage,setCoverage]=useState<DispatchCardCoverage|null>(null);
   const [loading,setLoading]=useState(true);
@@ -26,7 +42,15 @@ export function HqDispatchCardCoveragePanel({drivers,onAssetUpdated,embedded=fal
   const [result,setResult]=useState('');
   const cancelRef=useRef(false);
 
+  const effectiveCoverage=sharedCoverage!==undefined?sharedCoverage:coverage;
+  const effectiveLoading=sharedLoading!==undefined?sharedLoading:loading;
+  const effectiveError=error||sharedError||'';
+
   const refresh=useCallback(async()=>{
+    if(onRefreshCoverage) {
+      await onRefreshCoverage();
+      return;
+    }
     try {
       setLoading(true);
       const response=await fetch('/api/hq/drivers/assets/coverage',{cache:'no-store'});
@@ -37,15 +61,17 @@ export function HqDispatchCardCoveragePanel({drivers,onAssetUpdated,embedded=fal
     } catch(err) {
       setError(err instanceof Error?err.message:'카드 매핑 조회 실패');
     } finally {setLoading(false);}
-  },[]);
+  },[onRefreshCoverage]);
   useEffect(()=>{
-    void refresh();
+    if(!onRefreshCoverage) {
+      void refresh();
+    }
     return ()=>{cancelRef.current=true;};
-  },[refresh]);
+  },[refresh,onRefreshCoverage]);
 
   const selectedDriver=useMemo(() => drivers.find(d=>d.id===activeDriverId)||null,[drivers,activeDriverId]);
-  const ready=coverage?.drivers.filter(d=>d.identityReady&&d.missingVariants>0)||[];
-  const blocked=coverage?.drivers.filter(d=>!d.identityReady&&d.missingVariants>0)||[];
+  const ready=effectiveCoverage?.drivers.filter(d=>d.identityReady&&d.missingVariants>0)||[];
+  const blocked=effectiveCoverage?.drivers.filter(d=>!d.identityReady&&d.missingVariants>0)||[];
 
   /** Desktop or mobile: one active render at a time, safe to retry after closing.
    * Keep stored English names where present; missing names use the fixed card romanization.
@@ -53,7 +79,7 @@ export function HqDispatchCardCoveragePanel({drivers,onAssetUpdated,embedded=fal
    * Backend skipIfExists protects existing PC/mobile versions even under races.
    */
   const generateAllMissing=async()=>{
-    if(!coverage||generating||!ready.length)return;
+    if(!effectiveCoverage||generating||!ready.length)return;
     const planned=ready.reduce((n,d)=>n+d.missingVariants,0);
     if(!window.confirm('기사 '+ready.length+'명, 미생성 PC·모바일 카드 최대 '+planned+
       '장을 추가할까요?\n기존 카드는 유지하고, 기사 정보 미완성 '+blocked.length+
@@ -87,7 +113,7 @@ export function HqDispatchCardCoveragePanel({drivers,onAssetUpdated,embedded=fal
         const placement=normalizePortraitPlacement(portraitJson.placement);
         for(const slot of driver.slots) {
           if(cancelRef.current)break;
-          const vehicle=coverage.vehicles.find(v=>v.uuid===slot.vehicleId);
+          const vehicle=effectiveCoverage.vehicles.find(v=>v.uuid===slot.vehicleId);
           const assets=vehicle?resolveDispatchCardPhotos(vehicle):null;
           if(!vehicle||!assets)continue;
           for(const variant of ['pc','mobile'] as const) {
@@ -148,42 +174,46 @@ export function HqDispatchCardCoveragePanel({drivers,onAssetUpdated,embedded=fal
     aria-label="기사 배차카드 현황·일괄 생성">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="text-[12px] leading-relaxed text-[#73839D]">
-        {loading?'차량·기사 연결 확인 중…':coverage
-          ? '사진 준비 차량 '+coverage.vehicles.length+'대 · '+coverage.drivers.length+'명 · PC·모바일 '+coverage.savedVariants+'/'+coverage.requiredVariants+'장 등록 · 미생성/갱신 '+coverage.missingVariants+'장'
+        {effectiveLoading?'차량·기사 연결 확인 중…':effectiveCoverage
+          ? '사진 준비 차량 '+effectiveCoverage.vehicles.length+'대 · '+effectiveCoverage.drivers.length+'명 · PC·모바일 '+effectiveCoverage.savedVariants+'/'+effectiveCoverage.requiredVariants+'장 등록 · 미생성/갱신 '+effectiveCoverage.missingVariants+'장'
           :'차량과 기사 연결 확인'}
       </div>
-      <button type="button" onClick={()=>void refresh()} disabled={loading||generating}
-        aria-label="배차카드 현황 새로고침"
-        className="flex min-h-10 items-center gap-1.5 rounded-xl bg-[#F7F9FC] px-3 text-[12px] font-medium text-[#526680] disabled:opacity-50">
-        <RefreshCw className={'size-4 '+(loading?'animate-spin':'')}/> 새로고침
-      </button>
+      <HqButton variant="subtle" size="sm" onClick={()=>void refresh()} disabled={effectiveLoading||generating}
+        aria-label="배차카드 현황 새로고침">
+        <RefreshCw className={'size-4 '+(effectiveLoading?'animate-spin':'')}/> 새로고침
+      </HqButton>
     </div>
     <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-      <button type="button" disabled={loading||generating||!ready.length}
+      <HqButton variant="primary" disabled={effectiveLoading||generating||!ready.length}
         onClick={()=>void generateAllMissing()}
-        className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-[12px] bg-[#1E60F3] px-4 text-[13px] font-semibold text-white disabled:bg-[#E9EDF3] disabled:text-[#8190A3]">
+        className="flex-1">
         {generating?<Loader2 className="size-4 animate-spin"/>:<CheckCircle2 className="size-4"/>}
         {generating?'누락 카드 생성 중…':'준비된 기사 미생성 카드 일괄 생성'}
-      </button>
-      <button type="button" onClick={()=>setExpanded(v=>!v)}
-        aria-expanded={expanded}
-        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] bg-[#F5F7FA] px-4 text-[13px] font-medium text-[#526680]">
-        기사별 현황 {expanded?<ChevronDown className="size-4"/>:<ChevronRight className="size-4"/>}
-      </button>
+      </HqButton>
+      {!embedded && (
+        <HqButton variant="subtle" onClick={()=>setExpanded(v=>!v)} aria-expanded={expanded}>
+          기사별 현황 {expanded?<ChevronDown className="size-4"/>:<ChevronRight className="size-4"/>}
+        </HqButton>
+      )}
     </div>
+    {embedded && (
+      <p className="mt-2.5 text-[11px] text-[#7A8AA1]">
+        아래 기사 목록의 ‘배차카드’ 열에서 기사별 등록·미등록 차량을 바로 확인할 수 있어요.
+      </p>
+    )}
     {blocked.length>0&&<p className="mt-3 flex items-start gap-2 text-[12px] leading-relaxed text-[#8B6B4C]">
       <ShieldAlert className="mt-0.5 size-4 shrink-0"/> 기사 {blocked.length}명은 직책·연락처 또는 프로필 확인이 필요해요. 영문 성명은 회사 표준 형식으로 자동 입력됩니다.
     </p>}
     {generating&&<div role="status" className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-[#F7F9FC] p-3 text-[12px] text-[#526680]">
       <span className="min-w-0 break-words">{progress||'배차카드 일괄 생성 준비 중…'}</span>
-      <button type="button" onClick={()=>{cancelRef.current=true;}} className="shrink-0 rounded-lg bg-white px-2.5 py-2 font-medium">중단</button>
+      <HqButton variant="subtle" size="sm" onClick={()=>{cancelRef.current=true;}}>중단</HqButton>
     </div>}
-    {result&&<p role="status" className="mt-3 text-[12px] text-[#526680]">{result}</p>}
-    {error&&<p role="alert" className="mt-3 text-[12px] text-[#B45454]">{error}</p>}
-    {expanded&&coverage&&<div className="mt-4 space-y-2">
-      {coverage.drivers.map((driver:DispatchCardCoverageDriver)=>{
+    {result&&<HqInlineFeedback tone="info" className="mt-3" message={result} onDismiss={()=>setResult('')}/>}
+    {effectiveError&&<HqInlineFeedback tone="error" className="mt-3" message={effectiveError} onDismiss={()=>setError('')}/>}
+    {!embedded&&expanded&&effectiveCoverage&&<div className="mt-4 space-y-2">
+      {effectiveCoverage.drivers.map((driver:DispatchCardCoverageDriver)=>{
         const savedPairCount=driver.slots.filter(slot=>slot.pc&&slot.mobile).length;
-        return <div key={driver.id} className="rounded-[14px] border border-[#EFF2F6] p-3 sm:p-4">
+        return <HqCard key={driver.id} className="p-3 sm:p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[13px] font-semibold text-[#293D55]">{driver.name}</p>
@@ -198,31 +228,30 @@ export function HqDispatchCardCoveragePanel({drivers,onAssetUpdated,embedded=fal
                   ].filter(Boolean).join(' · ')||'기사 연락처/표기'} 확인 필요
               </p>}
             </div>
-            <button type="button" disabled={!drivers.some(item=>item.id===driver.id)||generating}
-              onClick={()=>setActiveDriverId(driver.id)}
-              className="min-h-10 shrink-0 rounded-[11px] bg-[#F2F5FA] px-3 text-[12px] font-semibold text-[#526680] disabled:opacity-50">
+            <HqButton variant="subtle" size="sm" disabled={!drivers.some(item=>item.id===driver.id)||generating}
+              onClick={()=>setActiveDriverId(driver.id)}>
               {driver.identityReady?(driver.missingVariants?'미생성 카드 만들기':'카드 보기'):'정보 확인·카드 만들기'}
-            </button>
+            </HqButton>
           </div>
           <details className="mt-2 text-[11px] text-[#73839A]">
             <summary className="cursor-pointer py-1">차량별 연결 확인</summary>
             <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
               {driver.slots.map(slot=><div key={slot.vehicleId} className="flex items-center justify-between gap-2 rounded-lg bg-[#F8FAFC] px-2.5 py-2">
                 <span className="min-w-0 truncate">{slot.plate}</span>
-                <span className={'shrink-0 '+(slot.pc&&slot.mobile?'text-[#477761]':'text-[#8A96A7]')}>
+                <HqBadge tone={slot.pc&&slot.mobile?'selected':slot.pc||slot.mobile?'warning':'neutral'}>
                   {slot.pc&&slot.mobile?'PC·모바일 완료':slot.pc||slot.mobile?'1종 등록':'미생성'}
-                </span>
+                </HqBadge>
               </div>)}
             </div>
           </details>
-        </div>;
+        </HqCard>;
       })}
     </div>}
-    {!loading&&!coverage&&!error&&<div className="py-3 text-[12px] text-[#7A8AA1]">차량 연결 정보를 찾을 수 없어요.</div>}
-    {selectedDriver&&coverage&&<HqDispatchCardBuilderModal
+    {!effectiveLoading&&!effectiveCoverage&&!effectiveError&&<div className="py-3 text-[12px] text-[#7A8AA1]">차량 연결 정보를 찾을 수 없어요.</div>}
+    {selectedDriver&&effectiveCoverage&&<HqDispatchCardBuilderModal
       isOpen={!!activeDriverId}
       driver={selectedDriver}
-      vehicles={coverage.vehicles}
+      vehicles={effectiveCoverage.vehicles}
       onClose={()=>setActiveDriverId(null)}
       onAssetUpdated={()=>{void refresh();onAssetUpdated?.();}}
       onProfileUpdated={()=>{void refresh();onAssetUpdated?.();}}
