@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { HqDriversTableView } from './HqDriversTableView';
-import { HqDispatchCardCoveragePanel } from './HqDispatchCardCoveragePanel';
 import { HqDriverDetailSplitView } from './HqDriverDetailSplitView';
 import { Plus, X, User, Phone, MapPin, Check, Loader2, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { useHqDrivers } from '@/utils/useHqDrivers';
@@ -157,8 +156,6 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
   return (
     <div className="hq-drivers-a space-y-5">
       {viewMode === 'table' ? (
-        <>
-        <HqDispatchCardCoveragePanel drivers={drivers} onAssetUpdated={refetch} />
         <HqDriversTableView
           onSelectDriver={handleSelectDriver}
           initialSearchQuery={initialSearchQuery}
@@ -172,8 +169,8 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
           onOpenLogin={() => setIsLoginModalOpen(true)}
           onUpdateDriver={updateDriver}
           onDeleteDriver={deleteDriver}
+          onCardAssetUpdated={refetch}
         />
-        </>
       ) : (
         <HqDriverDetailSplitView
           selectedDriverId={selectedDriverId || (drivers[0]?.id ?? '')}

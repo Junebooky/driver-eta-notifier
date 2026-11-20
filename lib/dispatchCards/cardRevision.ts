@@ -22,3 +22,13 @@ export function shouldRebuildDriverCards(
 ): boolean {
   return identityChanged || portraitChanged;
 }
+
+/**
+ * Only cards produced by the shared canvas builder are distributable.
+ * Legacy manually uploaded card files stay in history, never auto-display.
+ * Both builder paths write "dispatch_{plate}_{pc|mobile}.webp".
+ */
+export function isGeneratedDispatchCardFileName(name: unknown): boolean {
+  return typeof name === 'string' &&
+    /^dispatch_[\p{L}\p{N}_-]+_(?:pc|mobile)\.webp$/u.test(name);
+}

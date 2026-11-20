@@ -9,7 +9,7 @@ import {
   DriverVehicleInfoAsset,
 } from '@/types/driverVehicleAsset';
 import { resolveVehicleEntity } from '@/utils/vehicleData';
-import { isDispatchCardAssetStale } from '@/lib/dispatchCards/cardRevision';
+import { isDispatchCardAssetStale, isGeneratedDispatchCardFileName } from '@/lib/dispatchCards/cardRevision';
 
 export const BUCKET_NAME = 'cockpit-assets';
 export const DEFAULT_ORG = 'vip_limousine_korea';
@@ -639,10 +639,10 @@ export async function getDriverVehicleBundle(
     ? driverRecord.data.driver_meta as Record<string, unknown> : {};
   // Never offer an old static brochure after this driver's role, name, phone,
   // or portrait changed. Previous versions remain in archived history.
-  const currentPc = pcInfo &&
+  const currentPc = pcInfo && isGeneratedDispatchCardFileName(pcInfo.fileName) &&
     !isDispatchCardAssetStale(meta.dispatch_card_revision_at, pcInfo.createdAt) &&
     !isDispatchCardAssetStale(profile?.createdAt, pcInfo.createdAt) ? pcInfo : null;
-  const currentMobile = mobileInfo &&
+  const currentMobile = mobileInfo && isGeneratedDispatchCardFileName(mobileInfo.fileName) &&
     !isDispatchCardAssetStale(meta.dispatch_card_revision_at, mobileInfo.createdAt) &&
     !isDispatchCardAssetStale(profile?.createdAt, mobileInfo.createdAt) ? mobileInfo : null;
 
@@ -687,7 +687,7 @@ export async function getDriverVehicleAssetSummary(
   try {
     const [assets, driver, photo] = await Promise.all([
       supabaseAdmin.from('driver_vehicle_info_assets')
-        .select('vehicle_id, variant, created_at')
+        .select('vehicle_id, variant, created_at, file_name')
         .eq('organization_id', org).eq('driver_id', driverId).eq('status', 'active'),
       supabaseAdmin.from('drivers').select('driver_meta').eq('id', driverId).maybeSingle(),
       supabaseAdmin.from('driver_profile_assets')
@@ -699,7 +699,8 @@ export async function getDriverVehicleAssetSummary(
       ? driver.data.driver_meta as Record<string, unknown> : {};
     for (const row of assets.data || []) {
       if (!summary[row.vehicle_id]) summary[row.vehicle_id] = { pc: false, mobile: false };
-      const isStale = isDispatchCardAssetStale(meta.dispatch_card_revision_at, row.created_at) ||
+      const isStale = !isGeneratedDispatchCardFileName(row.file_name) ||
+        isDispatchCardAssetStale(meta.dispatch_card_revision_at, row.created_at) ||
         isDispatchCardAssetStale(photo.data?.created_at, row.created_at);
       if (row.variant === 'pc') {
         summary[row.vehicle_id].pc = !isStale;

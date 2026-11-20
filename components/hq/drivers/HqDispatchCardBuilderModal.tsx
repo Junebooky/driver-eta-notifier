@@ -41,6 +41,7 @@ interface Props {
   isOpen: boolean;
   driver: HqDriverSummary;
   vehicles: VipRealVehicle[];
+  initialVehicleId?: string;
   onClose: () => void;
   onAssetUpdated?: () => void;
   onProfileUpdated?: () => void;
@@ -72,7 +73,7 @@ function getPhotoPreviewUrl(path: string) {
 }
 
 export const HqDispatchCardBuilderModal: React.FC<Props> = ({
-  isOpen, driver, vehicles, onClose, onAssetUpdated, onProfileUpdated,
+  isOpen, driver, vehicles, initialVehicleId, onClose, onAssetUpdated, onProfileUpdated,
 }) => {
   const availableVehicles = useMemo(
     () => vehicles.filter(vehicle => Boolean(resolveDispatchCardPhotos(vehicle))),
@@ -187,9 +188,11 @@ export const HqDispatchCardBuilderModal: React.FC<Props> = ({
 
   useEffect(() => {
     if (!isOpen) return;
-    setSelectedVehicleId(previous => availableVehicles.some(v => v.uuid === previous)
-      ? previous : (availableVehicles[0]?.uuid || ''));
-  }, [isOpen, driver.id, availableVehicles]);
+    setSelectedVehicleId(previous =>
+      initialVehicleId && availableVehicles.some(v=>v.uuid===initialVehicleId)
+        ? initialVehicleId
+        : availableVehicles.some(v => v.uuid === previous) ? previous : (availableVehicles[0]?.uuid || ''));
+  }, [isOpen, driver.id, initialVehicleId, availableVehicles]);
 
   useEffect(() => {
     if (!isOpen) return;

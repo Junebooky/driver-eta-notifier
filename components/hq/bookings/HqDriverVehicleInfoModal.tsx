@@ -16,11 +16,13 @@ import {
   ShieldCheck,
   ChevronDown,
   Check,
+  Share2,
 } from 'lucide-react';
 import { HqBooking, CustomerBrochureStatus } from '@/types/hq';
 import { DriverVehicleAssetBundle, DriverInfoDispatchLog } from '@/types/driverVehicleAsset';
 import { haptics } from '@/utils/haptics';
 import { formatPhoneNumber } from '@/utils/formatters';
+import { HqButton, HqSegmentedTabs } from '@/components/hq/ui';
 
 export interface HqDriverVehicleInfoModalProps {
   isOpen: boolean;
@@ -51,6 +53,7 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   const [recipient, setRecipient] = useState(booking?.passengerPhone || '');
   const [manualDeliveryConfirmed, setManualDeliveryConfirmed] = useState(false);
   const submittingRef = useRef(false);
@@ -217,16 +220,42 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
   const currentAsset = activeTab === 'pc' ? bundle?.pcInfo : bundle?.mobileInfo;
   const selectedDelivery = DELIVERY_OPTIONS.find(option => option.value === channel) || DELIVERY_OPTIONS[0];
 
-  // Handle Download
+  // Fetch through our protected same-origin preview route, not an expiring
+  // signed third-party storage URL, so mobile OS sharing has a real file.
+  const currentAssetUrl = currentAsset?.filePath
+    ? '/api/hq/drivers/assets/preview?path=' + encodeURIComponent(currentAsset.filePath) : '';
+  const assetFileName = 'VIP_배차카드_' + (booking.driverName || '기사') +
+    '_' + (booking.vehiclePlate || '차량') + '_' + activeTab + '.webp';
   const handleDownload = () => {
-    if (!currentAsset?.signedUrl) return;
-    const link = document.createElement('a');
-    link.href = currentAsset.signedUrl;
-    link.download = `VIP안내_${booking.driverName || '기사'}_${booking.vehicleModel || '차량'}_${activeTab.toUpperCase()}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    if (!currentAssetUrl) return;
+    const anchor=document.createElement('a');
+    anchor.href=currentAssetUrl;
+    anchor.download=assetFileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
     haptics.success();
+  };
+  const handleShare=async()=>{
+    if(!currentAssetUrl||isSharing)return;
+    if(!navigator.share){
+      setFeedback({type:'warning',message:'이 브라우저는 파일 공유를 지원하지 않아요. 이미지를 저장한 다음 직접 전송해 주세요.'});
+      return;
+    }
+    setIsSharing(true);
+    try {
+      const response=await fetch(currentAssetUrl,{cache:'no-store'});
+      if(!response.ok)throw new Error('이미지 파일을 불러올 수 없습니다.');
+      const blob=await response.blob();
+      const file=new File([blob],assetFileName,{type:'image/webp'});
+      if(navigator.canShare&&!navigator.canShare({files:[file]}))
+        throw new Error('파일 공유를 지원하지 않는 환경입니다. 이미지를 저장해서 전송해 주세요.');
+      await navigator.share({files:[file],title:'VIP LIMOUSINE KOREA 배차카드'});
+      setFeedback({type:'success',message:'공유 메뉴를 열었어요. 실제 전달 여부는 확인한 뒤 기록해 주세요.'});
+    }catch(err){
+      if(err instanceof Error&&err.name==='AbortError')return;
+      setFeedback({type:'warning',message:err instanceof Error?err.message:'공유할 수 없습니다. 이미지를 저장해 주세요.'});
+    }finally{setIsSharing(false);}
   };
 
   // Handle Record Dispatch
@@ -385,15 +414,15 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                 <AlertTriangle className="w-6 h-6" />
               </div>
               <h3 className="text-[17px] font-bold tracking-tight text-[#17233B]">
-                아직 안내 카드가 없어요
+                최신 배차카드가 아직 없어요
               </h3>
               <p className="mx-auto max-w-md text-[13px] leading-6 text-[#73839D]">
                 <strong className="font-semibold text-[#17233B]">[{booking.driverName}]</strong> 기사님의{' '}
                 <strong className="font-semibold text-[#17233B]">[{booking.vehicleModel} ({booking.vehiclePlate})]</strong> 실차 조합
-                PC/모바일 안내 이미지가 Supabase에 아직 등록되지 않았습니다.
+                PC·모바일 신규 제작 카드가 준비되지 않았거나 갱신이 필요합니다.
               </p>
               <p className="text-[11px] text-[#95A3B9]">
-                잘못된 차량 이미지로 대신 보여드리지 않아요.
+                기존 수동 업로드 파일은 대신 표시하지 않습니다.
               </p>
               {onOpenAssetManager && (
                 <div className="pt-2">
@@ -405,7 +434,7 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                     }}
                     className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-[15px] bg-[#1E60F3] px-5 py-3 text-[13px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-all hover:bg-[#1757DC] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#1E60F3]/20"
                   >
-                    <span>안내 카드 등록하기</span>
+                    <span>배차카드 만들기·갱신</span>
                   </button>
                 </div>
               )}
@@ -415,45 +444,33 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
             <div className="space-y-4">
               {/* PC / Mobile Variant Toggle */}
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="inline-flex max-w-full items-center gap-1 rounded-[16px] bg-[#F1F4F9] p-1">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('pc')}
-                    aria-pressed={activeTab === 'pc'}
-                    className={`flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[12px] px-3 sm:px-4 text-[12px] font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 ${
-                      activeTab === 'pc'
-                        ? 'bg-white text-[#17233B] shadow-[0_3px_10px_rgba(35,49,78,0.07)]'
-                        : 'text-[#73839D] hover:text-[#17233B]'
-                    }`}
-                  >
-                    <Monitor className={activeTab === 'pc' ? 'size-4 text-[#1E60F3]' : 'size-4 text-[#95A3B9]'} />
-                    <span>PC 가로형 {bundle.pcInfo ? '✓' : '(미등록)'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('mobile')}
-                    aria-pressed={activeTab === 'mobile'}
-                    className={`flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[12px] px-3 sm:px-4 text-[12px] font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 ${
-                      activeTab === 'mobile'
-                        ? 'bg-white text-[#17233B] shadow-[0_3px_10px_rgba(35,49,78,0.07)]'
-                        : 'text-[#73839D] hover:text-[#17233B]'
-                    }`}
-                  >
-                    <Smartphone className={activeTab === 'mobile' ? 'size-4 text-[#1E60F3]' : 'size-4 text-[#95A3B9]'} />
-                    <span>모바일 세로형 {bundle.mobileInfo ? '✓' : '(미등록)'}</span>
-                  </button>
+                <HqSegmentedTabs aria-label="배차카드 미리보기 규격" value={activeTab}
+                  onValueChange={value=>setActiveTab(value as 'pc'|'mobile')}
+                  tabs={[
+                    {id:'pc',label:bundle.pcInfo?'PC 가로형':'PC 미등록'},
+                    {id:'mobile',label:bundle.mobileInfo?'모바일 세로형':'모바일 미등록'},
+                  ]}/>
+                <div className="flex flex-wrap items-center gap-2">
+                  {onOpenAssetManager&&!bundle.isFullyComplete&&(
+                    <HqButton variant="secondary" size="sm"
+                      onClick={()=>{
+                        onClose();
+                        onOpenAssetManager(booking.driverId||'',booking.vehiclePlate||'');
+                      }}>
+                      누락 카드 만들기
+                    </HqButton>
+                  )}
+                  {currentAsset&&<>
+                    <HqButton variant="secondary" size="sm" onClick={handleDownload}>
+                      <Download className="size-4"/> 이미지 저장
+                    </HqButton>
+                    <HqButton variant="secondary" size="sm" disabled={isSharing}
+                      onClick={()=>{void handleShare();}}>
+                      {isSharing?<Loader2 className="size-4 animate-spin"/>:<Share2 className="size-4"/>}
+                      공유하기
+                    </HqButton>
+                  </>}
                 </div>
-
-                {currentAsset && (
-                  <button
-                    type="button"
-                    onClick={handleDownload}
-                    className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-[14px] bg-white px-3.5 text-[12px] font-semibold text-[#4D607C] shadow-[0_5px_16px_rgba(35,49,78,0.045),0_2px_5px_rgba(35,49,78,0.02)] transition-all hover:bg-[#FAFBFD] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25"
-                  >
-                    <Download className="size-4 text-[#73839D]" />
-                    <span>이미지 저장</span>
-                  </button>
-                )}
               </div>
 
               {/* Premium white preview: retain original asset, no decorative overlays */}
@@ -481,7 +498,7 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                     <p className="text-[14px] font-semibold text-[#17233B]">
                       {activeTab === 'pc' ? 'PC 가로형' : '모바일 세로형'} 이미지가 아직 없습니다
                     </p>
-                    <p className="text-[12px] text-[#73839D]">기사·차량 안내자료를 등록하면 여기서 확인할 수 있어요.</p>
+                    <p className="text-[12px] text-[#73839D]">기사관리의 새 배차카드 제작기로 이 규격을 생성하면 여기서 확인할 수 있어요.</p>
                   </div>
                 )}
               </div>
@@ -662,7 +679,7 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 bg-white px-5 py-3.5 text-[11px] text-[#73839D] sm:px-7 sm:py-4">
           <span className="flex items-center gap-2">
             <ShieldCheck className="size-4 shrink-0 text-[#95A3B9]" />
-            <span>안전하게 보호되는 보안 링크예요</span>
+            <span>현재 기사·차량의 최신 배차카드만 표시합니다</span>
           </span>
           <button
             type="button"
