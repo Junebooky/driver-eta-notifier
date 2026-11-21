@@ -489,15 +489,16 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
 
         <div className="flex shrink-0 items-center gap-1.5">
           {onOpenDispatchCard&&(
-            <HqButton variant="subtle" size="sm" onClick={onOpenDispatchCard}
-              className="flex min-h-10 items-center gap-1.5 px-2.5 sm:px-3"
+            <HqButton variant="subtle" size="md" onClick={onOpenDispatchCard}
+              className="h-11 min-h-11 shrink-0 whitespace-nowrap px-3! sm:px-4!"
               aria-label="배차카드 빠른 검색" title="기사 배차카드 찾기">
               <img src="/images/icons/drivers/icon_driver.png" alt="" aria-hidden="true" className="size-5 shrink-0 object-contain"/>
-              <span className="text-[12px]">배차카드</span>
+              <span>배차카드</span>
             </HqButton>
           )}
-          <button
-            type="button"
+          <HqButton
+            variant="primary"
+            size="md"
             onClick={() => {
               haptics.lightTap();
               setOpenDropdown(null);
@@ -505,11 +506,11 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
               onOpenNewBooking();
             }}
             aria-label="예약 추가"
-            className="flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-[14px] bg-[#1E60F3] px-3 text-[12px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-colors hover:bg-[#1757DC] sm:px-4"
+            className="h-11 min-h-11 shrink-0 whitespace-nowrap px-3! sm:px-4!"
           >
-            <Plus className="w-5 h-5 sm:hidden stroke-[2.5]" />
+            <Plus className="size-5 shrink-0 sm:hidden stroke-[2.5]" />
             <span className="hidden sm:inline">+ 예약 추가</span>
-          </button>
+          </HqButton>
         </div>
       </div>
 

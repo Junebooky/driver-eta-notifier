@@ -16,6 +16,12 @@ test('HQ all-menu and dispatch header open the same lazy, vehicle-first card fin
  assert.match(sidebar,/배차카드 빠른 검색/);
  assert.match(dispatch,/onOpenDispatchCard&&/);
  assert.match(dispatch,/배차카드 빠른 검색/);
+ const headerActionsMatch=dispatch.match(/onOpenDispatchCard&&[\s\S]*?aria-label="예약 추가"[\s\S]*?<\/HqButton>/);
+ assert.ok(headerActionsMatch,'dispatch header action buttons should share HqButton');
+ const headerActions=headerActionsMatch[0];
+ assert.equal((headerActions.match(/size="md"/g)||[]).length,2);
+ assert.equal((headerActions.match(/h-11 min-h-11 shrink-0 whitespace-nowrap px-3! sm:px-4!/g)||[]).length,2);
+ assert.doesNotMatch(headerActions,/size="sm"|min-h-10/);
  assert.match(global,/useHqDrivers\(\)/);
  assert.match(global,/\/api\/hq\/drivers\/assets\/coverage/);
  assert.match(global,/<HqDispatchCardQuickFindModal/);
