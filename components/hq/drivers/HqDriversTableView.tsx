@@ -1,0 +1,931 @@
+'use client';
+
+import React, { Fragment, useCallback, useEffect, useState, useMemo } from 'react';
+import {
+  Users,
+  Plus,
+  MapPin,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Phone,
+  Loader2,
+  ShieldAlert,
+  AlertTriangle,
+  Key,
+  RefreshCw,
+} from 'lucide-react';
+import { HqDriverSummary } from '@/types/driverHq';
+import type { DispatchCardCoverage } from '@/lib/dispatchCards/dispatchCardCoverage';
+import { useHqDrivers } from '@/utils/useHqDrivers';
+import { haptics } from '@/utils/haptics';
+import { formatPhoneNumber } from '@/utils/formatters';
+import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
+import {
+  matchDriverWithCardSlots,
+  summarizeDriverCardCoverage,
+  type DriverSearchMatchResult,
+} from '@/utils/driverDispatchCardVehicles';
+import { HqButton, HqBadge, HqCard, HqSearchInput } from '@/components/hq/ui';
+import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
+import { HqDriverCardVehicleGroups } from './HqDriverCardVehicleGroups';
+import { HqDriverCardPickerModal } from './HqDriverCardPickerModal';
+import { HqDispatchCardQuickFindModal } from './HqDispatchCardQuickFindModal';
+import { HqDriverAssetManagerModal } from './HqDriverAssetManagerModal';
+import { HqDispatchCardBuilderModal } from './HqDispatchCardBuilderModal';
+
+export interface HqDriversTableViewProps {
+  onSelectDriver: (driverId: string) => void;
+  initialSearchQuery?: string;
+  onOpenAddDriver?: () => void;
+  drivers?: HqDriverSummary[];
+  counts?: {
+    total: number;
+    employed: number;
+    freelance: number;
+    englishCount: number;
+  };
+  isLoading?: boolean;
+  error?: string | null;
+  statusCode?: number | null;
+  onRetry?: () => void;
+  onOpenLogin?: () => void;
+  onUpdateDriver?: (id: string, updates: Record<string, any>) => Promise<boolean>;
+  onDeleteDriver?: (id: string) => Promise<boolean>;
+  onCardAssetUpdated?: () => void;
+}
+
+export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
+  onSelectDriver,
+  initialSearchQuery = '',
+  onOpenAddDriver,
+  drivers: propDrivers,
+  counts: propCounts,
+  isLoading: propIsLoading,
+  error: propError,
+  statusCode: propStatusCode,
+  onRetry: propOnRetry,
+  onOpenLogin,
+  onCardAssetUpdated,
+}) => {
+  // If not passed from parent, use the custom hook
+  const hookState = useHqDrivers();
+  const drivers = propDrivers ?? hookState.drivers;
+  const counts = propCounts ?? hookState.counts;
+  const isLoading = propIsLoading ?? hookState.isLoading;
+  const error = propError ?? hookState.error;
+  const statusCode = propStatusCode ?? hookState.statusCode;
+  const onRetry = propOnRetry ?? hookState.refetch;
+
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
+  const [affiliationFilter, setAffiliationFilter] = useState<'all' | 'employed' | 'freelance'>('all');
+  const [residenceFilter, setResidenceFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'driving' | 'off' | 'active' | 'vacation'>('all');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [driverIconError, setDriverIconError] = useState(false);
+  const [coverage, setCoverage] = useState<DispatchCardCoverage | null>(null);
+  const [coverageLoading, setCoverageLoading] = useState(true);
+  const [coverageError, setCoverageError] = useState('');
+  const [expandedCardDriverIds, setExpandedCardDriverIds] = useState<Record<string, boolean>>({});
+  const [searchCollapsedDriverIds, setSearchCollapsedDriverIds] = useState<Record<string, boolean>>({});
+  const [cardPickerDriverId, setCardPickerDriverId] = useState<string | null>(null);
+  const [globalCardSearchOpen, setGlobalCardSearchOpen] = useState(false);
+  const [cardPreviewTarget, setCardPreviewTarget] = useState<{ driverId: string; vehiclePlate?: string } | null>(null);
+  const [cardBuilderTarget, setCardBuilderTarget] = useState<{ driver: HqDriverSummary; vehicleId?: string } | null>(null);
+  const pageSize = 10;
+
+  const refreshCoverage = useCallback(async () => {
+    try {
+      setCoverageLoading(true);
+      const response = await fetch('/api/hq/drivers/assets/coverage', { cache: 'no-store' });
+      const json = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        coverage?: DispatchCardCoverage;
+        error?: string;
+      };
+      if (!response.ok || !json.ok || !json.coverage) {
+        throw new Error(json.error || '카드 매핑 조회 실패');
+      }
+      setCoverage(json.coverage);
+      setCoverageError('');
+    } catch (err) {
+      setCoverageError(err instanceof Error ? err.message : '카드 매핑 조회 실패');
+    } finally {
+      setCoverageLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshCoverage();
+  }, [refreshCoverage, drivers.length]);
+
+  const coverageByDriverId = useMemo(
+    () => new Map((coverage?.drivers || []).map((item) => [item.id, item])),
+    [coverage]
+  );
+
+  const vehicleById = useMemo(
+    () => new Map((coverage?.vehicles || []).map((vehicle) => [vehicle.uuid, vehicle])),
+    [coverage?.vehicles]
+  );
+
+  useEffect(() => {
+    setSearchCollapsedDriverIds({});
+  }, [searchQuery]);
+
+  const searchMatchesByDriverId = useMemo(() => {
+    const map = new Map<string, DriverSearchMatchResult>();
+    for (const driver of drivers) {
+      map.set(
+        driver.id,
+        matchDriverWithCardSlots({
+          query: searchQuery,
+          driver,
+          driverCoverage: coverageByDriverId.get(driver.id),
+          vehicleById,
+        })
+      );
+    }
+    return map;
+  }, [drivers, searchQuery, coverageByDriverId, vehicleById]);
+
+  const handleCardAssetUpdated = useCallback(() => {
+    void refreshCoverage();
+    onCardAssetUpdated?.();
+  }, [refreshCoverage, onCardAssetUpdated]);
+
+  // Helper to determine real-time operation status:
+  // 'driving' (운행 중 - 파랑 칩) | 'available' (운행 가능 - 초록 칩) | 'off' (휴무 - 회색 칩)
+  const getDriverStatus = (driver: HqDriverSummary): 'available' | 'driving' | 'off' => {
+    if (!driver.isAvailable) return 'off';
+    const today = getKstTodayDateStr();
+    const hasTodayTrip = driver.schedules?.some((s) => s.dateStr === today);
+    if (hasTodayTrip) return 'driving';
+    return 'available';
+  };
+
+  // Helper to check if a driver joined within the last 7 days (and has an explicit, valid created date)
+  const isNewDriver = (driver: HqDriverSummary): boolean => {
+    if (!driver.createdAt) return false;
+    try {
+      const createdTime = new Date(driver.createdAt).getTime();
+      const diffMs = Date.now() - createdTime;
+      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+      return diffDays >= 0 && diffDays <= 7;
+    } catch {
+      return false;
+    }
+  };
+
+  // Filtered List (소속 기사 우선 노출)
+  const filteredDrivers = useMemo(() => {
+    const list = drivers.filter((driver) => {
+      // Affiliation filter
+      if (affiliationFilter !== 'all' && driver.affiliationType !== affiliationFilter) {
+        return false;
+      }
+
+      // Residence filter
+      if (residenceFilter !== 'all') {
+        if (!driver.residence.includes(residenceFilter)) {
+          return false;
+        }
+      }
+
+      // Status filter
+      if (statusFilter !== 'all') {
+        const opStatus = getDriverStatus(driver);
+        if (statusFilter === 'available' && opStatus !== 'available') return false;
+        if (statusFilter === 'driving' && opStatus !== 'driving') return false;
+        if (statusFilter === 'off' && opStatus !== 'off') return false;
+        // Backward-compat for legacy filters
+        if (statusFilter === 'active' && !driver.isAvailable) return false;
+        if (statusFilter === 'vacation' && driver.isAvailable) return false;
+      }
+
+      // Search query (supports multi-token e.g. "김승준 1336" across driver profile & card slots)
+      if (searchQuery.trim()) {
+        const match = searchMatchesByDriverId.get(driver.id);
+        if (!match?.matched) return false;
+      }
+
+      return true;
+    });
+
+    // 소속(employed) 기사를 최상단에 먼저 노출, 동일 조건 시 이름 가나다순 정렬
+    return list.slice().sort((a, b) => {
+      if (a.affiliationType !== b.affiliationType) {
+        return a.affiliationType === 'employed' ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name, 'ko');
+    });
+  }, [drivers, affiliationFilter, residenceFilter, statusFilter, searchQuery, searchMatchesByDriverId]);
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filteredDrivers.length / pageSize));
+  const paginatedDrivers = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredDrivers.slice(start, start + pageSize);
+  }, [filteredDrivers, currentPage, pageSize]);
+
+  const handleRowClick = (driverId: string) => {
+    haptics.lightTap();
+    onSelectDriver(driverId);
+  };
+
+  return (
+    <div className="relative z-10 rounded-[23px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)]">
+      {/* Card Header: Icon + Title + Count */}
+      <div className="flex items-center justify-between gap-3 px-5 py-5 sm:px-6">
+        <div className="flex items-center gap-2.5">
+          {/* 기사관리 아이콘 & 마우스 호버 툴팁 */}
+          <div className="relative group/drivers inline-flex items-center justify-center cursor-pointer shrink-0">
+            {!driverIconError ? (
+              <img
+                src="/images/icons/drivers/icon_driver.png"
+                alt="기사 관리"
+                onError={() => setDriverIconError(true)}
+                className="w-12 h-12 sm:w-12 sm:h-12 object-contain shrink-0 transition-transform duration-150 group-hover/drivers:scale-110"
+              />
+            ) : (
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-50 border border-blue-100 text-[#1E60F3] flex items-center justify-center shrink-0 transition-transform duration-150 group-hover/drivers:scale-110 shadow-2xs">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
+            )}
+
+            {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
+            <div className="absolute bottom-full left-0 mb-2 hidden group-hover/drivers:flex flex-col items-start pointer-events-none z-[100]">
+              <span className="whitespace-nowrap rounded-[12px] bg-white px-3 py-2 text-[11px] font-medium text-[#4D607C] shadow-[0_8px_22px_rgba(35,49,78,0.1)] animate-in fade-in-50 duration-150">
+                소속 및 프리랜서 기사님들의 프로필과 배차 자격을 관리해요
+              </span>
+              <div className="-mt-1 ml-3.5 size-2 rotate-45 bg-white" />
+            </div>
+          </div>
+
+          <h2 className="text-[19px] font-bold tracking-[-0.03em] text-[#17233B] sm:text-[22px]">
+            기사 관리
+          </h2>
+          <span className="rounded-full bg-[#F7F9FC] px-3 py-1 text-[11px] font-medium text-[#73839D]">
+            {counts.total}명
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {/* Quick Add Driver Action */}
+          <button
+            type="button"
+            onClick={onOpenAddDriver}
+            className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[14px] bg-[#1E60F3] px-4 text-[12px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-colors hover:bg-[#1757DC]"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>기사 등록</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Desktop filters: mobile has its own compact search & tabs. */}
+      <div className="hidden lg:flex flex-wrap items-center justify-between gap-3 px-5 pb-5 text-[12px] sm:px-6">
+        {/* Left: Affiliation & Dropdown Filters */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Affiliation Tabs */}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                haptics.selection();
+                setAffiliationFilter('all');
+                setCurrentPage(1);
+              }}
+              className={`min-h-10 cursor-pointer whitespace-nowrap rounded-[13px] px-3.5 text-[12px] font-semibold transition-colors ${affiliationFilter === 'all'
+                ? 'bg-[#EEF3FF] text-[#1E60F3] font-semibold'
+                : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.04)] hover:bg-[#F7F9FC] hover:text-[#17233B]'
+                }`}
+            >
+              <span>전체 </span>
+              <span className="font-bold">{counts.total}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                haptics.selection();
+                setAffiliationFilter('employed');
+                setCurrentPage(1);
+              }}
+              className={`min-h-10 cursor-pointer whitespace-nowrap rounded-[13px] px-3.5 text-[12px] font-semibold transition-colors ${affiliationFilter === 'employed'
+                ? 'bg-[#EEF3FF] text-[#1E60F3] font-semibold'
+                : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.04)] hover:bg-[#F7F9FC] hover:text-[#17233B]'
+                }`}
+            >
+              <span>소속 </span>
+              <span className="font-bold">{counts.employed}</span>
+            </button>
+
+            {counts.freelance > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.selection();
+                  setAffiliationFilter('freelance');
+                  setCurrentPage(1);
+                }}
+                className={`min-h-10 cursor-pointer whitespace-nowrap rounded-[13px] px-3.5 text-[12px] font-semibold transition-colors ${affiliationFilter === 'freelance'
+                  ? 'bg-[#EEF3FF] text-[#1E60F3] font-semibold'
+                  : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.04)] hover:bg-[#F7F9FC] hover:text-[#17233B]'
+                  }`}
+              >
+                <span>프리랜서 </span>
+                <span className="font-bold">{counts.freelance}</span>
+              </button>
+            )}
+          </div>
+
+          {/* Searchable HQ-standard status & region filters */}
+          <div className="min-w-[155px]">
+            <HqSearchSelect
+              label="기사 운행 상태 필터"
+              size="sm"
+              value={statusFilter}
+              onChange={next => {
+                setStatusFilter(next as typeof statusFilter);
+                setCurrentPage(1);
+              }}
+              placeholder="운행 상태 전체"
+              options={[
+                { value: 'all', label: '운행 상태 전체' },
+                { value: 'available', label: '운행 가능' },
+                { value: 'driving', label: '운행 중' },
+                { value: 'off', label: '휴무' },
+              ]}
+            />
+          </div>
+          <div className="min-w-[155px]">
+            <HqSearchSelect
+              label="기사 거주 지역 필터"
+              size="sm"
+              value={residenceFilter}
+              onChange={next => {
+                setResidenceFilter(next);
+                setCurrentPage(1);
+              }}
+              placeholder="거주 지역 전체"
+              options={[
+                { value: 'all', label: '거주 지역 전체' },
+                { value: '서울', label: '서울 권역' },
+                { value: '경기', label: '경기 권역' },
+                { value: '인천', label: '인천 권역' },
+              ]}
+            />
+          </div>
+        </div>
+
+        {/* Right: Search */}
+        <div className="flex w-full items-center gap-2.5 sm:w-auto">
+          <HqSearchInput
+            type="text"
+            containerClassName="w-full sm:w-64"
+            aria-label="기사명 차종 연락처 검색"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
+            onClear={() => {
+              setSearchQuery('');
+              setCurrentPage(1);
+            }}
+            placeholder="기사명, 차종, 연락처로 검색"
+            className="sm:h-10"
+          />
+        </div>
+      </div>
+
+      {/* Mobile: each driver opens a full detail view; the card action stays separate. */}
+      <section className="space-y-3 px-4 pb-5 lg:hidden" aria-label="모바일 기사 목록">
+        <HqSearchInput
+          aria-label="기사 이름 연락처 검색"
+          value={searchQuery}
+          onChange={event => { setSearchQuery(event.target.value); setCurrentPage(1); }}
+          onClear={() => { setSearchQuery(''); setCurrentPage(1); }}
+          placeholder="기사 이름, 연락처 검색"
+        />
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+          {([{ key: 'all', label: '전체', count: counts.total }, { key: 'employed', label: '소속', count: counts.employed },
+          { key: 'freelance', label: '프리랜서', count: counts.freelance }] as const).map(item =>
+            <button type="button" key={item.key} onClick={() => { setAffiliationFilter(item.key); setCurrentPage(1); }}
+              aria-pressed={affiliationFilter === item.key}
+              className={'min-h-10 shrink-0 rounded-[12px] px-3.5 text-[13px] font-semibold transition-colors ' +
+                (affiliationFilter === item.key ? 'bg-[#EEF3FF] text-[#1E60F3]' : 'bg-[#F7F9FC] text-[#6C7C91]')}>
+              {item.label} {item.count}
+            </button>)}
+          <button type="button" onClick={() => setGlobalCardSearchOpen(true)}
+            disabled={!drivers.length || !coverage} className="ml-auto min-h-10 shrink-0 rounded-[12px] px-3 text-[13px] font-semibold text-[#526680] disabled:opacity-40">
+            전체 카드 찾기
+          </button>
+        </div>
+        {coverageError && <button type="button" onClick={() => void refreshCoverage()}
+          className="min-h-10 text-left text-[12px] text-[#A35E59] underline underline-offset-2">
+          배차카드 조회 실패 · 다시 시도
+        </button>}
+        {isLoading ? <p role="status" className="py-12 text-center text-[12px] text-[#8190A4]">기사 목록을 불러오는 중…</p> :
+          error ? <div role="alert" className="space-y-2 rounded-[14px] bg-[#FFF7F5] p-4 text-[12px] text-[#9B5F56]">
+            <p>{error}</p><button type="button" onClick={onRetry} className="min-h-10 font-semibold underline">다시 시도</button>
+            {(statusCode === 401 || statusCode === 403) && <button type="button" onClick={onOpenLogin} className="ml-4 min-h-10 font-semibold underline">관리자 로그인</button>}
+          </div> :
+            !filteredDrivers.length ? <p className="py-12 text-center text-[12px] text-[#8190A4]">조건에 맞는 기사가 없습니다.</p> :
+              filteredDrivers.map(driver => {
+                const opStatus = getDriverStatus(driver);
+                const summary = summarizeDriverCardCoverage(coverageByDriverId.get(driver.id));
+                const searchMatch = searchMatchesByDriverId.get(driver.id);
+                const hasMatchedCard = Boolean(searchMatch?.matchedVehicleIds.length);
+                return <div key={driver.id} className="rounded-[17px] bg-white p-3.5 shadow-[0_3px_15px_rgba(35,49,78,0.065)]">
+                  <button type="button" onClick={() => handleRowClick(driver.id)}
+                    className="flex min-h-12 w-full items-center gap-3 text-left" aria-label={driver.name + ' 기사 프로필 보기'}>
+                    <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#F3F5F8] text-[15px] font-semibold text-[#526680]">
+                      {driver.avatarUrl ? <img src={driver.avatarUrl} alt="" className="size-full object-cover" /> : driver.name.slice(0, 1)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2">
+                        <span className="truncate text-[14px] font-semibold text-[#17233B]">{driver.name}</span>
+                        {driver.affiliationType === 'employed' && <span className="text-[11px] text-[#73839D]">소속</span>}
+                      </span>
+                      <span className="mt-1 block text-[11px] text-[#8190A4]">
+                        {opStatus === 'driving' ? '운행 중' : opStatus === 'off' ? '휴무' : '운행 가능'}
+                      </span>
+                    </span>
+                    <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-[#9CA9BA]" />
+                  </button>
+                  <div className="mt-3 flex items-center justify-between border-t border-[#F1F3F6] pt-2.5">
+                    <button type="button" onClick={() => { if (coverage) setCardPickerDriverId(driver.id); else void refreshCoverage(); }}
+                      disabled={!coverage && coverageLoading}
+                      className="inline-flex min-h-11 items-center gap-2 rounded-[11px] px-2 text-[12px] font-semibold text-[#526680]">
+                      배차카드 <span className="text-[#8D99A9]">{coverageLoading ? '조회 중' : coverageError ? '조회 실패' : summary.label}</span>
+                      {hasMatchedCard && searchMatch?.matchedHighlightLabel && (
+                        <span className="hq-card-plate-float inline-flex items-center rounded-full bg-[#1E60F3] px-2 py-0.5 text-[10px] font-bold text-white shadow-xs">
+                          {searchMatch.matchedHighlightLabel} 여깄어요!
+                        </span>
+                      )}
+                      <ChevronRight className="size-3.5 text-[#9CA9BA]" />
+                    </button>
+                    {driver.phone && <a href={'tel:' + driver.phone} aria-label={driver.name + ' 전화 걸기'}
+                      className="inline-flex size-7 items-center justify-center rounded-full bg-[#F6F8FA] text-[#60728B]">
+                      <Phone className="size-[17px]" />
+                    </a>}
+                  </div>
+                </div>;
+              })}
+      </section>
+
+      {/* 3. Driver Table (desktop) */}
+      <div className="hidden overflow-x-auto lg:block">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b border-slate-100 bg-slate-50/60 text-xs font-medium text-slate-400 select-none whitespace-nowrap">
+              <th className="py-3.5 px-5 font-medium">기사 정보</th>
+              <th className="py-3.5 px-5 font-medium">운행 상태</th>
+              <th className="py-3.5 px-5 font-medium">배차카드</th>
+              <th className="py-3.5 px-5 font-medium">연락처</th>
+              <th className="py-3.5 px-5 font-medium">지원 언어</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
+            {isLoading ? (
+              <tr>
+                <td colSpan={5} className="py-16 text-center text-slate-400">
+                  <Loader2 className="w-8 h-8 mx-auto text-[#1E60F3] animate-spin mb-3" />
+                  <p className="font-bold text-slate-600">실시간 기사 데이터 동기화 중...</p>
+                </td>
+              </tr>
+            ) : error ? (
+              statusCode === 401 || statusCode === 403 ? (
+                <tr>
+                  <td colSpan={5} className="py-12 px-4 text-center">
+                    <div className="max-w-md mx-auto p-6 bg-amber-50/80 border border-amber-200/90 rounded-3xl space-y-3 shadow-sm">
+                      <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto shadow-xs">
+                        <ShieldAlert className="w-6 h-6 text-amber-600" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black text-slate-900 mb-1">
+                          본사 관리자(HQ Admin) 인증이 필요합니다
+                        </h4>
+                        <p className="text-xs text-slate-600 leading-relaxed">
+                          기사 명단 및 차량 배정 정보는 본사 관리자 전용 데이터입니다.
+                          <br />
+                          로그인 세션이 만료되었거나 인증되지 않았습니다. (HTTP {statusCode || 401})
+                        </p>
+                      </div>
+                      <div className="pt-2 flex items-center justify-center gap-2">
+                        {onOpenLogin && (
+                          <button
+                            type="button"
+                            onClick={onOpenLogin}
+                            className="px-4 py-2 bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white rounded-xl text-xs font-black shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                          >
+                            <Key className="w-3.5 h-3.5" />
+                            <span>관리자 로그인하기</span>
+                          </button>
+                        )}
+                        {onRetry && (
+                          <button
+                            type="button"
+                            onClick={onRetry}
+                            className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                          >
+                            다시 시도
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                <tr>
+                  <td colSpan={5} className="py-12 px-4 text-center">
+                    <div className="max-w-md mx-auto p-6 bg-rose-50/80 border border-rose-200/90 rounded-3xl space-y-3 shadow-sm">
+                      <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center mx-auto shadow-xs">
+                        <AlertTriangle className="w-6 h-6 text-rose-600" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black text-slate-900 mb-1">
+                          기사 목록을 불러오지 못했습니다
+                        </h4>
+                        <p className="text-xs text-rose-700 font-mono mb-1">{error}</p>
+                        <p className="text-[11px] text-slate-500">
+                          데이터베이스 연결 또는 서버 통신 상태를 확인해주세요. (HTTP {statusCode || 500})
+                        </p>
+                      </div>
+                      <div className="pt-2 flex items-center justify-center gap-2">
+                        {onRetry && (
+                          <button
+                            type="button"
+                            onClick={onRetry}
+                            className="px-4 py-2 bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white rounded-xl text-xs font-black shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            <span>다시 시도</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              )
+            ) : paginatedDrivers.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="py-12 text-center text-slate-400">
+                  <Users className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                  <p className="font-bold text-slate-600">
+                    {drivers.length === 0
+                      ? '등록된 기사가 없습니다.'
+                      : '검색 조건에 일치하는 기사가 없습니다.'}
+                  </p>
+                </td>
+              </tr>
+            ) : (
+              paginatedDrivers.map((driver) => {
+                const opStatus = getDriverStatus(driver);
+                const isNew = isNewDriver(driver);
+
+                // Multi-language support check: only non-Korean languages shown as mini badge
+                const foreignLanguages = (driver.languageLabels || [])
+                  .filter((l) => l !== '한국어')
+                  .concat(
+                    driver.englishAvailable && !(driver.languageLabels || []).includes('영어') ? ['영어'] : []
+                  );
+                const hasForeignLanguage = foreignLanguages.length > 0;
+                const driverCoverage = coverageByDriverId.get(driver.id);
+                const cardSummary = summarizeDriverCardCoverage(driverCoverage);
+                const searchMatch = searchMatchesByDriverId.get(driver.id);
+                const matchedVehicleIds = searchMatch?.matchedVehicleIds || [];
+                const autoExpandForVehicle = matchedVehicleIds.length > 0 && !searchCollapsedDriverIds[driver.id];
+                const isCardExpanded = Boolean(expandedCardDriverIds[driver.id]) || autoExpandForVehicle;
+
+                return (
+                  <Fragment key={driver.id}>
+                    <tr
+                      onClick={() => handleRowClick(driver.id)}
+                      className="hover:bg-blue-50/40 transition-colors cursor-pointer group"
+                    >
+                      {/* 1열: 기사 정보 (Avatar + Name) */}
+                      <td className="py-4 px-5 whitespace-nowrap">
+                        <div className="flex items-center gap-3">
+                          {driver.avatarUrl ? (
+                            <img
+                              src={driver.avatarUrl}
+                              alt={driver.name}
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = 'none';
+                              }}
+                              className="w-10 h-10 rounded-full object-cover border border-slate-200/80 shrink-0 shadow-2xs"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-600 border border-slate-200/80 font-bold text-xs flex items-center justify-center shrink-0">
+                              {driver.name.slice(0, 1)}
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1.5 whitespace-nowrap">
+                            <span className="whitespace-nowrap font-bold text-slate-900 group-hover:text-[#1E60F3] transition-colors">
+                              {driver.name}
+                            </span>
+                            {/* 소속 기사만 '소속' 뱃지 표시 (프리랜서는 다수이므로 미표시하여 시각적 소음 제거) */}
+                            {driver.affiliationType === 'employed' && (
+                              <span className="shrink-0 whitespace-nowrap px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#EEF3FF] text-[#31598F] border border-blue-200/80">
+                                소속
+                              </span>
+                            )}
+                            {isNew && (
+                              <span className="shrink-0 whitespace-nowrap px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#EEF3FF] text-[#31598F] border border-emerald-200/80">
+                                신규
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* 2열: 운행 상태 (운행 가능 / 운행 중 / 휴무) */}
+                      <td className="py-4 px-5 whitespace-nowrap">
+                        {opStatus === 'driving' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#EEF3FF] text-[#31598F] border border-blue-200/60 shadow-2xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#1E60F3] animate-pulse" />
+                            운행 중
+                          </span>
+                        ) : opStatus === 'off' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200/60">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                            휴무
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200/80">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                            운행 가능
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 3열: 배차카드 현황 토글 */}
+                      <td className="py-4 px-5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        {coverageLoading && !coverage ? (
+                          <HqBadge tone="neutral">확인 중…</HqBadge>
+                        ) : driverCoverage ? (
+                          <button
+                            type="button"
+                            aria-expanded={isCardExpanded}
+                            aria-label={`${driver.name} 배차카드 차량별 현황`}
+                            onClick={() => {
+                              haptics.lightTap();
+                              if (matchedVehicleIds.length > 0) {
+                                const nextExpanded = !isCardExpanded;
+                                setSearchCollapsedDriverIds(prev => ({ ...prev, [driver.id]: !nextExpanded }));
+                                setExpandedCardDriverIds(prev => ({ ...prev, [driver.id]: nextExpanded }));
+                              } else {
+                                setExpandedCardDriverIds(prev => ({ ...prev, [driver.id]: !prev[driver.id] }));
+                              }
+                            }}
+                            className={`inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-[12px] px-2 py-1 transition-colors ${isCardExpanded ? 'bg-[#EEF3FF]' : 'hover:bg-[#F3F6FB]'}`}
+                          >
+                            <HqBadge tone={cardSummary.tone}>{cardSummary.label}</HqBadge>
+                            <ChevronDown className={`size-3.5 text-[#73839D] transition-transform duration-150 ${isCardExpanded ? 'rotate-180 text-[#1E60F3]' : ''}`} />
+                          </button>
+                        ) : (
+                          <HqBadge tone="neutral">{coverageError ? '조회 실패' : '미확인'}</HqBadge>
+                        )}
+                      </td>
+
+                      {/* 4열: 연락처 (전화 걸기 연동) */}
+                      <td className="py-4 px-5 whitespace-nowrap">
+                        {driver.phone ? (
+                          <a
+                            href={`tel:${driver.phone}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="font-mono text-xs font-semibold text-slate-700 hover:text-[#1E60F3] hover:underline transition-colors inline-flex items-center gap-1.5 group/phone"
+                            title="전화 걸기"
+                          >
+                            <Phone className="w-3.5 h-3.5 text-slate-400 group-hover/phone:text-[#1E60F3] transition-colors" />
+                            <span>{formatPhoneNumber(driver.phone)}</span>
+                          </a>
+                        ) : (
+                          <span className="text-slate-300 font-mono text-xs">-</span>
+                        )}
+                      </td>
+
+                      {/* 4열: 지원 언어 (미국 국기 🇺🇸 표기, 비어있으면 하이픈 없이 빈 공간) */}
+                      <td className="py-4 px-5 whitespace-nowrap">
+                        {hasForeignLanguage ? (
+                          <div className="flex items-center gap-1.5">
+                            {foreignLanguages.map((lang) => {
+                              const isEng = lang === '영어' || lang.toLowerCase() === 'english' || lang === 'en';
+                              return (
+                                <span
+                                  key={lang}
+                                  className={isEng ? 'text-sm select-none' : 'inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200/80'}
+                                  title={isEng ? '영어 소통 가능' : lang}
+                                >
+                                  {isEng ? '🇺🇸' : lang}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                      </td>
+
+                    </tr>
+                    {isCardExpanded && driverCoverage && (
+                      <tr className="bg-[#FAFBFD]">
+                        <td colSpan={5} className="px-5 py-3.5">
+                          <HqCard className="space-y-3 p-3.5 sm:p-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-[12px] font-semibold text-[#17233B]">{driver.name} 배차카드 차량별 현황</span>
+                                <HqBadge tone="selected">완료 {cardSummary.completeVehicles}/{cardSummary.totalVehicles}대</HqBadge>
+                                <HqBadge tone="neutral">미등록 {cardSummary.unregisteredSlots.length}대</HqBadge>
+                                {cardSummary.imageMissingSlots.length > 0 &&
+                                  <HqBadge tone="warning">차량 이미지 미준비 {cardSummary.imageMissingSlots.length}대</HqBadge>}
+                                {!cardSummary.identityReady && (
+                                  <HqBadge tone="warning">
+                                    {(cardSummary.missingIdentityLabels.join(' · ') || '기사 정보') + ' 확인 필요'}
+                                  </HqBadge>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <HqButton
+                                  variant="subtle"
+                                  size="sm"
+                                  onClick={() => {
+                                    haptics.lightTap();
+                                    setCardPreviewTarget({ driverId: driver.id });
+                                  }}
+                                >
+                                  카드 보기
+                                </HqButton>
+                                <HqButton
+                                  variant="primary"
+                                  size="sm"
+                                  disabled={!driverCoverage.slots.some(slot => slot.imageReady !== false)}
+                                  onClick={() => {
+                                    haptics.lightTap();
+                                    setCardBuilderTarget({
+                                      driver,
+                                      vehicleId: cardSummary.unregisteredSlots.find(slot => slot.imageReady !== false)?.vehicleId ||
+                                        cardSummary.registeredSlots.find(slot => slot.imageReady !== false)?.vehicleId,
+                                    });
+                                  }}
+                                >
+                                  카드 만들기·수정
+                                </HqButton>
+                              </div>
+                            </div>
+
+                            <HqDriverCardVehicleGroups
+                              driverName={driver.name}
+                              slots={driverCoverage.slots}
+                              vehicles={coverage?.vehicles || []}
+                              highlightedVehicleIds={matchedVehicleIds}
+                              highlightLabel={searchMatch?.matchedHighlightLabel}
+                              onView={slot => {
+                                haptics.lightTap();
+                                setCardPreviewTarget({ driverId: driver.id, vehiclePlate: slot.plate });
+                              }}
+                              onCreate={slot => {
+                                haptics.lightTap();
+                                setCardBuilderTarget({ driver, vehicleId: slot.vehicleId });
+                              }}
+                            />
+                          </HqCard>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 4. Table Footer (Pagination & Count) */}
+      <div className="hidden p-4 sm:px-6 border-t border-slate-100 lg:flex flex-wrap items-center justify-between gap-4 text-xs bg-white">
+        <div className="flex items-center gap-2 text-slate-500 font-medium">
+          <span>
+            총 <strong className="font-bold text-slate-900">{filteredDrivers.length}명</strong>의 기사님이 등록되어 있어요
+          </span>
+          {error && (
+            <span className="text-[11px] text-rose-600 font-semibold flex items-center gap-1.5 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
+              <span>동기화 확인 필요</span>
+            </span>
+          )}
+        </div>
+
+        {/* Pagination rounded buttons */}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              haptics.selection();
+              setCurrentPage((p) => Math.max(1, p - 1));
+            }}
+            disabled={currentPage === 1}
+            className="w-8 h-8 rounded-full border border-slate-200 hover:bg-slate-50 flex items-center justify-center text-slate-500 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
+            aria-label="이전 페이지"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+
+          {Array.from({ length: totalPages }).map((_, idx) => {
+            const pageNum = idx + 1;
+            const isActive = pageNum === currentPage;
+            return (
+              <button
+                key={pageNum}
+                type="button"
+                onClick={() => {
+                  haptics.selection();
+                  setCurrentPage(pageNum);
+                }}
+                className={`min-w-8 h-8 px-2 rounded-full text-xs transition-all cursor-pointer ${isActive
+                  ? 'bg-[#1E60F3] text-white font-bold shadow-2xs'
+                  : 'border border-slate-200 hover:bg-slate-50 text-slate-600 font-medium'
+                  }`}
+              >
+                {pageNum}
+              </button>
+            );
+          })}
+
+          <button
+            type="button"
+            onClick={() => {
+              haptics.selection();
+              setCurrentPage((p) => Math.min(totalPages, p + 1));
+            }}
+            disabled={currentPage === totalPages}
+            className="w-8 h-8 rounded-full border border-slate-200 hover:bg-slate-50 flex items-center justify-center text-slate-500 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
+            aria-label="다음 페이지"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {globalCardSearchOpen && coverage && (
+        <HqDispatchCardQuickFindModal
+          isOpen coverage={coverage} drivers={drivers}
+          onClose={() => setGlobalCardSearchOpen(false)}
+          onView={(driverId, plate) => {
+            setGlobalCardSearchOpen(false);
+            setCardPreviewTarget({ driverId, vehiclePlate: plate });
+          }}
+          onCreate={(driver, vehicleId) => {
+            setGlobalCardSearchOpen(false);
+            setCardBuilderTarget({ driver, vehicleId });
+          }}
+        />
+      )}
+
+      {cardPickerDriverId && coverage && (
+        <HqDriverCardPickerModal
+          isOpen
+          driverName={drivers.find(item => item.id === cardPickerDriverId)?.name || '기사'}
+          slots={coverageByDriverId.get(cardPickerDriverId)?.slots || []}
+          vehicles={coverage.vehicles}
+          highlightedVehicleIds={searchMatchesByDriverId.get(cardPickerDriverId)?.matchedVehicleIds}
+          highlightLabel={searchMatchesByDriverId.get(cardPickerDriverId)?.matchedHighlightLabel}
+          onClose={() => setCardPickerDriverId(null)}
+          onView={slot => {
+            setCardPickerDriverId(null);
+            setCardPreviewTarget({ driverId: cardPickerDriverId, vehiclePlate: slot.plate });
+          }}
+          onCreate={slot => {
+            const driver = drivers.find(item => item.id === cardPickerDriverId);
+            setCardPickerDriverId(null);
+            if (driver) setCardBuilderTarget({ driver, vehicleId: slot.vehicleId });
+          }}
+        />
+      )}
+
+      {cardPreviewTarget && (
+        <HqDriverAssetManagerModal
+          isOpen
+          onClose={() => setCardPreviewTarget(null)}
+          drivers={drivers}
+          initialDriverId={cardPreviewTarget.driverId}
+          initialVehiclePlate={cardPreviewTarget.vehiclePlate}
+          preferRegisteredVehicle={!cardPreviewTarget.vehiclePlate}
+          onAssetUpdated={handleCardAssetUpdated}
+        />
+      )}
+
+      {cardBuilderTarget && coverage && (
+        <HqDispatchCardBuilderModal
+          isOpen
+          driver={cardBuilderTarget.driver}
+          vehicles={coverage.vehicles}
+          initialVehicleId={cardBuilderTarget.vehicleId}
+          onClose={() => setCardBuilderTarget(null)}
+          onAssetUpdated={handleCardAssetUpdated}
+          onProfileUpdated={handleCardAssetUpdated}
+        />
+      )}
+    </div>
+  );
+};

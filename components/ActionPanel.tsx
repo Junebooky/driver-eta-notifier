@@ -1,9 +1,22 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { NaviProvider, LocationPreset, RouteEstimate, DriverProfile } from '@/types';
-import { launchNavigationApp, calculateHaversineEstimate } from '@/utils/navigation';
-import { generateVipReportText, copyAndLaunchKakaoTalk } from '@/utils/kakao';
+import { NaviProvider, LocationPreset, RouteEstimate, DriverProfile, ReportMode } from '@/types';
+import { launchNavigationApp } from '@/utils/navigation';
+import { NaviDrivingLogConfirmModal } from '@/components/NaviDrivingLogConfirmModal';
+import { FreshEtaActionSheet } from '@/components/FreshEtaActionSheet';
+import {
+  executeFreshEtaAction,
+  captureActionSnapshot,
+  fetchFreshEtaRoute,
+  syncNavigationRouteToDrivingLog,
+  buildFreshReportText,
+  FreshEtaRouteResult,
+  FreshEtaSnapshot,
+  formatKstTimeHHMM,
+  copyTextSafely,
+  FreshEtaActionResult,
+} from '@/utils/freshEtaActionPipeline';
 import { Zap, Navigation, X } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
@@ -19,6 +32,10 @@ interface ActionPanelProps {
   reportText: string;
   targetChatRoom?: string;
   profile?: DriverProfile;
+  bookingId?: string;
+  reportMode?: ReportMode;
+  language?: 'ko' | 'en';
+  onFreshActionResult?: (result: FreshEtaActionResult) => void;
 }
 
 const NAVI_DISPLAY_NAMES: Record<NaviProvider, string> = {
@@ -50,10 +67,24 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   routeEstimate,
   reportText,
   targetChatRoom,
+  profile,
+  bookingId,
+  reportMode = 'DEPARTURE',
+  language = 'ko',
+  onFreshActionResult,
 }) => {
   const [isTmapAssistOpen, setIsTmapAssistOpen] = useState(false);
+  const [isNaviConfirmOpen, setIsNaviConfirmOpen] = useState(false);
   const [copiedWpIndex, setCopiedWpIndex] = useState<number | null>(null);
   const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Fresh ETA states
+  const [freshRouteResult, setFreshRouteResult] = useState<FreshEtaRouteResult | null>(null);
+  const [freshSnapshot, setFreshSnapshot] = useState<FreshEtaSnapshot | null>(null);
+  const [isLoadingFreshEta, setIsLoadingFreshEta] = useState(false);
+  const [isKakaoSheetOpen, setIsKakaoSheetOpen] = useState(false);
+  const [kakaoSheetReportText, setKakaoSheetReportText] = useState('');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Background scroll lock when Tmap assist modal is active
   useEffect(() => {
@@ -93,26 +124,72 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   }));
 
   /**
-   * 1-Second Fast Pass Action (Synchronous Clipboard Copy on Safari User Activation + Navi Launch + Haptics)
+   * 1-Second Fast Pass Action (Prompts Driving Log Confirmation + Fresh ETA Recalculation)
    */
   const handleFastPassAction = async () => {
-    // Confirmation pulse haptic feedback for primary fast pass action
     haptics.successPulse();
 
-    // 1. TOP-LEVEL SYNCHRONOUS CLIPBOARD COPY (Mandatory for Safari User Gesture Security)
+    // Capture snapshot at exact instant of click
+    const snapshot = captureActionSnapshot({
+      origin,
+      destination,
+      waypoints,
+      adminWaypoints,
+      isAdminRoute,
+      defaultNavi,
+      reportMode,
+      language,
+      bookingId,
+      driverProfile: profile,
+    });
+    setFreshSnapshot(snapshot);
+    setIsNaviConfirmOpen(true);
+    setIsLoadingFreshEta(true);
+
+    // Fetch fresh ETA in background to populate confirm modal
     try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(reportText);
-      } else {
-        const textArea = document.createElement('textarea');
-        textArea.value = reportText;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-      }
-    } catch (err) {
-      console.warn('Clipboard write failed:', err);
+      const freshRes = await fetchFreshEtaRoute(snapshot);
+      setFreshRouteResult(freshRes);
+    } catch {
+      // Fallback handled safely
+    } finally {
+      setIsLoadingFreshEta(false);
+    }
+  };
+
+  const handleConfirmNavigation = async (addToLog: boolean) => {
+    setIsNaviConfirmOpen(false);
+
+    const snapshot = freshSnapshot || captureActionSnapshot({
+      origin,
+      destination,
+      waypoints,
+      adminWaypoints,
+      isAdminRoute,
+      defaultNavi,
+      reportMode,
+      language,
+      bookingId,
+      driverProfile: profile,
+    });
+
+    const routeRes: FreshEtaRouteResult = freshRouteResult || {
+      durationMinutes: 0,
+      distanceKm: 0,
+      etaFormatted: '--:--',
+      departureTimeFormatted: snapshot.departureTimeFormatted,
+      computedAt: snapshot.clickedAt.toISOString(),
+      source: 'unverified',
+      isFresh: false,
+      routeFingerprint: `${origin.lat},${origin.lng}->${destination.lat},${destination.lng}`,
+    };
+
+    // 1. If driver selected "추가하고 안내 시작", record to driving log draft IMMEDIATELY
+    // This MUST occur before any early return (including Tmap waypoint assist)
+    if (addToLog) {
+      syncNavigationRouteToDrivingLog({ snapshot, routeResult: routeRes });
+      setToastMessage('운행 안내가 시작되었습니다. (운행일지 초안 등록)');
+      setTimeout(() => setToastMessage(null), 2500);
     }
 
     // 2. Multi-waypoint TMAP check: TMAP cannot receive external waypoints via deep link
@@ -121,13 +198,54 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       return;
     }
 
-    // 3. Direct launch for Naver, Kakao, or Tmap without waypoints
-    await launchNavigationApp(
-      defaultNavi,
-      targetNavi,
-      undefined, // Start navigation directly from driver's smartphone GPS
-      naviWaypoints
-    );
+    // 3. Launch Navigation app IMMEDIATELY with user gesture (0ms delay!)
+    try {
+      const activeWaypoints: LocationPreset[] = snapshot.isAdminRoute
+        ? [
+            { ...snapshot.origin, name: snapshot.origin.shortName || snapshot.origin.name },
+            ...(snapshot.adminWaypoints || []).map((w) => ({ ...w, name: w.shortName || w.name })),
+          ]
+        : snapshot.waypoints;
+
+      const naviWaypoints = activeWaypoints.slice(0, 5).map((w) => ({
+        name: w.shortName || w.name,
+        lat: w.lat,
+        lng: w.lng,
+        address: w.address,
+      }));
+
+      await launchNavigationApp(
+        snapshot.defaultNavi,
+        {
+          name: snapshot.destination.shortName || snapshot.destination.name,
+          lat: snapshot.destination.lat,
+          lng: snapshot.destination.lng,
+        },
+        undefined,
+        naviWaypoints
+      );
+    } catch (naviErr: any) {
+      console.warn('[ActionPanel] Navigation launch error:', naviErr?.message);
+    }
+
+    // 4. Report action result to callback with precomputed route
+    const reportText = buildFreshReportText({
+      snapshot,
+      etaFormatted: routeRes.etaFormatted,
+      durationMinutes: routeRes.durationMinutes,
+      distanceKm: routeRes.distanceKm,
+    });
+
+    onFreshActionResult?.({
+      success: true,
+      actionType: addToLog ? 'navi_with_log' : 'navi_only',
+      snapshot,
+      routeResult: routeRes,
+      reportText,
+      clipboardSuccess: false,
+      appLaunchSuccess: true,
+      requiresGestureFallback: false,
+    });
   };
 
   /**
@@ -157,30 +275,68 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   };
 
   /**
-   * Pure Text Copy & KakaoTalk App Launch Pipeline
-   * Copies formatted text and immediately invokes kakaotalk:// URL scheme
+   * Fresh ETA KakaoTalk App Launch Pipeline
+   * Recalculates ETA, formats report in current language & mode, copies and launches KakaoTalk
    */
   const handleKakaoReportAction = async () => {
     haptics.lightTap();
 
-    await copyAndLaunchKakaoTalk(reportText);
+    const snapshot = captureActionSnapshot({
+      origin,
+      destination,
+      waypoints,
+      adminWaypoints,
+      isAdminRoute,
+      defaultNavi,
+      reportMode,
+      language,
+      bookingId,
+      driverProfile: profile,
+    });
+
+    const result = await executeFreshEtaAction({
+      actionType: 'kakao_share',
+      origin: snapshot.origin,
+      destination: snapshot.destination,
+      waypoints: snapshot.waypoints,
+      adminWaypoints: snapshot.adminWaypoints,
+      isAdminRoute: snapshot.isAdminRoute,
+      defaultNavi: snapshot.defaultNavi,
+      reportMode: snapshot.reportMode,
+      language: snapshot.language,
+      bookingId: snapshot.bookingId,
+      driverProfile: snapshot.driverProfile,
+      clickedAt: snapshot.clickedAt,
+    });
+
+    onFreshActionResult?.(result);
+
+    if (result.requiresGestureFallback || !result.clipboardSuccess) {
+      setKakaoSheetReportText(result.reportText);
+      setFreshRouteResult(result.routeResult);
+      setFreshSnapshot(snapshot);
+      setIsKakaoSheetOpen(true);
+    } else {
+      setToastMessage('최신 보고문이 복사되었습니다. 카카오톡으로 이동합니다.');
+      setTimeout(() => setToastMessage(null), 2500);
+    }
   };
 
   return (
     <div className="w-full space-y-2.5 pt-1 pb-[max(env(safe-area-inset-bottom),16px)] select-none">
-      {/* Navigation Primary Action Button (Centered) */}
+      {/* Navigation Primary Action Button (Centered Pill) */}
       <button
         onClick={handleFastPassAction}
-        className="w-full py-4 px-4 bg-[#1E60F3] hover:bg-[#1346D8] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/35 active:translate-y-0 active:scale-[0.97] active:bg-[#0f3bb8] text-white rounded-2xl font-bold text-base tracking-tight shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 ease-out"
+        className="w-full py-4 px-5 bg-[#0055FF] hover:bg-[#0046D5] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] active:bg-[#003BB5] text-white rounded-full font-extrabold text-[15px] sm:text-base tracking-tight shadow-[0_6px_18px_rgba(0,85,255,0.28)] flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 ease-out"
       >
         <Zap className="w-4.5 h-4.5 text-yellow-300 fill-yellow-300 shrink-0" />
         <span>{getNaviActionText(defaultNavi)}</span>
       </button>
 
-      {/* KakaoTalk Pure Text Copy & App Launch Button (Centered) */}
+      {/* KakaoTalk Pure Text Copy & App Launch Button (Centered Pill) */}
       <button
         onClick={handleKakaoReportAction}
-        className="w-full py-4 px-4 bg-[#FEE500] hover:bg-[#FDD835] hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.97] text-[#191919] rounded-2xl font-bold text-base tracking-tight shadow-[0_4px_14px_rgba(254,229,0,0.25)] flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 ease-out"
+        className="w-full py-4 px-5 bg-[#FEE500] hover:bg-[#FDD835] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] text-[#191919] rounded-full font-extrabold text-[15px] sm:text-base tracking-tight shadow-[0_6px_18px_rgba(254,229,0,0.30)] flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 ease-out"
       >
         {/* Authentic Kakao Speech Bubble Icon */}
         <svg className="w-4.5 h-4.5 fill-[#191919] shrink-0" viewBox="0 0 24 24">
@@ -192,11 +348,11 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       {/* Tmap Smart Assist Bottom Sheet / Modal */}
       {isTmapAssistOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overscroll-contain touch-none select-none animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overscroll-contain touch-none select-none driver-modal-backdrop"
           onClick={() => setIsTmapAssistOpen(false)}
         >
           <div
-            className="w-full max-w-lg bg-white rounded-3xl border border-slate-100 shadow-2xl overflow-hidden flex flex-col max-h-[85dvh] animate-in zoom-in-95 duration-200 touch-auto"
+            className="w-full max-w-lg bg-white rounded-3xl border border-slate-100 shadow-2xl overflow-hidden flex flex-col max-h-[85dvh] touch-auto driver-modal-card"
             style={{ overscrollBehavior: 'contain' }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -347,6 +503,49 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Navigation -> Driving Log Linkage Confirmation Modal */}
+      <NaviDrivingLogConfirmModal
+        isOpen={isNaviConfirmOpen}
+        onClose={() => {
+          setIsNaviConfirmOpen(false);
+          setIsLoadingFreshEta(false);
+        }}
+        originName={origin?.shortName || origin?.name}
+        destinationName={destination?.shortName || destination?.name}
+        destinationAddress={destination?.address}
+        departureTime={freshSnapshot?.departureTimeFormatted}
+        etaText={
+          freshRouteResult?.etaFormatted && freshRouteResult.etaFormatted !== '--:--'
+            ? `예상 ${freshRouteResult.durationMinutes}분 (${freshRouteResult.etaFormatted} 도착)`
+            : routeEstimate?.etaFormatted
+            ? `예상 ${routeEstimate.durationMinutes}분 (${routeEstimate.etaFormatted} 도착)`
+            : undefined
+        }
+        isLoadingFreshEta={isLoadingFreshEta}
+        naviProvider={defaultNavi}
+        onConfirm={handleConfirmNavigation}
+      />
+
+      {/* Mobile Gesture Fallback Action Sheet for KakaoTalk Report */}
+      <FreshEtaActionSheet
+        isOpen={isKakaoSheetOpen}
+        onClose={() => setIsKakaoSheetOpen(false)}
+        reportText={kakaoSheetReportText || reportText}
+        originName={origin?.shortName || origin?.name}
+        destinationName={destination?.shortName || destination?.name}
+        departureTimeText={freshSnapshot?.departureTimeFormatted}
+        etaFormatted={freshRouteResult?.etaFormatted}
+        durationMinutes={freshRouteResult?.durationMinutes}
+        isKakaoAction={true}
+      />
+
+      {/* Floating Status Toast */}
+      {toastMessage && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-slate-900/90 text-white px-4 py-2 rounded-xl text-xs font-semibold shadow-lg backdrop-blur-xs animate-in fade-in">
+          {toastMessage}
         </div>
       )}
     </div>

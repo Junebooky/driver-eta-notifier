@@ -1,0 +1,2142 @@
+'use client';
+
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import Link from 'next/link';
+import { useDriverProfile, getOrCreateDeviceUuid } from '@/hooks/useDriverProfile';
+import { useLocation } from '@/hooks/useLocation';
+import { Header } from '@/components/Header';
+import { ProfileModal } from '@/components/ProfileModal';
+import { AdminPinModal } from '@/components/AdminPinModal';
+import { OriginDestinationSelector } from '@/components/OriginDestinationSelector';
+import { QuickActionBar } from '@/components/QuickActionBar';
+import { CustomPresetModal } from '@/components/CustomPresetModal';
+import { RouteInfoCard } from '@/components/RouteInfoCard';
+import { ReportTemplateSelector } from '@/components/ReportTemplateSelector';
+import { ActionPanel } from '@/components/ActionPanel';
+import { A2HSBanner } from '@/components/A2HSBanner';
+import { DepartureTimePickerModal } from '@/components/DepartureTimePickerModal';
+import { PredictionResultSheet } from '@/components/PredictionResultSheet';
+import { GasStationModal } from '@/components/GasStationModal';
+import { FlightModal } from '@/components/FlightModal';
+import { VehicleInspectionModal } from '@/components/VehicleInspectionModal';
+import { LocationSearchModal, SelectedLocationData } from '@/components/LocationSearchModal';
+import { RoadviewModal } from '@/components/RoadviewModal';
+import { DrivingLogModal } from '@/components/DrivingLogModal';
+import { ExpenseModal } from '@/components/ExpenseModal';
+import { FieldTipModal } from '@/components/FieldTipModal';
+import { DriverFieldKnowledgeModal } from '@/components/knowledge/DriverFieldKnowledgeModal';
+import { getFieldTipsCount } from '@/utils/fieldTipData';
+import { ScheduleTab } from '@/components/ScheduleTab';
+import { DriverBottomNav, type DriverTab } from '@/components/DriverBottomNav';
+import { ScheduleItem, scheduleToPresets } from '@/data/ferrariSchedules';
+import { PredictionResult } from '@/app/api/route/prediction/route';
+import { LocationPreset, ReportMode, RouteEstimate, HomeLocation, GasStation, FlightType } from '@/types';
+import { DEFAULT_PRESET_LOCATIONS, DEFAULT_ORIGIN } from '@/utils/presets';
+import { ensureClientAuth } from '@/utils/cockpitClientAuth';
+import { eventLegToPresets, type DriverEventFavorite, type DriverEventLeg, type DriverEventStop } from '@/utils/driverEventFavorites';
+import { getPresetPassengerName } from '@/utils/constants';
+import { generateReportText } from '@/utils/reportGenerator';
+import { calculateHaversineEstimate, getEtaString, launchNavigationApp } from '@/utils/navigation';
+import { haptics } from '@/utils/haptics';
+import { NaviDrivingLogConfirmModal } from '@/components/NaviDrivingLogConfirmModal';
+import {
+  captureActionSnapshot,
+  fetchFreshEtaRoute,
+  buildFreshReportText,
+  copyTextSafely,
+  executeFreshEtaAction,
+  syncNavigationRouteToDrivingLog,
+  registerOutboxAutoSync,
+  flushNavigationOutboxQueue,
+  FreshEtaRouteResult,
+} from '@/utils/freshEtaActionPipeline';
+
+export const getPresetsStorageKey = (vehicleNo?: string) => {
+  const v = vehicleNo?.match(/(\d+호차)/)?.[1] || (vehicleNo ? vehicleNo.trim() : '4호차');
+  return `cockpit_presets_${v}`;
+};
+
+export function deduplicatePresets(list: LocationPreset[]): LocationPreset[] {
+  const seenIds = new Set<string>();
+  const seenNames = new Set<string>();
+  return list.filter((p) => {
+    if (!p || !p.id) return false;
+    if (seenIds.has(p.id)) return false;
+    seenIds.add(p.id);
+
+    const vKey = `${p.name}___${p.vehicle_no || p.vehicleNo || 'common'}`;
+    if (seenNames.has(vKey)) return false;
+    seenNames.add(vKey);
+
+    return true;
+  });
+}
+
+const ADMIN_MODE_KEY = 'protocol_cockpit_admin_mode_v1';
+const LAST_ROUTE_STORAGE_KEY = 'cockpit_last_route';
+
+export default function DriverCockpit() {
+  const { profile, isLoaded, updateProfile, setPreferredNavi } = useDriverProfile();
+  const {
+    currentLocation: origin,
+    setCurrentLocation: setOrigin,
+    isLocating,
+    isUndergroundFallback,
+    gpsErrorMsg,
+    requestGpsLocation,
+    saveRecentPreset,
+  } = useLocation();
+
+  // Selection target mode: 'origin', 'destination', or 'waypoint' (default: 'destination')
+  const [selectionTarget, setSelectionTarget] = useState<'origin' | 'destination' | 'waypoint'>('destination');
+
+  // Ordered Presets State (combining defaults + customs with permanent order persistence)
+  const [presets, setPresets] = useState<LocationPreset[]>(DEFAULT_PRESET_LOCATIONS);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingPreset, setEditingPreset] = useState<LocationPreset | null>(null);
+
+  // Ephemeral newly added preset ID for temporary cobalt blue border highlight
+  const [newlyAddedPresetId, setNewlyAddedPresetId] = useState<string | null>(null);
+
+  // Admin PIN Mode ('1010') State
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+
+  // Home Registration Modal State
+  const [isHomeModalOpen, setIsHomeModalOpen] = useState(false);
+
+  // Real-time Gas Station Modal State
+  const [isGasModalOpen, setIsGasModalOpen] = useState(false);
+
+  // Real-time Flight Modal State (Incheon Airport)
+  const [isFlightModalOpen, setIsFlightModalOpen] = useState(false);
+  const [flightModalInitialFlightId, setFlightModalInitialFlightId] = useState<string | undefined>(undefined);
+  const [flightModalInitialType, setFlightModalInitialType] = useState<FlightType | undefined>(undefined);
+
+  // Vehicle Inspection (pickup / daily / return) state
+  const [isInspectionModalOpen, setIsInspectionModalOpen] = useState(false);
+  const [inspectionInitialMode, setInspectionInitialMode] = useState<'pickup' | 'daily' | 'return' | 'receipt'>('pickup');
+
+  // Standalone Location Search & Preset Modal State
+  const [isLocationSearchOpen, setIsLocationSearchOpen] = useState(false);
+
+  // Roadview Modal State
+  const [isRoadviewModalOpen, setIsRoadviewModalOpen] = useState(false);
+
+  // Driving Log (운행일지) & Expense (경비지출) Modals State
+  const [hasOpenedDrivingLog, setHasOpenedDrivingLog] = useState(false);
+  const [isExpenseOpen, setIsExpenseOpen] = useState(false);
+
+  // Field Tips (현장 팁) Modal State
+  const [isFieldTipModalOpen, setIsFieldTipModalOpen] = useState(false);
+
+  // Field Knowledge (현장 지식) Read-Only Driver Modal State
+  const [isFieldKnowledgeOpen, setIsFieldKnowledgeOpen] = useState(false);
+
+  // Scroll-direction hide/show state for top Header & bottom DriverBottomNav
+  const [isBarsHidden, setIsBarsHidden] = useState(false);
+  const lastScrollYRef = useRef(0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleScrollDirection = (currentY: number) => {
+      const clampedY = Math.max(0, currentY);
+      const delta = clampedY - lastScrollYRef.current;
+
+      if (clampedY <= 16) {
+        setIsBarsHidden(false);
+        lastScrollYRef.current = clampedY;
+      } else if (delta > 8) {
+        setIsBarsHidden(true);
+        lastScrollYRef.current = clampedY;
+      } else if (delta < -6) {
+        setIsBarsHidden(false);
+        lastScrollYRef.current = clampedY;
+      }
+    };
+
+    const onWindowScroll = () => {
+      handleScrollDirection(window.scrollY || document.documentElement.scrollTop || 0);
+    };
+
+    const onCaptiveScroll = (e: Event) => {
+      const target = e.target;
+      if (!(target instanceof HTMLElement)) return;
+      // Ignore scrolling inside modal overlays
+      if (target.closest('.driver-modal-backdrop') || target.closest('.driver-modal-card')) return;
+      if (target === document.documentElement || target === document.body) return;
+      handleScrollDirection(target.scrollTop);
+    };
+
+    window.addEventListener('scroll', onWindowScroll, { passive: true });
+    document.addEventListener('scroll', onCaptiveScroll, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener('scroll', onWindowScroll);
+      document.removeEventListener('scroll', onCaptiveScroll, { capture: true });
+    };
+  }, []);
+
+  // VIP Assignment Capability & Isolated Preview Gate State (Issue #14)
+  const [isVipAssigned, setIsVipAssigned] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('vip') === '0' || params.get('standard') === '1') return false;
+      if (params.get('vip') === '1' || params.get('preview') === 'vip') return true;
+      const stored = localStorage.getItem('cockpit_vip_preview_enabled');
+      if (stored !== null) return stored === 'true';
+    }
+    return true;
+  });
+
+  // Map search callback state for Driving Log 일정 추가
+  const [isSelectingForSchedule, setIsSelectingForSchedule] = useState(false);
+  const [selectedLocationForSchedule, setSelectedLocationForSchedule] = useState<{
+    name: string;
+    address?: string;
+  } | null>(null);
+
+  // Active vehicle identifier (e.g. '4호차', '1호차')
+  const currentVehicleNo = useMemo(() => {
+    return profile.vehicleNo?.match(/(\d+호차)/)?.[1] || '4호차';
+  }, [profile.vehicleNo]);
+
+  // Active Field Tips Count for current location (Defaults to origin or 조선팰리스 강남)
+  const currentFieldTipsCount = useMemo(() => {
+    const targetPlace = origin?.name || '조선팰리스 강남';
+    return getFieldTipsCount(targetPlace);
+  }, [origin?.name]);
+
+  // Fetch Presets with Vehicle Isolation (Common Master + Vehicle's Custom Presets)
+  const fetchPresetsForVehicle = useCallback(async (vNo: string) => {
+    const cleanV = vNo.match(/(\d+호차)/)?.[1] || vNo || '4호차';
+    const storageKey = getPresetsStorageKey(cleanV);
+    const orderKey = `cockpit_presets_order_${cleanV}`;
+
+    const applyOrder = (list: LocationPreset[]) => {
+      try {
+        const orderStr = localStorage.getItem(orderKey);
+        if (orderStr) {
+          const ids: string[] = JSON.parse(orderStr);
+          if (Array.isArray(ids) && ids.length > 0) {
+            const indexMap = new Map(ids.map((id, i) => [id, i]));
+            return [...list].sort((a, b) => {
+              const posA = indexMap.has(a.id) ? indexMap.get(a.id)! : 999;
+              const posB = indexMap.has(b.id) ? indexMap.get(b.id)! : 999;
+              return posA - posB;
+            });
+          }
+        }
+      } catch (e) { }
+      return list;
+    };
+
+    // 1. Load from vehicle-isolated localStorage first for instant UI response
+    try {
+      const cached = localStorage.getItem(storageKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const deduped = applyOrder(deduplicatePresets(parsed));
+          setPresets(deduped);
+          if (deduped.length !== parsed.length) {
+            localStorage.setItem(storageKey, JSON.stringify(deduped));
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load presets from vehicle storage:', e);
+    }
+
+    // 2. Fetch from API with vehicle_no parameter (Supabase cockpit.presets SSOT) with 3.5s timeout guard
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    try {
+      const res = await fetch(`/api/presets?vehicle_no=${encodeURIComponent(cleanV)}`, {
+        signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+          ? AbortSignal.timeout(3500)
+          : controller.signal,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.presets && Array.isArray(data.presets)) {
+          setPresets((prev) => {
+            const serverPresets: LocationPreset[] = data.presets;
+            const merged = serverPresets.map((sp) => {
+              const localMatch = prev.find((lp) => lp.id === sp.id);
+              if (localMatch) {
+                // 기사가 설정한 축약 name이 fullName으로 역전되지 않도록 가드 보강
+                let safeName = localMatch.name?.trim();
+                if (sp.name && sp.name.trim() !== '') {
+                  const spName = sp.name.trim();
+                  if (spName.length <= 8) {
+                    safeName = spName;
+                  } else if (!safeName) {
+                    safeName = spName.slice(0, 8);
+                  }
+                }
+                if (!safeName) {
+                  safeName = (sp.fullName || localMatch.fullName || '거점').slice(0, 8);
+                }
+
+                const safeFullName = sp.fullName || sp.full_name || localMatch.fullName || localMatch.full_name || sp.name || safeName;
+
+                return {
+                  ...localMatch,
+                  ...sp,
+                  name: safeName,
+                  shortName: safeName,
+                  fullName: safeFullName,
+                };
+              }
+              const displayN = sp.name && sp.name.length <= 8
+                ? sp.name
+                : (sp.fullName ? sp.fullName.slice(0, 8) : '거점');
+              return {
+                ...sp,
+                name: displayN,
+                shortName: displayN,
+                fullName: sp.fullName || sp.full_name || sp.name,
+              };
+            });
+            const deduped = applyOrder(deduplicatePresets(merged));
+            try {
+              localStorage.setItem(storageKey, JSON.stringify(deduped));
+            } catch (e) { }
+            return deduped;
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch presets for vehicle from API (timeout or network):', err);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }, []);
+
+  // Sync isolated presets whenever vehicle changes or profile loads
+  useEffect(() => { if (profile.driverId) { registerOutboxAutoSync(profile.driverId); void flushNavigationOutboxQueue(); } }, [profile.driverId]);
+
+  useEffect(() => {
+    if (isLoaded) {
+      fetchPresetsForVehicle(currentVehicleNo);
+    }
+  }, [isLoaded, currentVehicleNo, fetchPresetsForVehicle]);
+
+  // Load Admin State from LocalStorage on mount
+  useEffect(() => {
+    try {
+      const savedAdmin = localStorage.getItem(ADMIN_MODE_KEY);
+      if (savedAdmin === 'true') {
+        setIsAdmin(true);
+      }
+    } catch (e) { }
+  }, []);
+
+  // Supabase Fleet Architecture Driver Profile Sync (Only for onboarded profiles)
+  useEffect(() => {
+    async function syncDriverProfile() {
+      try {
+        const onboarded = typeof window !== 'undefined' ? localStorage.getItem('cockpit_driver_onboarded') : null;
+        // Do not auto-fetch or auto-inject 4호차 fallback if onboarding is pending or vehicleNo is not chosen yet
+        if (!onboarded || !profile.vehicleNo) {
+          return;
+        }
+
+        if (!profile.driverName || !profile.phone) {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3500);
+          try {
+            const dRes = await fetch(`/api/driver?vehicle_no=${encodeURIComponent(profile.vehicleNo)}`, {
+              signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+                ? AbortSignal.timeout(3500)
+                : controller.signal,
+            });
+            if (dRes.ok) {
+              const dData = await dRes.json();
+              if (dData.driver) {
+                const { id, vehicle_no, car_number, driver_name, phone, default_navi } = dData.driver;
+                const fullVehicleNo = car_number ? `${vehicle_no} ${car_number}` : vehicle_no;
+                updateProfile({
+                  id, driverId: id, vehicleNo: fullVehicleNo,
+                  carNumber: car_number || undefined,
+                  driverName: driver_name || profile.driverName,
+                  phone: phone || profile.phone,
+                  mobile: phone || profile.mobile,
+                  defaultNavi: default_navi || profile.defaultNavi || 'tmap',
+                });
+              }
+            }
+          } finally {
+            clearTimeout(timeoutId);
+          }
+        }
+      } catch (err) {
+        console.warn('Supabase remote driver sync skipped/unavailable (timeout or network):', err);
+      }
+    }
+
+    if (isLoaded) {
+      syncDriverProfile();
+    }
+  }, [isLoaded, profile.vehicleNo, profile.driverName, profile.phone]);
+
+  // Save Presets to LocalStorage (Isolated by current vehicle)
+  const savePresetsToStorage = (updated: LocationPreset[]) => {
+    const deduped = deduplicatePresets(updated);
+    setPresets(deduped);
+    try {
+      localStorage.setItem(getPresetsStorageKey(currentVehicleNo), JSON.stringify(deduped));
+      localStorage.setItem(`cockpit_presets_order_${currentVehicleNo}`, JSON.stringify(deduped.map((p) => p.id)));
+    } catch (e) {
+      console.warn('Failed to save ordered presets:', e);
+    }
+  };
+
+  const handleToggleAdmin = (status: boolean) => {
+    setIsAdmin(status);
+    try {
+      localStorage.setItem(ADMIN_MODE_KEY, String(status));
+    } catch (e) { }
+  };
+
+  const handleOpenAddModal = () => {
+    setNewlyAddedPresetId(null);
+    setEditingPreset(null);
+    setIsAddModalOpen(true);
+  };
+
+  const handleOpenEditModal = (preset: LocationPreset) => {
+    setNewlyAddedPresetId(null);
+    setEditingPreset(preset);
+    setIsAddModalOpen(true);
+  };
+
+  const handleAddCustomPreset = async (newPreset: LocationPreset) => {
+    let currentIsAdmin = isAdmin;
+    try {
+      if (!currentIsAdmin && typeof window !== 'undefined') {
+        currentIsAdmin = localStorage.getItem(ADMIN_MODE_KEY) === 'true';
+      }
+    } catch (e) { }
+
+    const isPresetCommon = Boolean(
+      currentIsAdmin ||
+      newPreset.isCommon ||
+      newPreset.type === 'common' ||
+      newPreset.isGlobal ||
+      (!newPreset.vehicle_no && !newPreset.vehicleNo)
+    );
+    const cleanVehicle = isPresetCommon ? null : currentVehicleNo;
+
+    const finalizedPreset: LocationPreset = {
+      ...newPreset,
+      type: isPresetCommon ? 'common' : 'personal',
+      isCommon: isPresetCommon,
+      isGlobal: isPresetCommon,
+      driverId: isPresetCommon ? null : (profile.id || getOrCreateDeviceUuid()),
+      vehicle_no: cleanVehicle,
+      vehicleNo: cleanVehicle,
+      createdAt: newPreset.createdAt || new Date().toISOString(),
+    };
+
+    const existingIndex = presets.findIndex(
+      (p) =>
+        (p.id && p.id === finalizedPreset.id) ||
+        (p.name === finalizedPreset.name && (p.vehicle_no === finalizedPreset.vehicle_no || (!p.vehicle_no && isPresetCommon)))
+    );
+
+    let updated: LocationPreset[];
+    if (existingIndex >= 0) {
+      updated = [...presets];
+      updated[existingIndex] = {
+        ...updated[existingIndex],
+        ...finalizedPreset,
+        id: updated[existingIndex].id,
+      };
+    } else if (isPresetCommon) {
+      // [태스크 2] 공통 거점 등록 시 기존 공통 거점들 중 맨 끝(개인 거점들 시작 직전)에 삽입하여 1페이지 전진 배치
+      const isCommonPreset = (p: LocationPreset) =>
+        Boolean(p.isCommon || p.type === 'common' || p.isGlobal || (!p.vehicle_no && !p.vehicleNo));
+
+      let insertIndex = 0;
+      for (let i = presets.length - 1; i >= 0; i--) {
+        if (isCommonPreset(presets[i])) {
+          insertIndex = i + 1;
+          break;
+        }
+      }
+      const copy = [...presets];
+      copy.splice(insertIndex, 0, finalizedPreset);
+      updated = deduplicatePresets(copy);
+    } else {
+      updated = deduplicatePresets([...presets, finalizedPreset]);
+    }
+
+    const reindexed = updated.map((p, idx) => ({ ...p, order: idx }));
+    savePresetsToStorage(reindexed);
+    setPresets(reindexed);
+    setNewlyAddedPresetId(finalizedPreset.id);
+
+    if (selectionTarget === 'origin') {
+      setOrigin(finalizedPreset);
+    } else {
+      setDestination(finalizedPreset);
+    }
+
+    // Supabase Sync with vehicle_no (Strict Rule: common presets have vehicle_no: null) with 3.5s timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    try {
+      const res = await fetch('/api/presets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...finalizedPreset,
+          vehicle_no: isPresetCommon ? null : currentVehicleNo,
+        }),
+        signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+          ? AbortSignal.timeout(3500)
+          : controller.signal,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.preset) {
+          const syncedPreset: LocationPreset = {
+            ...data.preset,
+            name: finalizedPreset.name,
+            shortName: finalizedPreset.shortName || finalizedPreset.name,
+            fullName: finalizedPreset.fullName || data.preset.fullName || data.preset.full_name,
+            type: isPresetCommon ? 'common' : (data.preset.type || 'personal'),
+            isCommon: isPresetCommon ? true : Boolean(data.preset.isCommon),
+            isGlobal: isPresetCommon ? true : Boolean(data.preset.isGlobal),
+            vehicle_no: isPresetCommon ? null : (data.preset.vehicle_no || currentVehicleNo),
+            vehicleNo: isPresetCommon ? null : (data.preset.vehicleNo || currentVehicleNo),
+          };
+          setPresets((prev) => {
+            const synced = prev.map((p) =>
+              p.id === finalizedPreset.id || (p.name === syncedPreset.name && p.vehicle_no === syncedPreset.vehicle_no)
+                ? syncedPreset
+                : p
+            );
+            const deduped = deduplicatePresets(synced);
+            try {
+              localStorage.setItem(getPresetsStorageKey(currentVehicleNo), JSON.stringify(deduped));
+            } catch (e) { }
+            return deduped;
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to sync new preset to Supabase (timeout or network):', e);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  };
+
+  const handleUpdatePreset = async (updatedPreset: LocationPreset) => {
+    let currentIsAdmin = isAdmin;
+    try {
+      if (!currentIsAdmin && typeof window !== 'undefined') {
+        currentIsAdmin = localStorage.getItem(ADMIN_MODE_KEY) === 'true';
+      }
+    } catch (e) { }
+
+    const isPresetCommon = Boolean(
+      currentIsAdmin ||
+      updatedPreset.isCommon ||
+      updatedPreset.type === 'common' ||
+      updatedPreset.isGlobal ||
+      (!updatedPreset.vehicle_no && !updatedPreset.vehicleNo)
+    );
+    const cleanVehicle = isPresetCommon ? null : (updatedPreset.vehicle_no || currentVehicleNo);
+
+    const finalizedPreset: LocationPreset = {
+      ...updatedPreset,
+      name: updatedPreset.name.trim(),
+      shortName: (updatedPreset.shortName || updatedPreset.name).trim(),
+      fullName: (updatedPreset.fullName || updatedPreset.name).trim(),
+      type: isPresetCommon ? 'common' : 'personal',
+      isCommon: isPresetCommon,
+      isGlobal: isPresetCommon,
+      vehicle_no: cleanVehicle,
+      vehicleNo: cleanVehicle || undefined,
+    };
+
+    // 1) 낙관적 로컬 상태 및 localStorage 즉시 반영
+    setPresets((prev) => {
+      const next = prev.map((p) => (p.id === finalizedPreset.id ? finalizedPreset : p));
+      savePresetsToStorage(next);
+      return next;
+    });
+
+    if (destination.id === finalizedPreset.id) {
+      setDestination(finalizedPreset);
+    }
+    if (origin.id === finalizedPreset.id) {
+      setOrigin(finalizedPreset);
+    }
+
+    // 2) 서버 비동기 UPDATE (PUT /api/presets) 전송 with 3.5s timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    try {
+      const res = await fetch('/api/presets', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...finalizedPreset,
+          vehicle_no: isPresetCommon ? null : currentVehicleNo,
+        }),
+        signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+          ? AbortSignal.timeout(3500)
+          : controller.signal,
+      });
+
+      if (res.ok) {
+        const serverData = await res.json();
+        const resPreset = serverData.preset || serverData;
+        // 서버 응답 수신 시, 클라이언트에서 수정한 표시 이름 강제 보존하여 롤백 방지
+        setPresets((prev) => {
+          const synced = prev.map((p) => {
+            if (p.id === finalizedPreset.id) {
+              return {
+                ...p,
+                ...resPreset,
+                name: finalizedPreset.name, // 클라이언트에서 수정한 표시 이름 ('SGBAC') 강제 보존!
+                shortName: finalizedPreset.shortName || finalizedPreset.name,
+                fullName: finalizedPreset.fullName || resPreset.full_name || resPreset.fullName || p.fullName,
+              };
+            }
+            return p;
+          });
+          savePresetsToStorage(synced);
+          return synced;
+        });
+      }
+    } catch (error) {
+      console.warn('Failed to sync updated preset to server (timeout or network):', error);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  };
+
+  const handleDeleteCustomPreset = async (id: string) => {
+    const updated = presets.filter((p) => p.id !== id);
+    savePresetsToStorage(updated);
+    if (destination.id === id) {
+      setDestination(DEFAULT_PRESET_LOCATIONS[0]);
+    }
+    if (origin.id === id) {
+      setOrigin(DEFAULT_PRESET_LOCATIONS[2]);
+    }
+
+    let currentIsAdmin = isAdmin;
+    try {
+      if (!currentIsAdmin && typeof window !== 'undefined') {
+        currentIsAdmin = localStorage.getItem(ADMIN_MODE_KEY) === 'true';
+      }
+    } catch (e) { }
+
+    // Supabase Sync with vehicle_no and admin permission check with 3.5s timeout
+    const deleteController = new AbortController();
+    const deleteTimeoutId = setTimeout(() => deleteController.abort(), 3500);
+    try {
+      const adminParam = currentIsAdmin ? '&is_admin=true' : '';
+      await fetch(`/api/presets?id=${encodeURIComponent(id)}&vehicle_no=${encodeURIComponent(currentVehicleNo)}${adminParam}`, {
+        method: 'DELETE',
+        headers: {
+          ...(currentIsAdmin ? { 'x-is-admin': 'true' } : {}),
+        },
+        signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+          ? AbortSignal.timeout(3500)
+          : deleteController.signal,
+      });
+    } catch (e) {
+      console.warn('Failed to delete preset from Supabase (timeout or network):', e);
+    } finally {
+      clearTimeout(deleteTimeoutId);
+    }
+  };
+
+  const handleReorderPresets = async (reordered: LocationPreset[]) => {
+    savePresetsToStorage(reordered);
+
+    // Sync reordered array IDs to Supabase cockpit_drivers
+    try {
+      await fetch('/api/driver', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          driverId: profile.driverId,
+          presetOrder: reordered.map((p) => p.id),
+        }),
+      });
+    } catch (e) {
+      console.warn('Failed to sync preset order to Supabase:', e);
+    }
+  };
+
+  // Register or update Home Location
+  const handleSaveHomeLocation = async (homeData: HomeLocation) => {
+    updateProfile({ homeLocation: homeData });
+
+    if (destination?.id === 'slot_home') {
+      setDestination({
+        id: 'slot_home',
+        name: homeData.name || '자택',
+        shortName: '자택',
+        lat: homeData.lat,
+        lng: homeData.lng,
+        category: 'HOME',
+        address: homeData.address,
+      });
+    }
+    if (origin?.id === 'slot_home') {
+      setOrigin({
+        id: 'slot_home',
+        name: homeData.name || '자택',
+        shortName: '자택',
+        lat: homeData.lat,
+        lng: homeData.lng,
+        category: 'HOME',
+        address: homeData.address,
+      });
+    }
+
+    // Supabase Sync
+    try {
+      await fetch('/api/driver', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          driverId: profile.driverId,
+          homeLocation: homeData,
+        }),
+      });
+    } catch (e) {
+      console.warn('Failed to sync home location to Supabase:', e);
+    }
+  };
+
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [destination, setDestination] = useState<LocationPreset>(DEFAULT_PRESET_LOCATIONS[0]);
+  const [waypoints, setWaypoints] = useState<LocationPreset[]>([]);
+  const [editingWaypointIndex, setEditingWaypointIndex] = useState<number>(-1);
+  const [waypointInsertIndex, setWaypointInsertIndex] = useState<number | null>(null);
+  const [adminWaypoints, setAdminWaypoints] = useState<LocationPreset[]>([]);
+  const [isAdminRoute, setIsAdminRoute] = useState(false);
+  const [activeBookingId, setActiveBookingId] = useState<string | undefined>(undefined);
+  const isRouteRestoredRef = useRef(false);
+
+  const [activeTab, setActiveTab] = useState<DriverTab>('drive');
+  const [eventFavorites, setEventFavorites] = useState<DriverEventFavorite[]>([]);
+  const [eventFavoritesLoading, setEventFavoritesLoading] = useState(false);
+  const [eventFavoritesError, setEventFavoritesError] = useState<string | null>(null);
+
+  const refreshDriverEvents = useCallback(async () => {
+    setEventFavoritesLoading(true);
+    try {
+      const session = await ensureClientAuth('driver', { driverName: profile.driverName, vehicleNo: profile.vehicleNo });
+      if (!session.authenticated || session.role !== 'driver' || !session.driverId) {
+        setEventFavorites([]);
+        setEventFavoritesError(session.authenticated ? '기사 계정으로 로그인하면 배정 행사가 표시됩니다.' : '로그인 후 배정 행사를 확인할 수 있습니다.');
+        return;
+      }
+      const response = await fetch('/api/driver/event-favorites', { cache: 'no-store', credentials: 'include' });
+      const data = await response.json();
+      if (!response.ok || !Array.isArray(data.events)) throw new Error(data.error || '행사 정보를 확인할 수 없습니다.');
+      setEventFavorites(data.events);
+      setEventFavoritesError(null);
+    } catch (err) {
+      setEventFavorites([]); // Fail closed. Never show another driver's stale event data.
+      setEventFavoritesError(err instanceof Error ? err.message : '행사 정보를 불러오지 못했습니다.');
+    } finally {
+      setEventFavoritesLoading(false);
+    }
+  }, [profile.driverName, profile.vehicleNo]);
+
+  useEffect(() => {
+    if (!isLoaded || (activeTab !== 'schedule' && !isAddModalOpen && !isLocationSearchOpen)) return;
+    void refreshDriverEvents();
+    const onFocus = () => { if (document.visibilityState !== 'hidden') void refreshDriverEvents(); };
+    const timer = window.setInterval(onFocus, 15000);
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('vip_hq_schedules_updated', onFocus);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('vip_hq_schedules_updated', onFocus);
+    };
+  }, [isLoaded, activeTab, isAddModalOpen, isLocationSearchOpen, refreshDriverEvents]);
+  const selectDriverTab = (tab: DriverTab) => {
+    haptics.lightTap();
+    if (tab === 'log') {
+      setHasOpenedDrivingLog(true);
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(new Event('cockpit:driving-log-tab-focused'));
+      }
+    }
+    setActiveTab(tab);
+    setIsBarsHidden(false);
+    lastScrollYRef.current = 0;
+    window.scrollTo({ top: 0 });
+  };
+  const [reportMode, setReportMode] = useState<ReportMode>('DEPARTURE');
+  const [activeLanguage, setActiveLanguage] = useState<'ko' | 'en'>('ko');
+  const [activeDisplayedReportText, setActiveDisplayedReportText] = useState<string>('');
+  const [navigationReport, setNavigationReport] = useState<{
+    originId: string; destinationId: string; language: 'ko' | 'en'; text: string;
+  } | null>(null);
+  const [pendingLegReportCopy, setPendingLegReportCopy] = useState<string | null>(null);
+  const [legCopyNotice, setLegCopyNotice] = useState<string | null>(null);
+  const directLegActionSeqRef = useRef(0);
+  const [isScheduleNaviConfirmOpen, setIsScheduleNaviConfirmOpen] = useState(false);
+  const [scheduleNaviFreshResult, setScheduleNaviFreshResult] = useState<FreshEtaRouteResult | null>(null);
+  const [isScheduleNaviLoading, setIsScheduleNaviLoading] = useState(false);
+  const [scheduleNaviSnapshot, setScheduleNaviSnapshot] = useState<any>(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isOnboarding, setIsOnboarding] = useState(false);
+  const [onboardingStage, setOnboardingStage] = useState<'splash' | 'sheet' | null>(null);
+
+  // [태스크 1 & 2] Hydration-Safe 마운트 시 복원 로직 (다중 경유지 및 단일 경유지 하위 호환)
+  useEffect(() => {
+    try {
+      const savedRoute = localStorage.getItem(LAST_ROUTE_STORAGE_KEY);
+      if (savedRoute) {
+        const parsed = JSON.parse(savedRoute);
+        if (parsed.origin) setOrigin(parsed.origin);
+        if (parsed.destination) setDestination(parsed.destination);
+        if (Array.isArray(parsed.waypoints)) {
+          setWaypoints(parsed.waypoints);
+        } else if (parsed.waypoint) {
+          setWaypoints([parsed.waypoint]);
+        }
+        if (parsed.adminWaypoints) setAdminWaypoints(parsed.adminWaypoints);
+        if (typeof parsed.isAdminRoute === 'boolean') setIsAdminRoute(parsed.isAdminRoute);
+      }
+    } catch (error) {
+      console.warn('[Cockpit] 최근 경로 로드 실패 (기본값 유지):', error);
+    } finally {
+      isRouteRestoredRef.current = true;
+    }
+  }, [setOrigin]);
+
+  // [태스크 1 & 2] 상태 변경 시 자동 영속화 (다중 경유지 배열 직렬화)
+  useEffect(() => {
+    if (!isRouteRestoredRef.current) return;
+    if (origin || destination) {
+      try {
+        localStorage.setItem(
+          LAST_ROUTE_STORAGE_KEY,
+          JSON.stringify({
+            origin,
+            destination,
+            waypoints: waypoints || [],
+            waypoint: waypoints && waypoints[0] ? waypoints[0] : null,
+            adminWaypoints: adminWaypoints || [],
+            isAdminRoute: Boolean(isAdminRoute),
+          })
+        );
+      } catch (error) {
+        console.error('[Cockpit] 최근 경로 저장 실패:', error);
+      }
+    }
+  }, [origin, destination, waypoints, adminWaypoints, isAdminRoute]);
+
+  // Initialization Gate: check driver onboarding status on first launch before revealing dashboard
+  useEffect(() => {
+    if (!isLoaded) return;
+    try {
+      const onboarded = localStorage.getItem('cockpit_driver_onboarded');
+      if (!onboarded) {
+        setIsOnboarding(true);
+        setOnboardingStage('splash');
+        setIsInitialized(true);
+        // Phase 1: Micro Splash (2.1s) -> Phase 2: Centered Onboarding Modal
+        const timer = setTimeout(() => {
+          setOnboardingStage('sheet');
+          setIsProfileModalOpen(true);
+        }, 2100);
+        return () => clearTimeout(timer);
+      } else {
+        setIsInitialized(true);
+      }
+    } catch (e) {
+      console.warn('Failed to check driver onboarding status:', e);
+      setIsInitialized(true);
+    }
+  }, [isLoaded]);
+
+  // Route estimation state (initialized with immediate dynamic estimate)
+  const [routeEstimate, setRouteEstimate] = useState<RouteEstimate>(() =>
+    calculateHaversineEstimate(origin.lat, origin.lng, DEFAULT_PRESET_LOCATIONS[0].lat, DEFAULT_PRESET_LOCATIONS[0].lng)
+  );
+  const [isLoadingRoute, setIsLoadingRoute] = useState(false);
+
+  // Departure Time & AI Prediction State (Isolated Simulation Layer)
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
+  const [isPredictionSheetOpen, setIsPredictionSheetOpen] = useState(false);
+  const [simulationDepartureDate, setSimulationDepartureDate] = useState<Date>(() => new Date());
+  const [predictionResult, setPredictionResult] = useState<PredictionResult | null>(null);
+  const [isLoadingPrediction, setIsLoadingPrediction] = useState(false);
+
+  // Fetch route duration & ETA from API with dynamic client clock calculation with 8s timeout guard
+  const fetchRouteEstimate = useCallback(
+    async (start: LocationPreset, end: LocationPreset, waypoints: LocationPreset[] = []) => {
+      setIsLoadingRoute(true);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const validWaypoints = (waypoints || []).filter(
+        (w) => w && typeof w.lat === 'number' && typeof w.lng === 'number' && (w.lat !== 0 || w.lng !== 0)
+      );
+      const safeStartLat = typeof start?.lat === 'number' && Number.isFinite(start.lat) ? start.lat : DEFAULT_ORIGIN.lat;
+      const safeStartLng = typeof start?.lng === 'number' && Number.isFinite(start.lng) ? start.lng : DEFAULT_ORIGIN.lng;
+      const safeEndLat = typeof end?.lat === 'number' && Number.isFinite(end.lat) ? end.lat : DEFAULT_PRESET_LOCATIONS[0].lat;
+      const safeEndLng = typeof end?.lng === 'number' && Number.isFinite(end.lng) ? end.lng : DEFAULT_PRESET_LOCATIONS[0].lng;
+
+      try {
+        const passListParam =
+          validWaypoints.length > 0
+            ? `&passList=${validWaypoints.map((w) => `${w.lng},${w.lat}`).join('_')}`
+            : '';
+        const url = `/api/route?startX=${safeStartLng}&startY=${safeStartLat}&endX=${safeEndLng}&endY=${safeEndLat}&startName=${encodeURIComponent(
+          start?.shortName || start?.name || '출발지'
+        )}&endName=${encodeURIComponent(end?.shortName || end?.name || '도착지')}${passListParam}`;
+
+        const res = await fetch(url, {
+          signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+            ? AbortSignal.timeout(8000)
+            : controller.signal,
+        });
+        if (!res.ok) {
+          throw new Error(`Route API error ${res.status}`);
+        }
+
+        const data = await res.json();
+        const durationMinutes = typeof data.durationMinutes === 'number' ? data.durationMinutes : 45;
+
+        // Dynamic ETA Calculation from Local Device Clock (Strict 24h format HH:mm)
+        const now = new Date();
+        const dynamicEtaFormatted = getEtaString(durationMinutes, now);
+
+        setRouteEstimate({
+          distanceKm: typeof data.distanceKm === 'number' ? data.distanceKm : 50,
+          durationMinutes,
+          etaFormatted: dynamicEtaFormatted,
+          trafficSummary: data.trafficSummary || '원활',
+          estimatedTollWon: data.estimatedTollWon ?? null,
+          isMock: Boolean(data.isMock),
+          isFallback: Boolean(data.isFallback),
+          fallbackNotice: data.fallbackNotice,
+          isCached: Boolean(data.isCached),
+        });
+      } catch (err: any) {
+        console.warn('TMAP Route API call failed or timed out, applying local estimate fallback:', err?.message);
+        const fallback = calculateHaversineEstimate(safeStartLat, safeStartLng, safeEndLat, safeEndLng, validWaypoints);
+        const now = new Date();
+        const dynamicEtaFormatted = getEtaString(fallback.durationMinutes, now);
+
+        setRouteEstimate({
+          distanceKm: fallback.distanceKm,
+          durationMinutes: fallback.durationMinutes,
+          etaFormatted: dynamicEtaFormatted,
+          trafficSummary: '직선 추정 (통신 재시도 중)',
+          estimatedTollWon: null,
+          isMock: false,
+          isFallback: true,
+          fallbackNotice: '통신 연결 지연으로 거점 직선거리 기반 추정 ETA가 표시됩니다.',
+          isCached: false,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+        setIsLoadingRoute(false);
+      }
+    },
+    []
+  );
+
+  // Fetch AI Prediction for future departure time (Strictly Genuine TMAP Prediction) with 8s timeout guard
+  const fetchPrediction = useCallback(
+    async (targetDate: Date, start: LocationPreset, end: LocationPreset, currentWaypoints?: LocationPreset[]) => {
+      setIsLoadingPrediction(true);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      try {
+        const validWaypoints = (currentWaypoints || []).filter(
+          (w) => w && typeof w.lat === 'number' && typeof w.lng === 'number' && (w.lat !== 0 || w.lng !== 0)
+        );
+        // Ensure predictionTime sent to TMAP is never behind server clock when querying near-now slots
+        const safePredictionDate =
+          targetDate.getTime() < Date.now() + 90 * 1000
+            ? new Date(Date.now() + 90 * 1000)
+            : targetDate;
+        const res = await fetch('/api/route/prediction', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            departure: { name: start.shortName || start.name, lat: start.lat, lng: start.lng },
+            destination: { name: end.shortName || end.name, lat: end.lat, lng: end.lng },
+            waypoints: validWaypoints.map((w) => ({ name: w.name, lat: w.lat, lng: w.lng })),
+            predictionTime: safePredictionDate.toISOString(),
+          }),
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData?.error || `Prediction API error ${res.status}`);
+        }
+        const data: PredictionResult = await res.json();
+        setPredictionResult(data);
+      } catch (err: unknown) {
+        console.warn('Prediction fetch error (timeout or network):', err);
+        const isAbort = err instanceof Error && err.name === 'AbortError';
+        const errorMsg = err instanceof Error ? err.message : '예측 정보를 불러올 수 없습니다.';
+        setPredictionResult({
+          baseDurationMinutes: null,
+          predictedDurationMinutes: null,
+          predictedDistanceKm: null,
+          departureTimeIso: targetDate.toISOString(),
+          departureTimeFormatted: '--:--',
+          arrivalTimeFormatted: null,
+          trafficSummary: 'TMAP 예측 불가',
+          isMock: false,
+          isFallback: false,
+          isUnavailable: true,
+          error: isAbort ? '요청 시간이 초과되었습니다.' : errorMsg,
+          timeline: [],
+        });
+      } finally {
+        clearTimeout(timeoutId);
+        setIsLoadingPrediction(false);
+      }
+    },
+    []
+  );
+
+  // Recalculate route whenever origin, destination, or waypoints change (Strictly Real-time TMAP)
+  useEffect(() => {
+    if (origin && destination) {
+      const effectiveWaypoints =
+        isAdminRoute && adminWaypoints.length > 0
+          ? adminWaypoints
+          : waypoints.filter((w) => w && w.lat && w.lng && (w.lat !== 0 || w.lng !== 0));
+      fetchRouteEstimate(origin, destination, effectiveWaypoints);
+    }
+  }, [
+    origin?.lat,
+    origin?.lng,
+    destination?.lat,
+    destination?.lng,
+    waypoints,
+    adminWaypoints,
+    isAdminRoute,
+    fetchRouteEstimate,
+  ]);
+
+  // Waypoint Add, Select & Remove handlers (Supporting up to 5 multi-waypoints with index-based insert)
+  const handleAddWaypoint = (afterIndex?: number) => {
+    if (waypoints.length >= 5) return;
+    const targetIndex = typeof afterIndex === 'number' ? afterIndex + 1 : waypoints.length;
+    setWaypointInsertIndex(targetIndex);
+    setEditingWaypointIndex(-1);
+    setSelectionTarget('waypoint');
+    setIsLocationSearchOpen(true);
+  };
+
+  const handleSelectWaypoint = (index: number) => {
+    setWaypointInsertIndex(null);
+    setEditingWaypointIndex(index);
+    setSelectionTarget('waypoint');
+    setIsLocationSearchOpen(true);
+  };
+
+  const handleRemoveWaypoint = (index: number) => {
+    setWaypoints((prev) => prev.filter((_, i) => i !== index));
+    setIsAdminRoute(false);
+    setWaypointInsertIndex(null);
+    if (selectionTarget === 'waypoint') {
+      setSelectionTarget('destination');
+    }
+  };
+
+  // Open Prediction Result Sheet directly (rounded to next 10-min slot) using real TMAP API
+  const handleOpenPredictionSheet = () => {
+    const next10 = new Date(Date.now() + 2 * 60 * 1000);
+    const rem = next10.getMinutes() % 10;
+    if (rem !== 0) {
+      next10.setMinutes(next10.getMinutes() + (10 - rem), 0, 0);
+    } else {
+      next10.setSeconds(0, 0);
+    }
+    setSimulationDepartureDate(next10);
+    setIsPredictionSheetOpen(true);
+    if (origin && destination) {
+      const currentWps =
+        isAdminRoute && adminWaypoints.length > 0
+          ? adminWaypoints
+          : waypoints.filter((w) => w && w.lat && w.lng && (w.lat !== 0 || w.lng !== 0));
+      fetchPrediction(next10, origin, destination, currentWps);
+    }
+  };
+
+  // Handle Departure Time selection from Wheel Picker (Simulation Preview Only)
+  const handleConfirmDepartureTime = (date: Date) => {
+    setSimulationDepartureDate(date);
+    setIsTimePickerOpen(false);
+    setIsPredictionSheetOpen(true);
+    if (origin && destination) {
+      const currentWps =
+        isAdminRoute && adminWaypoints.length > 0
+          ? adminWaypoints
+          : waypoints.filter((w) => w && w.lat && w.lng && (w.lat !== 0 || w.lng !== 0));
+      fetchPrediction(date, origin, destination, currentWps);
+    }
+  };
+
+  // Helper to insert or update waypoint (with index-based splice support)
+  const applyWaypointSelection = (resolvedPreset: LocationPreset) => {
+    if (editingWaypointIndex >= 0 && editingWaypointIndex < waypoints.length) {
+      setWaypoints((prev) => {
+        const copy = [...prev];
+        copy[editingWaypointIndex] = resolvedPreset;
+        return copy;
+      });
+    } else {
+      setWaypoints((prev) => {
+        const next = [...prev];
+        if (typeof waypointInsertIndex === 'number' && waypointInsertIndex >= 0 && waypointInsertIndex <= next.length) {
+          next.splice(waypointInsertIndex, 0, resolvedPreset);
+        } else {
+          next.push(resolvedPreset);
+        }
+        return next.slice(0, 5); // 최대 5개 상한 방어
+      });
+    }
+    setIsAdminRoute(false);
+    setEditingWaypointIndex(-1);
+    setWaypointInsertIndex(null);
+    setSelectionTarget('destination');
+  };
+
+  // Handle Preset Button Click
+  const handleSelectPreset = (preset: LocationPreset) => {
+    setNewlyAddedPresetId(null);
+
+    // [태스크 4] 경로 패키지 거점 원터치 일괄 로드
+    if (preset.isPackage && preset.packageData) {
+      setOrigin(preset.packageData.origin);
+      setWaypoints(preset.packageData.waypoints || []);
+      setDestination(preset.packageData.destination);
+      setIsAdminRoute(false);
+      setSelectionTarget('destination');
+      haptics.success();
+      return;
+    }
+
+    let resolvedPreset = preset;
+    // Resolve Home slot
+    if (preset.id === 'slot_home') {
+      if (profile.homeLocation) {
+        resolvedPreset = {
+          id: 'slot_home',
+          name: profile.homeLocation.name || '자택',
+          shortName: '자택',
+          lat: profile.homeLocation.lat,
+          lng: profile.homeLocation.lng,
+          category: 'HOME',
+          address: profile.homeLocation.address,
+        };
+      } else {
+        setIsHomeModalOpen(true);
+        return;
+      }
+    }
+
+    if (selectionTarget === 'origin') {
+      setOrigin(resolvedPreset);
+      saveRecentPreset(resolvedPreset);
+      setSelectionTarget('destination');
+    } else if (selectionTarget === 'waypoint') {
+      applyWaypointSelection(resolvedPreset);
+    } else {
+      setDestination(resolvedPreset);
+    }
+  };
+
+  // Select gas station as destination and trigger ETA calculation (Origin strictly preserved)
+  const handleSelectGasStation = (station: GasStation) => {
+    const gasPreset: LocationPreset = {
+      id: 'custom_gas_station',
+      name: station.name,
+      shortName: station.name.replace(/주유소$/, '').trim().slice(0, 8),
+      lat: station.lat,
+      lng: station.lng,
+      category: 'GAS',
+      address: station.address || `${station.name} (${station.brandName})`,
+    };
+
+    if (selectionTarget === 'origin') {
+      setOrigin(gasPreset);
+      setSelectionTarget('destination');
+    } else if (selectionTarget === 'waypoint') {
+      applyWaypointSelection(gasPreset);
+    } else {
+      setDestination(gasPreset);
+      setSelectionTarget('destination');
+    }
+  };
+
+  // Select flight airport terminal as destination (Origin strictly preserved)
+  const handleSelectFlightDestination = (preset: LocationPreset) => {
+    if (selectionTarget === 'origin') {
+      setOrigin(preset);
+      setSelectionTarget('destination');
+    } else if (selectionTarget === 'waypoint') {
+      applyWaypointSelection(preset);
+    } else {
+      setDestination(preset);
+      setSelectionTarget('destination');
+    }
+  };
+
+  // Handler for selecting location from standalone LocationSearchModal
+  const handleSelectLocationFromSearch = (loc: SelectedLocationData) => {
+    // Route back to Driving Log 일정 추가 if requested from AddScheduleModal
+    if (isSelectingForSchedule) {
+      setSelectedLocationForSchedule({
+        name: loc.name || loc.shortName,
+        address: loc.address,
+      });
+      setIsSelectingForSchedule(false);
+      setIsLocationSearchOpen(false);
+      haptics.selection();
+      return;
+    }
+
+    // [태스크 4] 검색 모달 내 경로 패키지 거점 선택 시 원터치 일괄 로드
+    if (loc.isPackage && loc.packageData) {
+      setOrigin(loc.packageData.origin);
+      setWaypoints(loc.packageData.waypoints || []);
+      setDestination(loc.packageData.destination);
+      setIsAdminRoute(false);
+      setSelectionTarget('destination');
+      haptics.success();
+      return;
+    }
+
+    const resolvedPreset: LocationPreset = {
+      id: loc.id || `loc_${Date.now()}`,
+      name: loc.name,
+      shortName: loc.shortName || loc.name.slice(0, 8),
+      lat: loc.lat,
+      lng: loc.lng,
+      category: loc.category || 'CUSTOM',
+      address: loc.address,
+    };
+
+    if (selectionTarget === 'origin') {
+      setOrigin(resolvedPreset);
+      saveRecentPreset(resolvedPreset);
+      setSelectionTarget('destination');
+    } else if (selectionTarget === 'waypoint') {
+      applyWaypointSelection(resolvedPreset);
+    } else {
+      setDestination(resolvedPreset);
+    }
+  };
+
+  // Bidirectional Swap UX (⇄)
+  const handleSwapOriginDestination = () => {
+    const currentOrigin = origin;
+    const currentDestination = destination;
+
+    setOrigin(currentDestination);
+    setDestination(currentOrigin);
+    saveRecentPreset(currentDestination);
+  };
+
+  // [태스크 1] 출발지-경유지-목적지 '경로 패키지 거점' 순차 자동 저장 핸들러 (버튼 '표시 이름(최대 8자)' 설정 보강)
+  const handleSaveRouteAsPreset = () => {
+    if (!origin || !destination) return;
+
+    // 1. 전체 경로명(full_name) 자동 조합
+    const waypointNames = waypoints.map((w) => w.shortName || w.name).join(' ➔ ');
+    const fullRouteName = waypointNames
+      ? `${origin.shortName || origin.name} ➔ ${waypointNames} ➔ ${destination.shortName || destination.name}`
+      : `${origin.shortName || origin.name} ➔ ${destination.shortName || destination.name}`;
+
+    // 2. 8자 추천 기본 표시명 생성 (출발지 3자 ➔ 목적지 4자 조합 최대 8자)
+    const defaultShortName = `${(origin.shortName || origin.name).slice(0, 3)}➔${(destination.shortName || destination.name).slice(0, 4)}`.slice(0, 8);
+
+    // 3. 기사/관리자에게 버튼에 표기할 8자 표시 이름 질의
+    const inputDisplayName = window.prompt(
+      `[거점 버튼 표시 이름 설정]\n그리드 버튼에 표시할 축약 이름을 입력하세요 (최대 8자):\n\n전체 경로: ${fullRouteName}`,
+      defaultShortName
+    );
+
+    if (!inputDisplayName || !inputDisplayName.trim()) return;
+
+    // 8자 제한 안전 절삭
+    const finalizedDisplayName = inputDisplayName.trim().slice(0, 8);
+
+    const newPackagePreset: LocationPreset = {
+      id: `pkg-${Date.now()}`,
+      name: finalizedDisplayName, // 그리드 버튼에 표시될 8자 이름
+      shortName: finalizedDisplayName,
+      full_name: fullRouteName,   // 상세 출발지-경유지-목적지 전체 이름
+      fullName: fullRouteName,
+      lat: destination.lat,
+      lng: destination.lng,
+      address: destination.address || destination.name,
+      category: 'CUSTOM',
+      type: 'personal',
+      isCommon: false,
+      isGlobal: false,
+      vehicle_no: currentVehicleNo,
+      vehicleNo: currentVehicleNo,
+      createdAt: new Date().toISOString(),
+      isPackage: true,
+      packageData: {
+        origin,
+        waypoints: [...waypoints],
+        destination,
+      },
+    };
+
+    setPresets((prev) => {
+      const next = [...prev];
+      // 12개 프리셋 목록 중 비어 있는 첫 번째 인덱스(빈 슬롯) 탐색
+      const emptyIndex = next.findIndex((p) => !p.name || p.name.includes('설정되지 않음'));
+      if (emptyIndex !== -1) {
+        next[emptyIndex] = { ...newPackagePreset, order: emptyIndex };
+      } else if (next.length < 12) {
+        next.push({ ...newPackagePreset, order: next.length });
+      } else {
+        // 12개가 꽉 찬 경우 12번째 슬롯(인덱스 11)에 대체 적재
+        next[11] = { ...newPackagePreset, order: 11 };
+      }
+      savePresetsToStorage(next);
+      return next;
+    });
+
+    // Supabase DB 백그라운드 동기화 (3.5초 타임아웃 방어)
+    fetch('/api/presets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...newPackagePreset,
+        vehicle_no: currentVehicleNo,
+      }),
+      signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+        ? AbortSignal.timeout(3500)
+        : undefined,
+    }).catch((err) => console.warn('Background preset sync failed:', err));
+
+    haptics.success();
+  };
+
+  /**
+   * One-tap event leg: open the chosen navigation app immediately from the
+   * user's gesture, and separately prepare the customer-origin report.
+   * Clipboard is best-effort after fresh ETA (mobile browser permissions apply).
+   * Never reuse old leg ETA or announce a copy that has not succeeded.
+   */
+  const handleNavigateEventLeg = (leg: DriverEventLeg) => {
+    const pair = eventLegToPresets(leg);
+    if (!pair) return;
+    const actionSeq = ++directLegActionSeqRef.current;
+    const snapshot = captureActionSnapshot({
+      origin: pair.origin,
+      destination: pair.destination,
+      waypoints: [],
+      adminWaypoints: [],
+      isAdminRoute: false,
+      defaultNavi: profile.defaultNavi,
+      reportMode: 'DEPARTURE',
+      language: activeLanguage,
+      bookingId: leg.scheduleId,
+      driverProfile: profile,
+    });
+
+    // Only the chosen client-defined leg is visible in route/report/log state.
+    setOrigin(pair.origin);
+    setDestination(pair.destination);
+    setAdminWaypoints([]);
+    setWaypoints([]);
+    setIsAdminRoute(false);
+    setActiveBookingId(leg.scheduleId);
+    setReportMode('DEPARTURE');
+    setRouteEstimate({ distanceKm: 0, durationMinutes: 0, etaFormatted: '--:--', isMock: false, isUnavailable: true }); // No previous-leg ETA.
+    setNavigationReport(null);
+    setPendingLegReportCopy(null);
+    setLegCopyNotice(null);
+    setIsAddModalOpen(false);
+    setIsLocationSearchOpen(false);
+    setSelectionTarget('destination');
+    setActiveTab('drive');
+
+    // Kick off fresh ETA without blocking deep-link navigation.
+    const freshEtaPromise = fetchFreshEtaRoute(snapshot);
+
+    // Deep link MUST be invoked before awaiting the network/clipboard promises.
+    void launchNavigationApp(profile.defaultNavi, {
+      name: pair.destination.shortName || pair.destination.name,
+      lat: pair.destination.lat,
+      lng: pair.destination.lng,
+    }, undefined, []).catch((err) => {
+      console.warn('[EventLeg] Could not start navigation:', err);
+    });
+
+    void freshEtaPromise.then((fresh) => {
+      if (actionSeq !== directLegActionSeqRef.current) return;
+      setRouteEstimate({
+        distanceKm: fresh.distanceKm,
+        durationMinutes: fresh.durationMinutes,
+        etaFormatted: fresh.etaFormatted,
+        trafficSummary: fresh.trafficSummary || '',
+        isMock: false,
+        isFallback: !fresh.isFresh,
+        isUnavailable: fresh.isUnavailable,
+      });
+      const report = buildFreshReportText({
+        snapshot,
+        etaFormatted: fresh.etaFormatted,
+        durationMinutes: fresh.durationMinutes,
+        distanceKm: fresh.distanceKm,
+      });
+      setNavigationReport({
+        originId: pair.origin.id,
+        destinationId: pair.destination.id,
+        language: snapshot.language,
+        text: report,
+      });
+      // Browsers may reject clipboard writes after an app switch. Offer one-tap retry.
+      void copyTextSafely(report).then((copied) => {
+        if (actionSeq !== directLegActionSeqRef.current) return;
+        if (!copied) {
+          setPendingLegReportCopy(report);
+          setLegCopyNotice('자동 복사가 제한됐습니다. 아래 버튼으로 복사해 주세요.');
+        } else {
+          setPendingLegReportCopy(null);
+          setLegCopyNotice('단톡방 보고서가 자동 복사됐습니다.');
+        }
+      });
+    }).catch((err) => {
+      if (actionSeq !== directLegActionSeqRef.current) return;
+      console.warn('[EventLeg] Fresh ETA unavailable:', err);
+      const report = buildFreshReportText({
+        snapshot,
+        etaFormatted: '--:--',
+      });
+      setNavigationReport({
+        originId: pair.origin.id,
+        destinationId: pair.destination.id,
+        language: snapshot.language,
+        text: report,
+      });
+      setPendingLegReportCopy(report);
+      setLegCopyNotice('ETA 확인이 어려워 보고서에 도착 미정을 표시했습니다. 복사를 눌러 확인해 주세요.');
+    });
+    haptics.success();
+  };
+
+  /** Pick just one stop in the active origin/destination/waypoint selection mode. */
+  const handleSelectEventStop = (stop: DriverEventStop) => {
+    if (!stop.isPoiConfirmed || typeof stop.lat !== 'number' || typeof stop.lng !== 'number') return;
+    handleSelectLocationFromSearch({
+      id: 'event-stop-' + stop.id,
+      name: stop.name,
+      shortName: stop.name,
+      address: stop.address,
+      lat: stop.lat,
+      lng: stop.lng,
+      category: 'CUSTOM',
+    });
+    setIsAddModalOpen(false);
+  };
+
+  // Schedule Tab Action Handlers
+  const handleSelectRouteFromSchedule = useCallback(
+    (originPreset: LocationPreset, destinationPreset: LocationPreset, schedule?: ScheduleItem) => {
+      // Multi-stop schedule cards must use the segment picker, not silently route across the entire day.
+      if (schedule && ((schedule.routeWaypoints?.length || 0) > 2 ||
+        (schedule.adminWaypoints?.length || 0) > 0 || (schedule.waypoints?.length || 0) > 0)) return;
+      setOrigin(originPreset);
+      setDestination(destinationPreset);
+      if (schedule?.id) setActiveBookingId(String(schedule.id));
+      setIsAdminRoute(false);
+      setAdminWaypoints([]);
+      setWaypoints([]);
+      fetchRouteEstimate(originPreset, destinationPreset, []);
+      setActiveTab('drive');
+      haptics.success();
+    },
+    [setOrigin, setDestination, fetchRouteEstimate]
+  );
+
+  const handleNavigateForSchedule = useCallback(
+    async (schedule: ScheduleItem, leg?: DriverEventLeg) => {
+      if (leg) {
+        handleNavigateEventLeg(leg);
+        return;
+      }
+      // Never send every stop to the navigator as a single continuous drive.
+      if (!leg && ((schedule.routeWaypoints?.length || 0) > 2 ||
+        (schedule.adminWaypoints?.length || 0) > 0 || (schedule.waypoints?.length || 0) > 0)) return;
+      const pair = leg ? eventLegToPresets(leg) : scheduleToPresets(schedule);
+      if (!pair) return;
+      const { origin: originPreset, destination: destinationPreset } = leg
+        ? pair as { origin: LocationPreset; destination: LocationPreset }
+        : { origin: (pair as ReturnType<typeof scheduleToPresets>).originPreset, destination: (pair as ReturnType<typeof scheduleToPresets>).destinationPreset };
+      if (schedule?.id) setActiveBookingId(String(schedule.id));
+      setOrigin(originPreset);
+      setDestination(destinationPreset);
+      setIsAdminRoute(false);
+      setAdminWaypoints([]);
+      setWaypoints([]);
+      fetchRouteEstimate(originPreset, destinationPreset, []);
+
+      // Switch to Drive tab and open unified navigation confirm flow with fresh ETA recalculation
+      // Never show an ETA calculated for a previous selected leg if the next request fails.
+      setScheduleNaviFreshResult(null);
+      setActiveTab('drive');
+      setIsScheduleNaviConfirmOpen(true);
+      setIsScheduleNaviLoading(true);
+
+      const snapshot = captureActionSnapshot({
+        origin: originPreset,
+        destination: destinationPreset,
+        waypoints: [],
+        adminWaypoints: [],
+        isAdminRoute: false,
+        defaultNavi: profile.defaultNavi,
+        reportMode: 'DEPARTURE',
+        language: activeLanguage,
+        bookingId: String(schedule.id),
+        driverProfile: profile,
+      });
+      setScheduleNaviSnapshot(snapshot);
+
+      try {
+        const freshRes = await fetchFreshEtaRoute(snapshot);
+        setScheduleNaviFreshResult(freshRes);
+      } catch {
+        // Safe fallback handled gracefully
+      } finally {
+        setIsScheduleNaviLoading(false);
+      }
+      haptics.heavyTap();
+    },
+    [profile, activeLanguage, setOrigin, setDestination, fetchRouteEstimate]
+  );
+
+  const handleConfirmScheduleNavigation = async (addToLog: boolean) => {
+    setIsScheduleNaviConfirmOpen(false);
+
+    const snapshot = scheduleNaviSnapshot || captureActionSnapshot({
+      origin,
+      destination,
+      waypoints,
+      adminWaypoints,
+      isAdminRoute,
+      defaultNavi: profile.defaultNavi,
+      reportMode: 'DEPARTURE',
+      language: activeLanguage,
+      bookingId: activeBookingId,
+      driverProfile: profile,
+    });
+
+    const routeRes: FreshEtaRouteResult = scheduleNaviFreshResult || {
+      durationMinutes: 0,
+      distanceKm: 0,
+      etaFormatted: '--:--',
+      departureTimeFormatted: snapshot.departureTimeFormatted,
+      computedAt: snapshot.clickedAt.toISOString(),
+      source: 'unverified',
+      isFresh: false,
+      routeFingerprint: `${origin.lat},${origin.lng}->${destination.lat},${destination.lng}`,
+    };
+
+    if (addToLog) {
+      syncNavigationRouteToDrivingLog({ snapshot, routeResult: routeRes });
+    }
+
+    try {
+      await launchNavigationApp(
+        snapshot.defaultNavi,
+        {
+          name: snapshot.destination.shortName || snapshot.destination.name,
+          lat: snapshot.destination.lat,
+          lng: snapshot.destination.lng,
+        },
+        undefined,
+        []
+      );
+    } catch (naviErr: any) {
+      console.warn('[ScheduleNavi] Launch error:', naviErr?.message);
+    }
+  };
+
+  const handleOpenPredictionForSchedule = useCallback(
+    (schedule: ScheduleItem, leg?: DriverEventLeg) => {
+      if (!leg && ((schedule.routeWaypoints?.length || 0) > 2 ||
+        (schedule.adminWaypoints?.length || 0) > 0 || (schedule.waypoints?.length || 0) > 0)) return;
+      const pair = leg ? eventLegToPresets(leg) : null;
+      if (leg && !pair) return;
+      const { originPreset, destinationPreset } = pair
+        ? { originPreset: pair.origin, destinationPreset: pair.destination }
+        : scheduleToPresets(schedule);
+      if (schedule?.id) setActiveBookingId(String(schedule.id));
+      setOrigin(originPreset);
+      setDestination(destinationPreset);
+      setWaypoints([]);
+      setAdminWaypoints([]);
+      setIsAdminRoute(false);
+      fetchRouteEstimate(originPreset, destinationPreset, []);
+
+      const [year, month, day] = schedule.date.split('-').map(Number);
+      const [hour, minute] = schedule.pickup_time.split(':').map(Number);
+      const schedDate = new Date();
+      // Later stops have appointment/arrival times, not confirmed departure times.
+      // For those legs start the ETA picker from "now", never reuse day-one pickup time.
+      if (!leg || leg.index === 0) {
+        if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+          schedDate.setFullYear(year, month - 1, day);
+          schedDate.setHours(hour || 9, minute || 0, 0, 0);
+        }
+      }
+      // If the schedule's date/time has already passed, project same pickup hour:minute onto today/tomorrow for valid TMAP prediction
+      if (schedDate.getTime() < Date.now() + 60 * 1000) {
+        const now = new Date();
+        schedDate.setFullYear(now.getFullYear(), now.getMonth(), now.getDate());
+        if (schedDate.getTime() < Date.now() + 60 * 1000) {
+          schedDate.setDate(schedDate.getDate() + 1);
+        }
+      }
+      setSimulationDepartureDate(schedDate);
+      setIsPredictionSheetOpen(true);
+      fetchPrediction(schedDate, originPreset, destinationPreset, []);
+      haptics.mediumTap();
+    },
+    [setOrigin, setDestination, fetchRouteEstimate, fetchPrediction]
+  );
+
+  const handleOpenFlightModalFromSchedule = useCallback(
+    (flightId: string, type: 'arrival' | 'departure') => {
+      setFlightModalInitialFlightId(flightId);
+      setFlightModalInitialType(type);
+      setIsFlightModalOpen(true);
+      haptics.mediumTap();
+    },
+    []
+  );
+
+  // Resolved effective waypoints considering admin and user inputs
+  const effectiveWaypoints = useMemo(() => {
+    return isAdminRoute && adminWaypoints.length > 0
+      ? adminWaypoints
+      : (waypoints && waypoints.length > 0 ? waypoints : []);
+  }, [isAdminRoute, adminWaypoints, waypoints]);
+
+  // Real-time dynamic report text generated from current state
+  const reportPreviewText = useMemo(() => {
+    return generateReportText({
+      mode: reportMode,
+      profile,
+      origin,
+      destination,
+      waypoints: effectiveWaypoints,
+      etaFormatted: routeEstimate?.etaFormatted,
+      distanceKm: routeEstimate?.distanceKm,
+      durationMinutes: routeEstimate?.durationMinutes,
+    });
+  }, [reportMode, profile, origin, destination, effectiveWaypoints, routeEstimate]);
+
+  // Pre-initialization & Onboarding Splash Gate: completely blocks dashboard FOUC on initial mount
+  if (!isInitialized || (isOnboarding && onboardingStage === 'splash')) {
+    return (
+      <div className="fixed inset-0 z-50 bg-inherit flex flex-col items-center justify-center p-6 text-center select-none">
+        <div className="flex flex-col items-center max-w-xs animate-in zoom-in-95 duration-300">
+          <img
+            src="/cockpit_app_icon.png"
+            alt="Protocol Cockpit"
+            className="w-20 h-20 rounded-[20px] shadow-[0_12px_32px_rgba(30,96,243,0.22)] ring-1 ring-slate-200/80 mb-6 animate-pulse"
+          />
+          <h1 className="text-3xl font-extrabold text-[#1E60F3] tracking-tight mb-3">
+            환영합니다!
+          </h1>
+          <p className="text-sm font-semibold text-slate-800 mb-1.5 leading-snug">
+            VIP 의전 관제 시스템에 접속하셨습니다.
+          </p>
+          <p className="text-sm text-slate-500 font-normal leading-relaxed">
+            원활한 이동 보고를 위해 드라이버 정보를 등록해 주세요.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <main className="driver-app min-h-dvh bg-inherit text-slate-800 flex flex-col items-center justify-between overflow-x-clip selection:bg-[#1E60F3]/20">
+      <div className="w-full max-w-md mx-auto min-h-dvh pb-[calc(88px+env(safe-area-inset-bottom))] flex flex-col justify-between bg-inherit shadow-xl relative border-x border-slate-200/50 overflow-x-clip">
+        {/* Top Header with Safe Area Inset & Navi Switcher */}
+        <Header
+          profile={profile}
+          onOpenProfileModal={() => setIsProfileModalOpen(true)}
+          onSelectNavi={(prov) => {
+            setPreferredNavi(prov);
+          }}
+          onOpenAdminModal={() => setIsAdminModalOpen(true)}
+          isAdmin={isAdmin}
+          isHidden={isBarsHidden}
+        />
+
+        {/* Add to Home Screen Guidance Banner */}
+        <A2HSBanner />
+
+        {/* Admin Mode Active Banner */}
+        {isAdmin && (
+          <div className="px-4 py-2 bg-blue-600 text-white text-xs font-bold flex items-center justify-between shadow-sm animate-fade-in">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-blue-300 animate-ping" />
+              관리자 모드 활성화
+            </span>
+            <div className="flex items-center gap-1.5">
+              <Link
+                href="/hq"
+                className="px-2 py-0.5 rounded bg-white text-[#1E60F3] hover:bg-blue-50 text-[11px] font-extrabold cursor-pointer transition-colors shadow-2xs"
+              >
+                HQ 대시보드 ➔
+              </Link>
+              <button
+                onClick={() => handleToggleAdmin(false)}
+                className="px-2 py-0.5 rounded bg-white/20 hover:bg-white/30 text-[11px] font-extrabold cursor-pointer"
+              >
+                종료
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Tab View Switch: [운행 대시보드] vs [배차 스케줄] */}
+        {activeTab === 'drive' ? (
+          <div className="flex-1 p-3.5 space-y-3 animate-fade-in">
+            {/* 1. Origin / Destination Separate Selection & Bidirectional Swap (⇄) UX + Top 4 Quick Utility Bar */}
+            <OriginDestinationSelector
+              origin={origin}
+              destination={destination}
+              waypoints={waypoints}
+              adminWaypoints={adminWaypoints}
+              isAdminRoute={isAdminRoute}
+              selectionTarget={selectionTarget}
+              onSelectTarget={(target) => setSelectionTarget(target)}
+              onSelectOrigin={() => setSelectionTarget('origin')}
+              onSelectDestination={() => setSelectionTarget('destination')}
+              onSelectWaypoint={(index) => handleSelectWaypoint(index)}
+              onAddWaypoint={handleAddWaypoint}
+              onRemoveWaypoint={handleRemoveWaypoint}
+              onSwap={handleSwapOriginDestination}
+              onOpenSearchModal={(target, wpIndex) => {
+                setSelectionTarget(target);
+                if (target === 'waypoint') {
+                  setEditingWaypointIndex(typeof wpIndex === 'number' ? wpIndex : -1);
+                  setWaypointInsertIndex(null);
+                }
+                setIsLocationSearchOpen(true);
+              }}
+              onOpenInspectionModal={() => setIsInspectionModalOpen(true)}
+              onOpenFlightModal={() => setIsFlightModalOpen(true)}
+              onOpenGasModal={() => setIsGasModalOpen(true)}
+              onOpenPresetModal={handleOpenAddModal}
+              onSaveRouteAsPreset={handleSaveRouteAsPreset}
+              onSetCurrentLocation={requestGpsLocation}
+              onOpenFieldTips={() => {
+                haptics.selection();
+                setIsFieldTipModalOpen(true);
+              }}
+              fieldTipsCount={currentFieldTipsCount}
+              isLocatingGps={isLocating}
+            />
+
+            {/* 2. Standalone 7-Button Quick Action Bar (4 Top / 3 Centered) */}
+            <QuickActionBar
+              isVipEnabled={isVipAssigned}
+              onOpenDrivingLogModal={() => selectDriverTab('log')}
+              onOpenExpenseModal={() => setIsExpenseOpen(true)}
+              onOpenInspectionModal={() => setIsInspectionModalOpen(true)}
+              onOpenPresetModal={handleOpenAddModal}
+              onOpenAddModal={handleOpenAddModal}
+              onOpenGasModal={() => setIsGasModalOpen(true)}
+              onOpenFlightModal={() => setIsFlightModalOpen(true)}
+              onOpenRoadviewModal={() => setIsRoadviewModalOpen(true)}
+              onOpenFieldKnowledgeModal={() => setIsFieldKnowledgeOpen(true)}
+            />
+
+            {/* 3. Route Estimation & ETA Status (Strictly Real-time TMAP) */}
+            <RouteInfoCard
+              routeEstimate={routeEstimate}
+              isLoadingRoute={isLoadingRoute}
+              isLocating={isLocating}
+              isUndergroundFallback={isUndergroundFallback}
+              gpsErrorMsg={gpsErrorMsg}
+              onRequestGps={requestGpsLocation}
+              onRefreshRoute={() => {
+                if (origin && destination) {
+                  const effectiveWaypoints = isAdminRoute && adminWaypoints.length > 0
+                    ? adminWaypoints
+                    : (waypoints && waypoints.length > 0 ? waypoints : []);
+                  fetchRouteEstimate(origin, destination, effectiveWaypoints);
+                }
+              }}
+              onOpenTimePicker={handleOpenPredictionSheet}
+            />
+
+            {/* 4. Report Template Selector with Globe English Translation */}
+            <ReportTemplateSelector
+              currentMode={reportMode}
+              onSelectMode={(mode) => setReportMode(mode)}
+              reportPreviewText={reportPreviewText}
+              navigationReport={navigationReport}
+              profile={profile}
+              origin={origin}
+              destination={destination}
+              waypoints={effectiveWaypoints}
+              etaFormatted={routeEstimate?.etaFormatted}
+              onActiveReportTextChange={(text, lang) => {
+                setActiveDisplayedReportText(text);
+                if (lang) setActiveLanguage(lang);
+              }}
+              onFreshEtaCalculated={(freshEta) => {
+                setRouteEstimate((prev) => ({ ...prev, etaFormatted: freshEta }));
+              }}
+            />
+
+            {/* Browser clipboard restrictions require an explicit retry, never a false success. */}
+            {legCopyNotice && (
+              <div role="status" className="flex items-center justify-between gap-2 rounded-[14px] bg-white px-3.5 py-3 text-[12px] font-semibold text-[#4D607C] shadow-[0_2px_12px_rgba(35,49,78,0.05)]">
+                <span className="min-w-0 flex-1">{legCopyNotice}</span>
+                {pendingLegReportCopy && (
+                  <button type="button" onClick={async () => {
+                    const copied = await copyTextSafely(pendingLegReportCopy);
+                    if (copied) {
+                      setPendingLegReportCopy(null);
+                      setLegCopyNotice('단톡방 보고서가 복사됐습니다.');
+                    } else {
+                      setLegCopyNotice('브라우저에서 복사가 차단됐습니다. 보고 미리보기에서 직접 복사해 주세요.');
+                    }
+                  }} className="shrink-0 rounded-[11px] bg-[#1E60F3] px-3 py-2 text-[12px] font-bold text-white">
+                    보고 복사
+                  </button>
+                )}
+                <button type="button" aria-label="알림 닫기" onClick={() => {
+                  setLegCopyNotice(null); setPendingLegReportCopy(null);
+                }} className="shrink-0 text-[#8290A5]">×</button>
+              </div>
+            )}
+
+            {/* 5. 1-Sec Fast Pass & Kakao Share Action Panel */}
+            <ActionPanel
+              defaultNavi={profile.defaultNavi}
+              origin={origin}
+              destination={destination}
+              waypoints={waypoints}
+              adminWaypoints={adminWaypoints}
+              isAdminRoute={isAdminRoute}
+              routeEstimate={routeEstimate}
+              reportText={activeDisplayedReportText || reportPreviewText}
+              targetChatRoom={profile.targetChatRoom}
+              profile={profile}
+              bookingId={activeBookingId}
+              reportMode={reportMode}
+              language={activeLanguage}
+              onFreshActionResult={(result) => {
+                if (result.routeResult.etaFormatted && result.routeResult.etaFormatted !== '--:--') {
+                  setRouteEstimate((prev) => ({
+                    ...prev,
+                    distanceKm: result.routeResult.distanceKm || prev.distanceKm,
+                    durationMinutes: result.routeResult.durationMinutes || prev.durationMinutes,
+                    etaFormatted: result.routeResult.etaFormatted,
+                  }));
+                }
+              }}
+            />
+          </div>
+        ) : activeTab === 'schedule' ? (
+          <div className="flex-1 p-3.5 animate-fade-in">
+            <ScheduleTab
+              profile={profile}
+              presets={presets}
+              eventFavorites={eventFavorites}
+              eventFavoritesLoading={eventFavoritesLoading}
+              eventFavoritesError={eventFavoritesError}
+              onRefreshEventFavorites={() => void refreshDriverEvents()}
+              onLoadEventLeg={handleNavigateEventLeg}
+              onOpenProfileModal={() => setIsProfileModalOpen(true)}
+              onSelectRouteForCockpit={handleSelectRouteFromSchedule}
+              onOpenPredictionForSchedule={handleOpenPredictionForSchedule}
+              onNavigateForSchedule={handleNavigateForSchedule}
+              onOpenFlightModal={handleOpenFlightModalFromSchedule}
+              onSwitchVehicle={(vNo) => {
+                // Vehicle tabs filter the authenticated driver's trips; they never switch people.
+                updateProfile({ vehicleNo: vNo });
+                fetchPresetsForVehicle(vNo);
+              }}
+            />
+          </div>
+        ) : null}
+        {/* Keep the same editor mounted so switching tabs preserves unsaved input. */}
+        {hasOpenedDrivingLog && <div hidden={activeTab !== 'log'} className="flex-1 bg-inherit">
+          <DrivingLogModal presentation="page" isOpen={true}
+            onClose={() => selectDriverTab('drive')} driverProfile={profile} bookingId={activeBookingId}
+            onOpenProfileModal={() => setIsProfileModalOpen(true)}
+            onUpdateProfile={updateProfile}
+            onOpenLocationSearch={() => { setIsSelectingForSchedule(true); setIsLocationSearchOpen(true); }}
+            selectedLocationFromMap={selectedLocationForSchedule} />
+        </div>}
+        <DriverBottomNav activeTab={activeTab} onSelect={selectDriverTab} isHidden={isBarsHidden} />
+      </div>
+
+
+
+      {/* Driver Profile Edit / Onboarding Modal (Centered Modal) */}
+      <ProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => {
+          setIsProfileModalOpen(false);
+          setIsOnboarding(false);
+          setOnboardingStage(null);
+        }}
+        profile={profile}
+        isOnboarding={isOnboarding}
+        onSave={async (updated) => {
+          const response = await fetch('/api/driver', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+              driverId: profile.driverId, driver_name: updated.driverName, phone: updated.phone || updated.mobile,
+              passenger_name: updated.passengerName ?? null, default_navi: updated.defaultNavi ?? profile.defaultNavi,
+              car_number: updated.carNumber ?? profile.carNumber,
+            })
+          });
+          const result = await response.json();
+          if (!response.ok || !result.ok) throw new Error(result.error || '프로필이 저장되지 않았습니다.');
+          const driver = result.driver;
+          updateProfile({ ...updated, id: driver.id, driverId: driver.id, vehicleNo: driver.vehicle_no || '', carNumber: updated.carNumber || driver.car_number || '', driverName: driver.driver_name, phone: driver.phone || '', passengerName: driver.passenger_name ?? null });
+          localStorage.setItem('cockpit_driver_onboarded', 'true');
+          setIsOnboarding(false); setOnboardingStage(null);
+          return true;
+        }}
+      />
+
+      {/* Admin Mode Master PIN ('1010') Modal */}
+      <AdminPinModal
+        isOpen={isAdminModalOpen}
+        onClose={() => setIsAdminModalOpen(false)}
+        isAdmin={isAdmin}
+        onToggleAdmin={handleToggleAdmin}
+      />
+
+      {/* Custom VIP Preset Add / Edit Modal */}
+      <CustomPresetModal
+        isOpen={isAddModalOpen}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setEditingPreset(null);
+        }}
+        presets={presets}
+        eventFavorites={eventFavorites}
+        eventFavoritesLoading={eventFavoritesLoading}
+        eventFavoritesError={eventFavoritesError}
+        onRefreshEventFavorites={() => void refreshDriverEvents()}
+        onLoadEventLeg={handleNavigateEventLeg}
+        onSelectEventStop={handleSelectEventStop}
+        onReorderPresets={handleReorderPresets}
+        onDeletePreset={handleDeleteCustomPreset}
+        onAddPreset={handleAddCustomPreset}
+        presetToEdit={editingPreset}
+        onUpdatePreset={handleUpdatePreset}
+        isAdmin={isAdmin}
+        homeLocation={profile.homeLocation}
+        vehicleNo={currentVehicleNo}
+        onOpenHomeModal={() => {
+          setIsAddModalOpen(false);
+          setIsHomeModalOpen(true);
+        }}
+        newlyAddedPresetId={newlyAddedPresetId}
+        onClearHighlight={() => setNewlyAddedPresetId(null)}
+      />
+
+      {/* Home Location Address Registration Modal */}
+      <CustomPresetModal
+        isOpen={isHomeModalOpen}
+        onClose={() => setIsHomeModalOpen(false)}
+        onAddPreset={() => { }}
+        isHomeMode={true}
+        homeLocation={profile.homeLocation}
+        onSaveHome={handleSaveHomeLocation}
+      />
+
+      {/* Native Departure Time Picker Modal (4-Column Wheel Picker) */}
+      <DepartureTimePickerModal
+        isOpen={isTimePickerOpen}
+        onClose={() => {
+          setIsTimePickerOpen(false);
+          setIsPredictionSheetOpen(true);
+        }}
+        onConfirm={handleConfirmDepartureTime}
+        initialDate={simulationDepartureDate}
+      />
+
+      {/* AI Duration Prediction Result Bottom Sheet (Isolated Simulation Layer) */}
+      <PredictionResultSheet
+        isOpen={isPredictionSheetOpen}
+        onClose={() => setIsPredictionSheetOpen(false)}
+        prediction={predictionResult}
+        isLoading={isLoadingPrediction}
+        onOpenTimePicker={() => {
+          setIsPredictionSheetOpen(false);
+          setIsTimePickerOpen(true);
+        }}
+        selectedDate={simulationDepartureDate}
+      />
+
+      {/* Real-time Gas Station Recommendation Modal (Opinet x TMAP) */}
+      <GasStationModal
+        isOpen={isGasModalOpen}
+        onClose={() => setIsGasModalOpen(false)}
+        currentLat={origin.lat}
+        currentLng={origin.lng}
+        originId={origin?.id}
+        defaultNavi={profile.defaultNavi}
+        profile={profile}
+        onSelectStation={handleSelectGasStation}
+      />
+
+      {/* Incheon Airport Real-time Flight Modal (Arrival/Departure) */}
+      <FlightModal
+        isOpen={isFlightModalOpen}
+        onClose={() => {
+          setIsFlightModalOpen(false);
+          setFlightModalInitialFlightId(undefined);
+          setFlightModalInitialType(undefined);
+        }}
+        profile={profile}
+        onSelectDestination={handleSelectFlightDestination}
+        initialFlightId={flightModalInitialFlightId}
+        initialType={flightModalInitialType}
+      />
+
+      {/* Existing inspection UI with authoritative company custody and local drafts */}
+      {isInspectionModalOpen && <VehicleInspectionModal
+        key={profile.driverId || 'local'}
+        isOpen={isInspectionModalOpen}
+        onClose={() => setIsInspectionModalOpen(false)}
+        profile={profile}
+        profilePlateNumber={profile.plateNumber}
+        initialMode={inspectionInitialMode}
+        onCustodySaved={setActiveBookingId}
+        bookingId={activeBookingId}
+      />}
+
+      {/* Standalone Location Search & Preset Modal */}
+      <LocationSearchModal
+        isOpen={isLocationSearchOpen}
+        onClose={() => {
+          setIsLocationSearchOpen(false);
+          setWaypointInsertIndex(null);
+        }}
+        target={selectionTarget}
+        presets={presets}
+        eventFavorites={eventFavorites}
+        eventFavoritesLoading={eventFavoritesLoading}
+        eventFavoritesError={eventFavoritesError}
+        onRefreshEventFavorites={() => void refreshDriverEvents()}
+        onLoadEventLeg={handleNavigateEventLeg}
+        homeLocation={profile.homeLocation}
+        currentSelectedId={
+          selectionTarget === 'origin'
+            ? origin?.id
+            : selectionTarget === 'waypoint'
+              ? (editingWaypointIndex >= 0 && editingWaypointIndex < waypoints.length
+                ? waypoints[editingWaypointIndex]?.id
+                : undefined)
+              : destination?.id
+        }
+        onSelectLocation={handleSelectLocationFromSearch}
+        onOpenHomeModal={() => setIsHomeModalOpen(true)}
+        onOpenManagePresets={() => {
+          setIsAddModalOpen(true);
+        }}
+        onTogglePresetFavorite={(preset, action) => {
+          if (action === 'remove') {
+            handleDeleteCustomPreset(preset.id);
+          } else if (action === 'add') {
+            handleAddCustomPreset(preset);
+          }
+        }}
+      />
+
+      {/* On-Site Roadview & Entry Route Inspection Modal */}
+      <RoadviewModal
+        isOpen={isRoadviewModalOpen}
+        onClose={() => setIsRoadviewModalOpen(false)}
+        currentDestination={destination}
+        presets={presets}
+        homeLocation={profile.homeLocation}
+      />
+
+      {/* Expense (경비지출) Modal Shell */}
+      <ExpenseModal
+        isOpen={isExpenseOpen}
+        onClose={() => setIsExpenseOpen(false)}
+        driverProfile={profile}
+        bookingId={activeBookingId}
+      />
+
+      {/* Field Tips (현장 팁) Modal */}
+      <FieldTipModal
+        isOpen={isFieldTipModalOpen}
+        onClose={() => setIsFieldTipModalOpen(false)}
+        currentPlaceName={origin?.name || '조선팰리스 강남'}
+        currentAddress={origin?.address || '서울 강남구 테헤란로 231'}
+        originPlaceName={origin?.name}
+        originAddress={origin?.address}
+        destinationPlaceName={destination?.name}
+        destinationAddress={destination?.address}
+        onOpenRoadview={() => {
+          setIsFieldTipModalOpen(false);
+          setIsRoadviewModalOpen(true);
+        }}
+      />
+
+      {/* Field Knowledge (현장 지식) Read-Only Driver Modal */}
+      <DriverFieldKnowledgeModal
+        isOpen={isFieldKnowledgeOpen}
+        onClose={() => setIsFieldKnowledgeOpen(false)}
+      />
+
+      {/* Schedule Card Navigation Driving Log Confirmation Modal */}
+      <NaviDrivingLogConfirmModal
+        isOpen={isScheduleNaviConfirmOpen}
+        onClose={() => {
+          setIsScheduleNaviConfirmOpen(false);
+          setIsScheduleNaviLoading(false);
+        }}
+        originName={origin?.shortName || origin?.name}
+        destinationName={destination?.shortName || destination?.name}
+        destinationAddress={destination?.address}
+        departureTime={scheduleNaviSnapshot?.departureTimeFormatted}
+        etaText={
+          scheduleNaviFreshResult?.etaFormatted && scheduleNaviFreshResult.etaFormatted !== '--:--'
+            ? `예상 ${scheduleNaviFreshResult.durationMinutes}분 (${scheduleNaviFreshResult.etaFormatted} 도착)`
+            : routeEstimate?.etaFormatted
+              ? `예상 ${routeEstimate.durationMinutes}분 (${routeEstimate.etaFormatted} 도착)`
+              : undefined
+        }
+        isLoadingFreshEta={isScheduleNaviLoading}
+        naviProvider={profile.defaultNavi}
+        onConfirm={handleConfirmScheduleNavigation}
+      />
+
+    </main>
+  );
+}

@@ -10,10 +10,17 @@ export const haptics = {
     if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       try {
         navigator.vibrate?.(15);
-      } catch (e) {
+      } catch {
         // Safe navigation: ignore if unsupported or disabled by OS
       }
     }
+  },
+
+  /**
+   * Selection feedback for list item clicks and pickers
+   */
+  selection: () => {
+    haptics.lightTap();
   },
 
   /**
@@ -23,7 +30,7 @@ export const haptics = {
     if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       try {
         navigator.vibrate?.(25);
-      } catch (e) {
+      } catch {
         // Safe navigation: ignore
       }
     }
@@ -43,7 +50,7 @@ export const haptics = {
     if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       try {
         navigator.vibrate?.(40);
-      } catch (e) {
+      } catch {
         // Safe navigation: ignore
       }
     }
@@ -56,7 +63,7 @@ export const haptics = {
     if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       try {
         navigator.vibrate?.([30, 40, 30]);
-      } catch (e) {
+      } catch {
         // Safe navigation: ignore
       }
     }
@@ -69,7 +76,7 @@ export const haptics = {
     if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       try {
         navigator.vibrate?.([30, 40, 30]);
-      } catch (e) {
+      } catch {
         // Safe navigation: ignore
       }
     }
@@ -82,7 +89,7 @@ export const haptics = {
     if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       try {
         navigator.vibrate?.([60, 40, 60]);
-      } catch (e) {
+      } catch {
         // Safe navigation: ignore
       }
     }
@@ -95,7 +102,7 @@ export const haptics = {
     if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       try {
         navigator.vibrate?.([80, 50, 80]);
-      } catch (e) {
+      } catch {
         // Safe navigation: ignore
       }
     }

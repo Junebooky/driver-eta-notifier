@@ -1,20 +1,22 @@
+import { verifyServerAuth } from '@/lib/auth/serverAuth';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { LocationPreset } from '@/types';
 import { DEFAULT_PRESET_LOCATIONS } from '@/utils/presets';
 
 export async function GET(req: NextRequest) {
+  const auth = await verifyServerAuth(req);
+  if (!auth.ok || !auth.session) return NextResponse.json({ error: auth.error }, { status: auth.statusCode });
   try {
     const { searchParams } = new URL(req.url);
-    const rawVehicleNo = searchParams.get('vehicle_no');
+    const rawVehicleNo = auth.session.role === 'driver' ? auth.session.vehicleNo : searchParams.get('vehicle_no');
     const vehicleNo = rawVehicleNo?.match(/(\d+호차)/)?.[1] || (rawVehicleNo && rawVehicleNo !== 'all' ? rawVehicleNo.trim() : null);
 
     let query = supabaseAdmin.from('presets').select('*');
 
     // Strict Rule: If vehicleNo is provided, query common master presets (vehicle_no IS NULL) OR vehicle's own custom presets
-    if (vehicleNo) {
-      query = query.or(`vehicle_no.is.null,vehicle_no.eq.${vehicleNo}`);
-    }
+    if (vehicleNo) query = query.or(`vehicle_no.is.null,vehicle_no.eq.${vehicleNo.replace(/[^0-9가-힣a-zA-Z_-]/g, '')}`);
+    else if (auth.session.role === 'driver') query = query.is('vehicle_no', null);
 
     const { data: rawPresets, error: presetsError } = await query;
 
@@ -60,6 +62,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PUT(req: Request) {
+  const auth = await verifyServerAuth(req);
+  if (!auth.ok || !auth.session) return NextResponse.json({ error: auth.error }, { status: auth.statusCode });
   try {
     const body = await req.json();
     const { id, name, shortName, fullName, full_name, address, lat, lng, type, isCommon, isGlobal, vehicle_no, vehicleNo, order, order_index, category } = body;
@@ -71,6 +75,10 @@ export async function PUT(req: Request) {
     const isPresetCommon = Boolean(isCommon || type === 'common' || isGlobal || (!vehicle_no && !vehicleNo));
     const targetVehicle = isPresetCommon ? null : (vehicle_no || vehicleNo);
     const cleanVehicleNo = targetVehicle ? (targetVehicle.match(/(\d+호차)/)?.[1] || targetVehicle.trim()) : null;
+
+    if (auth.session.role === 'driver' && (isPresetCommon || cleanVehicleNo !== auth.session.vehicleNo)) return NextResponse.json({ error: '본인 즐겨찾기만 수정할 수 있습니다.' }, { status: 403 });
+    const ownership = await checkPresetOwnership(id, auth.session.role, auth.session.vehicleNo);
+    if (!ownership) return NextResponse.json({ error: '즐겨찾기 수정 권한이 없습니다.' }, { status: 403 });
 
     // Display Name ('SGBAC') vs Full Name ('서울김포비즈니스항공센터')
     const displayName = (name || shortName || (fullName ? fullName.slice(0, 8) : '')).trim();
@@ -105,22 +113,7 @@ export async function PUT(req: Request) {
 
     if (error) {
       console.error('Failed to update preset in DB:', error);
-      // DB 업데이트 실패 시에도 프론트엔드가 중단되지 않도록 적절한 응답 반환
-      return NextResponse.json({
-        ...body,
-        ...updatePayload,
-        preset: {
-          ...body,
-          ...updatePayload,
-          shortName: displayName,
-          fullName: fullPlaceName,
-          type: isPresetCommon ? 'common' : 'personal',
-          isCommon: isPresetCommon,
-          isGlobal: isPresetCommon,
-          vehicle_no: isPresetCommon ? null : cleanVehicleNo,
-          vehicleNo: isPresetCommon ? null : cleanVehicleNo,
-        },
-      }, { status: 200 });
+      return NextResponse.json({ error: '즐겨찾기가 저장되지 않았습니다.' }, { status: 503 });
     }
 
     const savedPreset: LocationPreset = {
@@ -155,6 +148,8 @@ export async function PUT(req: Request) {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await verifyServerAuth(req);
+  if (!auth.ok || !auth.session) return NextResponse.json({ error: auth.error }, { status: auth.statusCode });
   try {
     const body = await req.json();
     const { id, name, shortName, fullName, full_name, address, lat, lng, category, order, order_index = 0, vehicle_no, vehicleNo } = body;
@@ -169,6 +164,8 @@ export async function POST(req: NextRequest) {
     const isCommon = Boolean(body.isCommon || body.type === 'common' || body.isGlobal);
     const targetVehicle = isCommon ? null : (vehicle_no || vehicleNo);
     const cleanVehicleNo = targetVehicle ? (targetVehicle.match(/(\d+호차)/)?.[1] || targetVehicle.trim()) : null;
+
+    if (auth.session.role === 'driver' && (isCommon || cleanVehicleNo !== auth.session.vehicleNo || !(await checkPresetOwnership(id, auth.session.role, auth.session.vehicleNo)))) return NextResponse.json({ error: '본인 즐겨찾기만 등록할 수 있습니다.' }, { status: 403 });
 
     const payload: any = {
       name: displayName || (fullPlaceName ? fullPlaceName.slice(0, 8) : '거점'),
@@ -261,10 +258,12 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const auth = await verifyServerAuth(req);
+  if (!auth.ok || !auth.session) return NextResponse.json({ error: auth.error }, { status: auth.statusCode });
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
-    const rawVehicleNo = searchParams.get('vehicle_no');
+    const rawVehicleNo = auth.session.role === 'driver' ? auth.session.vehicleNo : searchParams.get('vehicle_no');
     const isAdmin =
       searchParams.get('is_admin') === 'true' ||
       searchParams.get('isAdmin') === 'true' ||
@@ -317,4 +316,11 @@ export async function DELETE(req: NextRequest) {
     console.error('Error deleting preset:', err);
     return NextResponse.json({ error: err?.message }, { status: 500 });
   }
+}
+
+async function checkPresetOwnership(id: string | null | undefined, role: string, vehicleNo?: string) {
+  if (role === 'hq_admin') return true;
+  if (!id) return true;
+  const { data, error } = await supabaseAdmin.from('presets').select('vehicle_no').eq('id', id).maybeSingle();
+  return !error && (!data || Boolean(vehicleNo && data.vehicle_no === vehicleNo));
 }

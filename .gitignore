@@ -44,3 +44,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Supabase CLI local cache
+supabase/.temp/
+
+# Synthetic browser QA output
+.qa-artifacts/

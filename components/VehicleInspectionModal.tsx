@@ -1,7 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, startTransition } from 'react';
 import { DriverProfile } from '@/types';
+import { useVehicleCustody } from '@/hooks/useVehicleCustody';
+import { VIP_REAL_VEHICLES } from '@/utils/vehicleData';
+import { isReportingUuid } from '@/utils/receiptSubmission';
+import { createRetryableJsonMutation } from '@/utils/retryableJsonMutation';
+import { inspectionPhotoForSubmission } from '@/utils/vehicleCustody';
+import type { CustodyWriteResult } from '@/types/vehicleCustody';
 import {
   generateReceiptReport,
   generateReturnReport,
@@ -38,6 +44,8 @@ interface VehicleInspectionModalProps {
   profile: DriverProfile;
   profilePlateNumber?: string;
   initialMode?: 'pickup' | 'daily' | 'return' | 'receipt';
+  bookingId?: string;
+  onCustodySaved?: (bookingId: string) => void;
 }
 
 const DAMAGE_PART_CHIPS = [
@@ -78,9 +86,27 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   profile,
   profilePlateNumber,
   initialMode = 'pickup',
+  bookingId,
+  onCustodySaved,
 }) => {
   const normalizedInitialMode = initialMode === 'receipt' ? 'pickup' : (initialMode || 'pickup');
   const [activeTab, setActiveTab] = useState<'pickup' | 'daily' | 'return'>(normalizedInitialMode);
+  const serverMode = isReportingUuid(profile.driverId);
+  const custody = useVehicleCustody(isOpen && serverMode);
+  const [selectedBookingId, setSelectedBookingId] = useState(bookingId || '');
+  const selectedBooking = custody.data?.bookings.find(row => row.id === selectedBookingId) || custody.data?.bookings[0];
+  const activeCustody = custody.data?.custodies.find(row => !row.returned_at);
+  const [custodyConfirmed, setCustodyConfirmed] = useState(false);
+  const [mismatchReason, setMismatchReason] = useState('');
+  const [custodyMessage, setCustodyMessage] = useState<string | null>(null);
+  const [custodySaving, setCustodySaving] = useState(false);
+  const custodyLock = useRef(false);
+  const mutation = useMemo(() => createRetryableJsonMutation(`cockpit_custody_pending_${profile.driverId || 'unlinked'}`), [profile.driverId]);
+  const [pendingCustody, setPendingCustody] = useState(mutation.hasPending);
+  const initialBinding = useRef('');
+  const serverAssignmentPlate = selectedBooking?.vehicle_plate || activeCustody?.vehicle_plate || '';
+  const inspectionDraftKey = serverMode ? `cockpit_inspection_draft_${profile.driverId}_${selectedBooking?.id || bookingId || 'unselected'}` : getInspectionStorageKey(profile.vehicleNo);
+
 
   // Profile hocha and car number defaults
   const detectedHocha = useMemo(() => {
@@ -131,6 +157,26 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   const dailyPhotoInputRef = useRef<HTMLInputElement>(null);
   const returnPhotoInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    if (!serverMode || !custody.ready) return;
+    const binding = activeTab === 'return' && activeCustody ? activeCustody.id : selectedBooking?.id || '';
+    if (!binding || initialBinding.current === binding) return;
+    initialBinding.current = binding;
+    startTransition(() => {
+      setCustodyConfirmed(false);
+      if (activeTab === 'return' && activeCustody) {
+        setCarNumber(activeCustody.vehicle_plate);
+        setInitialData({ initialTotalKm: activeCustody.pickup_odometer, initialDte: activeCustody.pickup_details.dte || 0,
+          inspectionDate: formatInspectionDate(), vehicleHocha: '', carNumber: activeCustody.vehicle_plate,
+          outerDamage: activeCustody.pickup_details.damage, selectedParts: activeCustody.pickup_details.parts, savedAt: activeCustody.picked_up_at });
+      } else if (selectedBooking) {
+        setSelectedBookingId(selectedBooking.id);
+        setCarNumber(selectedBooking.vehicle_plate);
+        setReceiptTotalKm(''); setReturnTotalKm(''); setInitialData(null);
+      }
+    });
+  }, [serverMode, custody.ready, activeTab, activeCustody, selectedBooking]);
+
   // Existing damage parts inherited from initial receipt inspection or current receipt state
   const existingDamageParts = useMemo(() => {
     if (initialData?.selectedParts && initialData.selectedParts.length > 0) {
@@ -175,7 +221,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   // Persist current inspection data to vehicle-specific isolated storage key
   const saveVehicleInspectionData = (overrides?: Record<string, any>) => {
     if (typeof window === 'undefined') return;
-    const currentKey = getInspectionStorageKey(profile.vehicleNo || vehicleHocha);
+    const currentKey = inspectionDraftKey;
 
     const initialKmNum = parseFloat(sanitizeNumericInput(receiptTotalKm)) || 0;
     const initialDteNum = parseFloat(sanitizeNumericInput(receiptDte)) || 0;
@@ -228,12 +274,18 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
       keyLocation,
       // Initial Data snapshot for return calculation
       initialData: currentInitialData,
+      bookingId: (serverMode ? selectedBooking?.id : bookingId) || overrides?.bookingId,
+      driverId: profile.driverId,
+      mismatchReason,
       savedAt: new Date().toISOString(),
       ...overrides,
     };
 
     try {
       localStorage.setItem(currentKey, JSON.stringify(payload));
+      if (bookingId) {
+        localStorage.setItem(`${currentKey}_${bookingId}`, JSON.stringify(payload));
+      }
     } catch (err) {
       if (err instanceof DOMException && (err.name === 'QuotaExceededError' || err.code === 22)) {
         try {
@@ -260,14 +312,16 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
       return;
     }
 
-    const currentKey = getInspectionStorageKey(profile.vehicleNo);
+    if (serverMode && !custody.ready) return;
+    const defaultPlate = serverMode ? serverAssignmentPlate : detectedCarNumber;
+    const currentKey = inspectionDraftKey;
     let rawData: string | null = null;
     try {
       rawData = localStorage.getItem(currentKey);
-      if (!rawData && profile.vehicleNo) {
+      if (!serverMode && !rawData && profile.vehicleNo) {
         rawData = localStorage.getItem(`cockpit_vehicle_inspection_${profile.vehicleNo.trim()}`);
       }
-      if (!rawData) {
+      if (!rawData && !serverMode) {
         // Fallback: Check if legacy initial inspection exists and belongs to this vehicle
         const legacyRaw = localStorage.getItem(STORAGE_KEY_INITIAL_INSPECTION);
         if (legacyRaw) {
@@ -299,7 +353,8 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
       try {
         const parsed = JSON.parse(rawData);
         setVehicleHocha(parsed.vehicleHocha || detectedHocha);
-        setCarNumber(detectedCarNumber || parsed.carNumber || '');
+        setCarNumber(serverMode ? parsed.carNumber || defaultPlate : detectedCarNumber || parsed.carNumber || '');
+        if (serverMode) setMismatchReason(parsed.mismatchReason || '');
 
         // Pickup (Receipt) Data
         const pOdo = parsed.pickupOdo || parsed.receiptTotalKm || '';
@@ -361,20 +416,21 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
         console.error('점검 데이터 파싱 실패:', e);
         resetToCleanState();
         setVehicleHocha(detectedHocha);
-        setCarNumber(detectedCarNumber);
+        setCarNumber(defaultPlate);
       }
     } else {
       // 해당 호차의 점검 기록이 없으면 깨끗한 초기 상태(Clean State)로 리셋
       resetToCleanState();
       setVehicleHocha(detectedHocha);
-      setCarNumber(detectedCarNumber);
+      setCarNumber(defaultPlate);
     }
 
     isLoadedRef.current = true;
-  }, [isOpen, profile.vehicleNo, detectedHocha, detectedCarNumber]);
+  }, [isOpen, profile.vehicleNo, detectedHocha, detectedCarNumber, inspectionDraftKey, serverMode, custody.ready, serverAssignmentPlate]);
 
   // Task 2: Real-time synchronization of profilePlateNumber / profile.plateNumber to carNumber when modal is open or profile updates
   useEffect(() => {
+    if (serverMode) return;
     const targetPlate = profilePlateNumber?.trim() || profile.plateNumber?.trim() || detectedCarNumber;
     if (isOpen && targetPlate) {
       setCarNumber(targetPlate);
@@ -440,6 +496,19 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
       if (returnMeterPhoto) URL.revokeObjectURL(returnMeterPhoto);
     };
   }, [receiptMeterPhoto, dailyMeterPhoto, returnMeterPhoto]);
+
+  // Lock background page scroll when VehicleInspectionModal is open
+  useEffect(() => {
+    if (!isOpen || typeof document === 'undefined') return;
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+    };
+  }, [isOpen]);
 
   // Damage chip toggle handler (pickup & return)
   const handleToggleDamageChip = (part: string, mode: 'pickup' | 'return') => {
@@ -516,6 +585,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
     if (!file) return;
 
     haptics.lightTap();
+    setCustodyConfirmed(false);
     const objectUrl = URL.createObjectURL(file);
     if (mode === 'pickup') {
       if (receiptMeterPhoto) URL.revokeObjectURL(receiptMeterPhoto);
@@ -663,19 +733,53 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Handle Save (Confirm button) - saves to vehicle-isolated localStorage and closes
+  const saveServerCustody = async (retry = false) => {
+    if (custodyLock.current) return;
+    custodyLock.current = true; setCustodySaving(true); setCustodyMessage(null);
+    try {
+      let response: Response;
+      if (retry) response = await mutation.retry();
+      else {
+        if (!custody.ready || isOcrAnalyzing) throw new Error('최신 서버 기록과 계기판을 먼저 확인해 주세요.');
+        const returning = activeTab === 'return';
+        const vehicle = VIP_REAL_VEHICLES.find(row => row.plate.replace(/\s/g, '') === carNumber.replace(/\s/g, ''));
+        const odometerInput = returning ? returnTotalKm : receiptTotalKm;
+        if (!vehicle || !custodyConfirmed || !odometerInput.trim()) throw new Error('실제 전체 차량번호와 계기판 주행거리를 확인하고 체크해 주세요.');
+        if (returning && !activeCustody) throw new Error('반납할 인수 기록이 없습니다. 서버 기록을 새로고침해 주세요.');
+        if (!returning && !selectedBooking) throw new Error('확정 배정된 일정을 먼저 선택해 주세요. 차량 미배정은 관리자에게 요청해 주세요.');
+        const photo = await inspectionPhotoForSubmission(returning ? returnMeterPhoto : receiptMeterPhoto);
+        response = await mutation.send('/api/vehicle-custody', {
+          action: returning ? 'return' : 'pickup', bookingId: returning ? undefined : selectedBooking?.id,
+          expectedVersion: returning ? undefined : selectedBooking?.version, custodyId: returning ? activeCustody?.id : undefined,
+          vehicleId: vehicle.uuid, confirmed: custodyConfirmed, reason: mismatchReason,
+          inspection: { odometer: Number(sanitizeNumericInput(odometerInput)),
+            dte: (returning ? returnDte : receiptDte).trim() ? Number(sanitizeNumericInput(returning ? returnDte : receiptDte)) : undefined,
+            damage: returning ? returnDamage : receiptDamage, parts: returning ? returnSelectedParts : receiptSelectedParts,
+            parkingLocation: returning ? parkingLocation : undefined, keyLocation: returning ? keyLocation : undefined }, photo,
+        });
+      }
+      const result: CustodyWriteResult & { error?: string } = await response.json();
+      if (!response.ok || result.ok !== true) throw new Error(result.error || '서버 저장 결과를 확인하지 못했습니다.');
+      const fresh = await custody.refresh(true);
+      window.dispatchEvent(new Event('vip_vehicle_custody_updated'));
+      setCustodyConfirmed(false);
+      if (result.outcome === 'mismatch') {
+        setCustodyMessage(`차량 불일치 확인 요청을 저장했습니다. 배정 ${result.assignedPlate} / 실제 선택 ${result.actualPlate}. 관리자 확인 전까지 인수 완료가 아닙니다.`);
+        haptics.warningPulse();
+      } else {
+        setCustodyMessage(`${result.outcome === 'returned' ? '반납' : '인수'} 기록이 서버에 저장되었습니다.${fresh ? '' : ' 최신 상태 재조회에 실패했습니다. 새로고침해 확인해 주세요.'}`);
+        haptics.success();
+        if (result.outcome === 'picked_up' && result.custody) onCustodySaved?.(result.custody.booking_id);
+      }
+    } catch (error) {
+      setCustodyMessage(error instanceof Error ? error.message : '서버 저장에 실패했습니다. 입력은 보존되어 있습니다.');
+      haptics.errorAlert();
+    } finally { custodyLock.current = false; setCustodySaving(false); setPendingCustody(mutation.hasPending); }
+  };
+
   const handleConfirmSave = () => {
-    haptics.lightTap();
-    const effectiveCarNumber =
-      carNumber?.trim() ||
-      profilePlateNumber?.trim() ||
-      profile.plateNumber?.trim() ||
-      profile.carNumber?.trim() ||
-      detectedCarNumber;
-    if (!carNumber?.trim() && effectiveCarNumber) {
-      setCarNumber(effectiveCarNumber);
-    }
-    saveVehicleInspectionData({ carNumber: effectiveCarNumber });
+    if (serverMode && activeTab !== 'daily') { void saveServerCustody(); return; }
+    saveVehicleInspectionData();
     onClose();
   };
 
@@ -710,7 +814,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3.5 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overscroll-none driver-modal-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           haptics.lightTap();
@@ -718,18 +822,21 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
         }
       }}
     >
-      <div className="bg-white rounded-3xl w-full max-w-md max-h-[92vh] flex flex-col shadow-2xl border border-slate-100 overflow-hidden animate-scale-up">
+      <div
+        className="bg-[#F6F8FC] rounded-3xl w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl border border-slate-100 overflow-hidden text-slate-900 overscroll-contain driver-modal-card"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header: Title + Close */}
-        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-100 shrink-0">
-          <div className="flex items-center space-x-2">
-            <div className="w-7 h-7 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center shadow-xs">
-              <ClipboardCheck className="w-4 h-4" />
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 bg-[#F6F8FC] shrink-0">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-2xl bg-[#0055FF] text-white flex items-center justify-center shadow-[0_4px_12px_rgba(0,85,255,0.25)] shrink-0">
+              <ClipboardCheck className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900 tracking-tight">
+              <h2 className="text-[18px] font-black text-slate-900 tracking-tight leading-tight">
                 차량 인수·반납 체크
               </h2>
-              <p className="text-[11px] text-slate-400 font-normal">
+              <p className="text-[12px] text-slate-500 font-medium mt-0.5">
                 {formatInspectionDate()}
               </p>
             </div>
@@ -740,24 +847,25 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               haptics.lightTap();
               onClose();
             }}
-            className="w-8 h-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+            className="w-9 h-9 rounded-full bg-slate-200/60 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
             aria-label="닫기"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Tab Segmented Control (3단 전환: 수령 | 일일 | 반납) */}
-        <div className="px-5 pt-3.5 pb-2 shrink-0">
-          <div className="w-full bg-slate-100/90 p-1 rounded-full relative flex items-center select-none shadow-inner">
+        {/* Tab Segmented Control (3단 전환: 인수 | 데일리 체크 | 반납) */}
+        <div className="px-5 pt-1 pb-3 shrink-0">
+          <div className="w-full bg-white p-1.5 rounded-2xl border border-slate-100/90 shadow-[0_2px_10px_rgba(15,23,42,0.04)] relative flex items-center select-none">
             {/* Sliding Pill Indicator */}
             <div
-              className={`w-[calc((100%-8px)/3)] h-[calc(100%-8px)] absolute top-1 left-1 rounded-full bg-[#1E60F3] shadow-[0_4px_14px_rgba(30,96,243,0.35)] transition-transform duration-300 ease-out pointer-events-none transform ${activeTab === 'pickup'
-                ? 'translate-x-0'
-                : activeTab === 'daily'
-                  ? 'translate-x-full'
-                  : 'translate-x-[200%]'
-                }`}
+              className={`w-[calc((100%-12px)/3)] h-[calc(100%-12px)] absolute top-1.5 left-1.5 rounded-xl bg-[#0055FF] shadow-[0_4px_12px_rgba(0,85,255,0.25)] transition-transform duration-300 ease-out pointer-events-none transform ${
+                activeTab === 'pickup'
+                  ? 'translate-x-0'
+                  : activeTab === 'daily'
+                    ? 'translate-x-full'
+                    : 'translate-x-[200%]'
+              }`}
             />
 
             <button
@@ -766,12 +874,13 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 haptics.lightTap();
                 setActiveTab('pickup');
               }}
-              className="flex-1 py-2 rounded-full z-10 flex items-center justify-center space-x-1 sm:space-x-1.5 cursor-pointer transition-colors duration-300"
+              className="flex-1 py-2.5 rounded-xl z-10 flex items-center justify-center space-x-1 sm:space-x-1.5 cursor-pointer transition-colors duration-300"
             >
-              <Gauge className={`w-3.5 h-3.5 ${activeTab === 'pickup' ? 'text-white' : 'text-slate-400'}`} />
+              <Gauge className={`w-4 h-4 ${activeTab === 'pickup' ? 'text-white' : 'text-slate-400'}`} />
               <span
-                className={`text-sm tracking-tight transition-colors duration-300 ${activeTab === 'pickup' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
-                  }`}
+                className={`text-[14px] tracking-tight transition-colors duration-300 ${
+                  activeTab === 'pickup' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
+                }`}
               >
                 인수
               </span>
@@ -783,12 +892,13 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 haptics.lightTap();
                 setActiveTab('daily');
               }}
-              className="flex-1 py-2 rounded-full z-10 flex items-center justify-center space-x-1 sm:space-x-1.5 cursor-pointer transition-colors duration-300"
+              className="flex-1 py-2.5 rounded-xl z-10 flex items-center justify-center space-x-1 sm:space-x-1.5 cursor-pointer transition-colors duration-300"
             >
-              <CalendarCheck className={`w-3.5 h-3.5 ${activeTab === 'daily' ? 'text-white' : 'text-slate-400'}`} />
+              <CalendarCheck className={`w-4 h-4 ${activeTab === 'daily' ? 'text-white' : 'text-slate-400'}`} />
               <span
-                className={`text-sm tracking-tight transition-colors duration-300 ${activeTab === 'daily' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
-                  }`}
+                className={`text-[14px] tracking-tight transition-colors duration-300 ${
+                  activeTab === 'daily' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
+                }`}
               >
                 데일리 체크
               </span>
@@ -800,12 +910,13 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 haptics.lightTap();
                 setActiveTab('return');
               }}
-              className="flex-1 py-2 rounded-full z-10 flex items-center justify-center space-x-1 sm:space-x-1.5 cursor-pointer transition-colors duration-300"
+              className="flex-1 py-2.5 rounded-xl z-10 flex items-center justify-center space-x-1 sm:space-x-1.5 cursor-pointer transition-colors duration-300"
             >
-              <RotateCcw className={`w-3.5 h-3.5 ${activeTab === 'return' ? 'text-white' : 'text-slate-400'}`} />
+              <RotateCcw className={`w-4 h-4 ${activeTab === 'return' ? 'text-white' : 'text-slate-400'}`} />
               <span
-                className={`text-sm tracking-tight transition-colors duration-300 ${activeTab === 'return' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
-                  }`}
+                className={`text-[14px] tracking-tight transition-colors duration-300 ${
+                  activeTab === 'return' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
+                }`}
               >
                 반납
               </span>
@@ -814,11 +925,11 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
         </div>
 
         {/* Scrollable Form Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-2 space-y-4 text-base">
+        <div className="flex-1 overflow-y-auto px-5 py-2 space-y-4 text-base overscroll-contain">
           {/* Vehicle Basic Info Row: 2 columns (차량호차, 차량번호) */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[13px] font-semibold text-slate-600 mb-1 truncate">
+              <label className="block text-[13px] font-bold text-slate-700 mb-1.5 truncate">
                 호차
               </label>
               <input
@@ -826,30 +937,170 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 value={vehicleHocha}
                 onChange={(e) => setVehicleHocha(e.target.value)}
                 placeholder="4호차"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors text-base"
+                className="w-full px-4 py-3.5 bg-white border border-slate-100/90 rounded-2xl shadow-[0_3px_12px_rgba(15,23,42,0.04)] font-bold text-slate-900 text-[15px] focus:border-[#0055FF] outline-none transition-all"
               />
             </div>
             <div>
-              <label className="block text-[13px] font-semibold text-slate-600 mb-1 truncate">
+              <label className="block text-[13px] font-bold text-slate-700 mb-1.5 truncate">
                 차량번호
               </label>
-              <input
-                type="text"
-                value={carNumber}
-                onChange={(e) => setCarNumber(e.target.value)}
-                placeholder="142호 7811"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors text-base"
-              />
+              {serverMode ? (
+                <select
+                  aria-label="실제 차량번호"
+                  value={carNumber}
+                  disabled={custodySaving || pendingCustody || (activeTab === 'return' && Boolean(activeCustody))}
+                  onChange={(event) => {
+                    setCarNumber(event.target.value);
+                    setCustodyConfirmed(false);
+                  }}
+                  className="min-h-[50px] w-full rounded-2xl border border-slate-100/90 bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)] px-3 text-[15px] font-bold text-slate-900 focus:border-[#0055FF] outline-none"
+                >
+                  {!VIP_REAL_VEHICLES.some((row) => row.plate === carNumber) && (
+                    <option value={carNumber}>{carNumber || '전체 차량번호 선택'}</option>
+                  )}
+                  {VIP_REAL_VEHICLES.map((row) => (
+                    <option key={row.uuid} value={row.plate}>
+                      {row.plate} · {row.modelShort}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={carNumber}
+                  onChange={(e) => setCarNumber(e.target.value)}
+                  placeholder="142호 7811"
+                  className="w-full px-4 py-3.5 bg-white border border-slate-100/90 rounded-2xl shadow-[0_3px_12px_rgba(15,23,42,0.04)] font-bold text-slate-900 text-[15px] focus:border-[#0055FF] outline-none transition-all"
+                />
+              )}
             </div>
           </div>
 
+          {serverMode && (
+            <section
+              aria-label="서버 차량 인수 상태"
+              className="space-y-3 rounded-3xl border border-slate-100/90 bg-white p-4 shadow-[0_3px_14px_rgba(15,23,42,0.04)]"
+            >
+              <p className="text-[14px] font-black text-slate-900">배정 차량 확인 · 인수·반납 공유</p>
+              <p className="text-xs text-slate-500">
+                계기판 입력을 기존 점검 양식과 함께 사용합니다. 일일점검·복사·카톡은 이 기기의 초안이며 서버 인수 완료와 별도입니다.
+              </p>
+              {custody.error && (
+                <p role="alert" className="text-sm text-rose-700">
+                  {custody.error}
+                </p>
+              )}
+              {!custody.data && !custody.error && (
+                <p role="status" className="text-sm text-slate-600">
+                  최신 배정과 인수 기록을 확인하고 있습니다.
+                </p>
+              )}
+              {activeTab !== 'return' && (
+                <label className="block text-xs font-bold text-slate-600">
+                  배정 일정
+                  <select
+                    aria-label="인수할 배정 일정"
+                    disabled={custodySaving || pendingCustody || Boolean(activeCustody)}
+                    value={selectedBooking?.id || ''}
+                    onChange={(event) => {
+                      setSelectedBookingId(event.target.value);
+                      setCustodyMessage(null);
+                    }}
+                    className="mt-1.5 min-h-12 w-full rounded-2xl border border-slate-100 bg-[#F8FAFC] p-2.5 text-[14px] font-semibold"
+                  >
+                    {!custody.data?.bookings.length && <option value="">확정된 기사·차량 배정 필요</option>}
+                    {custody.data?.bookings.map((row) => (
+                      <option key={row.id} value={row.id}>
+                        {row.date} {row.pickup_time.slice(0, 5)} · {row.vehicle_plate || '차량 미배정'} · {row.origin}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {selectedBooking && activeTab !== 'return' && (
+                <p className="text-sm">
+                  등록된 배정 차량: <strong>{selectedBooking.vehicle_plate || '미배정'}</strong>
+                  <br />
+                  실제 선택 차량: <strong>{carNumber || '선택 필요'}</strong>
+                </p>
+              )}
+              {activeCustody && (
+                <p className="rounded-2xl bg-[#EBF3FF]/70 p-3.5 text-sm font-bold text-[#0055FF]">
+                  인수 중 · {activeCustody.vehicle_plate}
+                  <span className="mt-1 block text-xs font-normal text-slate-600">
+                    {activeCustody.pickup_odometer.toLocaleString()} km ·{' '}
+                    {new Date(activeCustody.picked_up_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
+                    <br />이 차량을 계속 사용 중이면 다시 인수하지 않아도 됩니다. 반납 탭에서 기록을 마쳐주세요.
+                  </span>
+                </p>
+              )}
+              {custody.data?.mismatches.map((row) => (
+                <p key={row.request_id} className="rounded-2xl bg-amber-50 p-3 text-xs text-amber-900">
+                  관리자 확인 대기 · {row.result.assignedPlate} → {row.result.actualPlate} · {row.result.reason}
+                </p>
+              ))}
+              {activeTab === 'pickup' &&
+                selectedBooking &&
+                carNumber.replace(/\s/g, '') !== selectedBooking.vehicle_plate.replace(/\s/g, '') && (
+                  <label className="block text-sm font-bold text-amber-900">
+                    다른 차량을 선택한 사유
+                    <input
+                      aria-label="차량 불일치 사유"
+                      value={mismatchReason}
+                      onChange={(event) => setMismatchReason(event.target.value)}
+                      maxLength={1000}
+                      className="mt-1 min-h-11 w-full rounded-2xl border border-amber-200 bg-white p-2.5 text-base"
+                    />
+                    <span className="mt-1 block text-xs font-normal">
+                      확인 요청만 저장합니다. 관리자 배차 변경 전에는 이 차량을 인수 완료로 처리하지 않습니다.
+                    </span>
+                  </label>
+                )}
+              {activeTab !== 'daily' && (
+                <label className="flex items-start gap-2 text-sm font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={custodyConfirmed}
+                    disabled={custodySaving || pendingCustody}
+                    onChange={(event) => setCustodyConfirmed(event.target.checked)}
+                    className="mt-1"
+                  />
+                  <span>실제 전체 차량번호와 계기판 주행거리를 직접 확인했습니다.</span>
+                </label>
+              )}
+              {custodyMessage && (
+                <p role="status" className="break-words text-sm font-bold text-slate-800">
+                  {custodyMessage}
+                </p>
+              )}
+              <button
+                type="button"
+                disabled={custodySaving}
+                onClick={() => void custody.refresh(true)}
+                className="min-h-11 text-sm font-bold text-[#0055FF]"
+              >
+                서버 기록 새로고침
+              </button>
+              {pendingCustody && (
+                <button
+                  type="button"
+                  disabled={custodySaving}
+                  onClick={() => void saveServerCustody(true)}
+                  className="ml-2 min-h-11 text-sm font-bold text-[#0055FF]"
+                >
+                  이전 저장 결과 재확인
+                </button>
+              )}
+            </section>
+          )}
+
           {/* TAB 1: PICKUP MODE */}
           {activeTab === 'pickup' && (
-            <div className="space-y-3 animate-fade-in">
+            <div className="space-y-4 animate-fade-in">
               {/* Meter Inputs */}
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[13px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[13px] font-bold text-slate-700 mb-1.5">
                     총 주행거리 (km)
                   </label>
                   <input
@@ -858,11 +1109,11 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     value={formatNumberWithComma(receiptTotalKm)}
                     onChange={(e) => setReceiptTotalKm(sanitizeNumericInput(e.target.value))}
                     placeholder="예: 14,698"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
+                    className="w-full px-4 py-3.5 bg-white border border-slate-100/90 rounded-2xl shadow-[0_3px_12px_rgba(15,23,42,0.04)] font-black text-slate-900 text-[15px] placeholder:font-medium placeholder:text-slate-400 focus:border-[#0055FF] outline-none transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-[13px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[13px] font-bold text-slate-700 mb-1.5">
                     주행가능거리 (km)
                   </label>
                   <input
@@ -871,18 +1122,18 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     value={formatNumberWithComma(receiptDte)}
                     onChange={(e) => setReceiptDte(sanitizeNumericInput(e.target.value))}
                     placeholder="예: 276"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
+                    className="w-full px-4 py-3.5 bg-white border border-slate-100/90 rounded-2xl shadow-[0_3px_12px_rgba(15,23,42,0.04)] font-black text-slate-900 text-[15px] placeholder:font-medium placeholder:text-slate-400 focus:border-[#0055FF] outline-none transition-all"
                   />
                 </div>
               </div>
 
               {/* Dashboard Photo Slot */}
               <div>
-                <label className="block text-[13px] font-semibold text-slate-600 mb-1">
+                <label className="block text-[13px] font-bold text-slate-700 mb-1.5">
                   계기판 AI 자동 인식 ✨
                 </label>
                 {receiptMeterPhoto ? (
-                  <div className="relative w-full h-28 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 group">
+                  <div className="relative w-full h-32 rounded-3xl overflow-hidden border border-slate-100/90 bg-white shadow-[0_3px_14px_rgba(15,23,42,0.04)] group">
                     <img
                       src={receiptMeterPhoto}
                       alt="수령 계기판 사진"
@@ -891,12 +1142,12 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleRemoveMeterPhoto('pickup')}
-                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-900/70 hover:bg-slate-900 text-white flex items-center justify-center transition-all shadow-md active:scale-90 cursor-pointer"
+                      className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-slate-900/70 hover:bg-slate-900 text-white flex items-center justify-center transition-all shadow-md active:scale-90 cursor-pointer"
                       title="사진 삭제"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-4 h-4" />
                     </button>
-                    <div className="absolute bottom-1.5 left-2 px-2 py-0.5 rounded bg-slate-900/60 backdrop-blur-xs text-[10px] text-white font-medium">
+                    <div className="absolute bottom-2 left-2.5 px-2.5 py-0.5 rounded-full bg-slate-900/60 backdrop-blur-xs text-[10px] text-white font-semibold">
                       로컬 미리보기 (DB 업로드 없음)
                     </div>
                   </div>
@@ -912,10 +1163,15 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     <button
                       type="button"
                       onClick={() => receiptPhotoInputRef.current?.click()}
-                      className="w-full py-2.5 px-3 rounded-xl border border-dashed border-slate-300 hover:border-[#1E60F3] bg-slate-50 hover:bg-blue-50/20 text-slate-500 hover:text-[#1E60F3] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      className="w-full py-3.5 px-4 rounded-2xl border border-slate-100/90 bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)] hover:border-blue-200 text-slate-700 hover:text-[#0055FF] flex items-center justify-center gap-2.5 transition-all cursor-pointer active:scale-[0.99]"
                     >
-                      <Camera className="w-4 h-4 text-slate-400 shrink-0" />
-                      <span className="text-sm font-semibold">계기판 사진 등록</span>
+                      <img
+                        src="/images/icons/driver_ui/icon_camera.png"
+                        alt="카메라"
+                        className="w-7 h-7 object-contain shrink-0"
+                        draggable={false}
+                      />
+                      <span className="text-[14px] font-extrabold">계기판 사진 등록</span>
                     </button>
                   </div>
                 )}
@@ -923,84 +1179,88 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
               {/* OCR Analysis State & Feedback Banner */}
               {isOcrAnalyzing && (
-                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-blue-50/70 border border-blue-200/80 text-blue-700 text-sm animate-pulse">
-                  <Sparkles className="w-4 h-4 text-[#1E60F3] shrink-0 animate-spin" />
+                <div className="flex items-center gap-2 p-3 rounded-2xl bg-[#EBF3FF]/80 border border-blue-200/80 text-[#0055FF] text-sm font-semibold animate-pulse">
+                  <Sparkles className="w-4 h-4 text-[#0055FF] shrink-0 animate-spin" />
                   <span>Gemini Vision이 계기판 주행거리 및 타코미터 RPM을 분석 중입니다...</span>
                 </div>
               )}
               {ocrFeedback && !isOcrAnalyzing && (
-                <div className="flex items-start gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-sm">
-                  <Sparkles className="w-3.5 h-3.5 text-[#1E60F3] shrink-0 mt-0.5" />
+                <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] text-slate-700 text-sm">
+                  <Sparkles className="w-4 h-4 text-[#0055FF] shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <p className="font-semibold text-slate-800">계기판 자동 인식 완료</p>
-                    <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">{ocrFeedback}</p>
+                    <p className="font-bold text-slate-900">계기판 자동 인식 완료</p>
+                    <p className="text-xs text-slate-500 leading-relaxed mt-0.5">{ocrFeedback}</p>
                   </div>
                 </div>
               )}
 
-              {/* 2D Top-Down Interactive Vehicle Inspection Viewer */}
-              <div className="space-y-1 pt-0.5">
-                <label className="block text-[13px] font-semibold text-slate-600">
-                  차량 외관 체크
-                </label>
-                <VehicleTopDownViewer
-                  selectedParts={receiptSelectedParts}
-                  onTogglePart={(part) => handleToggleDamageChip(part, 'pickup')}
-                  mode="pickup"
-                />
-              </div>
-
-              {/* Outer Damage Quick Chip Selector & Input */}
-              <div className="space-y-1 pt-1">
-                <label className="block text-[13px] font-semibold text-slate-600">
-                  흠집 위치 선택
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {/* Clean reset chip */}
-                  <button
-                    type="button"
-                    onClick={() => handleResetDamageToClean('pickup')}
-                    className={`px-2.5 py-1 text-sm rounded-lg border transition-all cursor-pointer flex items-center ${isReceiptClean
-                      ? 'border-[#1E60F3]/40 bg-blue-50/70 text-slate-800 font-bold shadow-xs'
-                      : 'border-slate-200 bg-white text-slate-400 font-medium hover:bg-slate-50'
-                      }`}
-                  >
-                    <span className={isReceiptClean ? 'text-[#1E60F3] font-black text-sm mr-1' : 'text-slate-300 text-sm mr-1'}>
-                      ✓
-                    </span>
-                    <span>이상 없음 (무)</span>
-                  </button>
-
-                  {/* Body part chips */}
-                  {DAMAGE_PART_CHIPS.map((part) => {
-                    const isSelected = receiptSelectedParts.includes(part);
-                    return (
-                      <button
-                        key={part}
-                        type="button"
-                        onClick={() => handleToggleDamageChip(part, 'pickup')}
-                        className={`px-2.5 py-1 text-sm rounded-lg border transition-all cursor-pointer ${isSelected
-                          ? 'border-[#1E60F3]/40 bg-[#1E60F3]/85 hover:bg-[#1E60F3]/90 text-white font-bold shadow-xs'
-                          : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
-                          }`}
-                      >
-                        {part}
-                      </button>
-                    );
-                  })}
+              {/* 2D Top-Down Interactive Vehicle Inspection Viewer & Damage Chips Card */}
+              <div className="p-4 rounded-3xl bg-white border border-slate-100/90 shadow-[0_3px_14px_rgba(15,23,42,0.04)] space-y-3.5">
+                <div className="space-y-1.5">
+                  <label className="block text-[13px] font-bold text-slate-700">
+                    차량 외관 체크
+                  </label>
+                  <VehicleTopDownViewer
+                    selectedParts={receiptSelectedParts}
+                    onTogglePart={(part) => handleToggleDamageChip(part, 'pickup')}
+                    mode="pickup"
+                  />
                 </div>
 
-                <div className="pt-1">
-                  <label className="block text-[13px] font-semibold text-slate-600 mb-1">
-                    외관 데미지 상세 (직접 수정 가능)
+                {/* Outer Damage Quick Chip Selector & Input */}
+                <div className="space-y-2 pt-1">
+                  <label className="block text-[13px] font-bold text-slate-700">
+                    흠집 위치 선택
                   </label>
-                  <input
-                    type="text"
-                    value={receiptDamage}
-                    onChange={(e) => setReceiptDamage(e.target.value)}
-                    placeholder="무 (미입력 시 '무' 표기)"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors text-sm"
-                  />
+                  <div className="flex flex-wrap gap-1.5">
+                    {/* Clean reset chip */}
+                    <button
+                      type="button"
+                      onClick={() => handleResetDamageToClean('pickup')}
+                      className={`px-3 py-1.5 text-[13px] rounded-xl border transition-all cursor-pointer flex items-center ${
+                        isReceiptClean
+                          ? 'border-[#0055FF] bg-[#EBF3FF]/70 text-[#0055FF] font-extrabold'
+                          : 'border-slate-100 bg-[#F8FAFC] text-slate-500 font-semibold hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className={isReceiptClean ? 'text-[#0055FF] font-black text-sm mr-1' : 'text-slate-300 text-sm mr-1'}>
+                        ✓
+                      </span>
+                      <span>이상 없음 (무)</span>
+                    </button>
+
+                    {/* Body part chips */}
+                    {DAMAGE_PART_CHIPS.map((part) => {
+                      const isSelected = receiptSelectedParts.includes(part);
+                      return (
+                        <button
+                          key={part}
+                          type="button"
+                          onClick={() => handleToggleDamageChip(part, 'pickup')}
+                          className={`px-3 py-1.5 text-[13px] rounded-xl border transition-all cursor-pointer ${
+                            isSelected
+                              ? 'border-[#0055FF] bg-[#0055FF] text-white font-bold shadow-[0_2px_8px_rgba(0,85,255,0.2)]'
+                              : 'border-slate-100 bg-[#F8FAFC] text-slate-600 font-semibold hover:bg-slate-100'
+                          }`}
+                        >
+                          {part}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="pt-1.5">
+                    <label className="block text-[13px] font-bold text-slate-700 mb-1.5">
+                      외관 데미지 상세 (직접 수정 가능)
+                    </label>
+                    <input
+                      type="text"
+                      value={receiptDamage}
+                      onChange={(e) => setReceiptDamage(e.target.value)}
+                      placeholder="무 (미입력 시 '무' 표기)"
+                      className="w-full px-4 py-3 bg-[#F8FAFC] border border-slate-100 rounded-2xl text-slate-800 font-medium text-[14px] focus:bg-white focus:border-[#0055FF] outline-none transition-all"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -1008,10 +1268,10 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
           {/* TAB 2: DAILY INSPECTION MODE */}
           {activeTab === 'daily' && (
-            <div className="space-y-3 animate-fade-in">
+            <div className="space-y-4 animate-fade-in">
               {/* Range Input Only (Odometer Hidden) */}
               <div>
-                <label className="block text-[13px] font-semibold text-slate-600 mb-1">
+                <label className="block text-[13px] font-bold text-slate-700 mb-1.5">
                   주행가능거리 (km)
                 </label>
                 <input
@@ -1020,17 +1280,17 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                   value={formatNumberWithComma(dailyDte)}
                   onChange={(e) => setDailyDte(sanitizeNumericInput(e.target.value))}
                   placeholder="예: 280"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
+                  className="w-full px-4 py-3.5 bg-white border border-slate-100/90 rounded-2xl shadow-[0_3px_12px_rgba(15,23,42,0.04)] font-black text-slate-900 text-[15px] placeholder:font-medium placeholder:text-slate-400 focus:border-[#0055FF] outline-none transition-all"
                 />
               </div>
 
               {/* Dashboard Photo Slot for Daily */}
               <div>
-                <label className="block text-[13px] font-semibold text-slate-600 mb-1">
+                <label className="block text-[13px] font-bold text-slate-700 mb-1.5">
                   계기판 사진 (선택)
                 </label>
                 {dailyMeterPhoto ? (
-                  <div className="relative w-full h-28 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 group">
+                  <div className="relative w-full h-32 rounded-3xl overflow-hidden border border-slate-100/90 bg-white shadow-[0_3px_14px_rgba(15,23,42,0.04)] group">
                     <img
                       src={dailyMeterPhoto}
                       alt="일일 점검 계기판 사진"
@@ -1039,12 +1299,12 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleRemoveMeterPhoto('daily')}
-                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-900/70 hover:bg-slate-900 text-white flex items-center justify-center transition-all shadow-md active:scale-90 cursor-pointer"
+                      className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-slate-900/70 hover:bg-slate-900 text-white flex items-center justify-center transition-all shadow-md active:scale-90 cursor-pointer"
                       title="사진 삭제"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-4 h-4" />
                     </button>
-                    <div className="absolute bottom-1.5 left-2 px-2 py-0.5 rounded bg-slate-900/60 backdrop-blur-xs text-[10px] text-white font-medium">
+                    <div className="absolute bottom-2 left-2.5 px-2.5 py-0.5 rounded-full bg-slate-900/60 backdrop-blur-xs text-[10px] text-white font-semibold">
                       로컬 미리보기 (DB 업로드 없음)
                     </div>
                   </div>
@@ -1060,10 +1320,15 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     <button
                       type="button"
                       onClick={() => dailyPhotoInputRef.current?.click()}
-                      className="w-full py-2.5 px-3 rounded-xl border border-dashed border-slate-300 hover:border-[#1E60F3] bg-slate-50 hover:bg-blue-50/20 text-slate-500 hover:text-[#1E60F3] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      className="w-full py-3.5 px-4 rounded-2xl border border-slate-100/90 bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)] hover:border-blue-200 text-slate-700 hover:text-[#0055FF] flex items-center justify-center gap-2.5 transition-all cursor-pointer active:scale-[0.99]"
                     >
-                      <Camera className="w-4 h-4 text-slate-400 shrink-0" />
-                      <span className="text-sm font-semibold">계기판 사진 등록</span>
+                      <img
+                        src="/images/icons/driver_ui/icon_camera.png"
+                        alt="카메라"
+                        className="w-7 h-7 object-contain shrink-0"
+                        draggable={false}
+                      />
+                      <span className="text-[14px] font-extrabold">계기판 사진 등록</span>
                     </button>
                   </div>
                 )}
@@ -1071,116 +1336,118 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
               {/* OCR Analysis State & Feedback Banner */}
               {isOcrAnalyzing && (
-                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-blue-50/70 border border-blue-200/80 text-blue-700 text-sm animate-pulse">
-                  <Sparkles className="w-4 h-4 text-[#1E60F3] shrink-0 animate-spin" />
+                <div className="flex items-center gap-2 p-3 rounded-2xl bg-[#EBF3FF]/80 border border-blue-200/80 text-[#0055FF] text-sm font-semibold animate-pulse">
+                  <Sparkles className="w-4 h-4 text-[#0055FF] shrink-0 animate-spin" />
                   <span>Gemini Vision이 계기판을 분석 중입니다...</span>
                 </div>
               )}
               {ocrFeedback && !isOcrAnalyzing && (
-                <div className="flex items-start gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-sm">
-                  <Sparkles className="w-3.5 h-3.5 text-[#1E60F3] shrink-0 mt-0.5" />
+                <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] text-slate-700 text-sm">
+                  <Sparkles className="w-4 h-4 text-[#0055FF] shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <p className="font-semibold text-slate-800">계기판 인식 완료</p>
-                    <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">{ocrFeedback}</p>
+                    <p className="font-bold text-slate-900">계기판 인식 완료</p>
+                    <p className="text-xs text-slate-500 leading-relaxed mt-0.5">{ocrFeedback}</p>
                   </div>
                 </div>
               )}
 
-              {/* 2D Top-Down Interactive Vehicle Inspection Viewer */}
-              <div className="space-y-1 pt-0.5">
-                <div className="flex items-center justify-between">
-                  <label className="block text-[13px] font-semibold text-slate-600">
-                    차량 외관 2D 탑뷰 점검
-                  </label>
-                  <div className="flex items-center gap-2 text-[10px] font-medium text-slate-500">
-                    {existingDamageParts.length > 0 && (
-                      <span className="flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#1E60F3]" />
-                        기존 누적 {existingDamageParts.length}
-                      </span>
-                    )}
-                    {dailyNewParts.length > 0 && (
-                      <span className="flex items-center gap-1 text-red-600 font-bold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                        금일 신규 {dailyNewParts.length}
-                      </span>
-                    )}
+              {/* 2D Top-Down Interactive Vehicle Inspection Viewer & Damage Chips Card */}
+              <div className="p-4 rounded-3xl bg-white border border-slate-100/90 shadow-[0_3px_14px_rgba(15,23,42,0.04)] space-y-3.5">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[13px] font-bold text-slate-700">
+                      차량 외관 2D 탑뷰 점검
+                    </label>
+                    <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-500">
+                      {existingDamageParts.length > 0 && (
+                        <span className="flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#0055FF]" />
+                          기존 누적 {existingDamageParts.length}
+                        </span>
+                      )}
+                      {dailyNewParts.length > 0 && (
+                        <span className="flex items-center gap-1 text-red-600 font-bold">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                          금일 신규 {dailyNewParts.length}
+                        </span>
+                      )}
+                    </div>
                   </div>
+                  <VehicleTopDownViewer
+                    selectedParts={[...existingDamageParts, ...dailyNewParts]}
+                    onTogglePart={handleToggleDailyDamage}
+                    existingParts={existingDamageParts}
+                    mode="daily"
+                  />
                 </div>
-                <VehicleTopDownViewer
-                  selectedParts={[...existingDamageParts, ...dailyNewParts]}
-                  onTogglePart={handleToggleDailyDamage}
-                  existingParts={existingDamageParts}
-                  mode="daily"
-                />
-              </div>
 
-              {/* Outer Damage Quick Chip Selector & One-Touch Clean */}
-              <div className="space-y-1 pt-1">
-                <div className="flex items-center justify-between">
-                  <label className="block text-[13px] font-semibold text-slate-600">
+                {/* Outer Damage Quick Chip Selector & One-Touch Clean */}
+                <div className="space-y-2 pt-1">
+                  <label className="block text-[13px] font-bold text-slate-700">
                     외관 부위별 빠른 선택
                   </label>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {/* One-touch clean check button */}
-                  <button
-                    type="button"
-                    onClick={handleResetDailyDamage}
-                    className={`px-2.5 py-1 text-sm rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${dailyNewParts.length === 0
-                      ? 'border-[#1E60F3]/40 bg-blue-50/70 text-[#1E60F3] font-bold shadow-xs'
-                      : 'border-slate-200 bg-white text-slate-400 font-medium hover:bg-slate-50'
+                  <div className="flex flex-wrap gap-1.5">
+                    {/* One-touch clean check button */}
+                    <button
+                      type="button"
+                      onClick={handleResetDailyDamage}
+                      className={`px-3 py-1.5 text-[13px] rounded-xl border transition-all cursor-pointer flex items-center gap-1 ${
+                        dailyNewParts.length === 0
+                          ? 'border-[#0055FF] bg-[#EBF3FF]/70 text-[#0055FF] font-extrabold'
+                          : 'border-slate-100 bg-[#F8FAFC] text-slate-500 font-semibold hover:bg-slate-100'
                       }`}
-                  >
-                    <span className={dailyNewParts.length === 0 ? 'text-[#1E60F3] font-black text-sm mr-0.5' : 'text-slate-300 text-sm mr-0.5'}>
-                      ✓
-                    </span>
-                    <span>이상없음 (무) </span>
-                  </button>
+                    >
+                      <span className={dailyNewParts.length === 0 ? 'text-[#0055FF] font-black text-sm mr-0.5' : 'text-slate-300 text-sm mr-0.5'}>
+                        ✓
+                      </span>
+                      <span>이상없음 (무)</span>
+                    </button>
 
-                  {/* Body part chips with Existing vs New differentiation */}
-                  {DAMAGE_PART_CHIPS.map((part) => {
-                    const isExisting = existingDamageParts.includes(part);
-                    const isNew = dailyNewParts.includes(part);
+                    {/* Body part chips with Existing vs New differentiation */}
+                    {DAMAGE_PART_CHIPS.map((part) => {
+                      const isExisting = existingDamageParts.includes(part);
+                      const isNew = dailyNewParts.includes(part);
 
-                    return (
-                      <button
-                        key={part}
-                        type="button"
-                        onClick={() => handleToggleDailyDamage(part)}
-                        className={`px-2.5 py-1 text-sm rounded-lg border transition-all flex items-center gap-1 ${isExisting
-                          ? 'border-slate-200 bg-slate-100 text-slate-500 font-medium cursor-default opacity-85'
-                          : isNew
-                            ? 'border-red-400 bg-red-500 hover:bg-red-600 text-white font-bold shadow-xs ring-1 ring-red-400/50 cursor-pointer'
-                            : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100 cursor-pointer'
+                      return (
+                        <button
+                          key={part}
+                          type="button"
+                          onClick={() => handleToggleDailyDamage(part)}
+                          className={`px-3 py-1.5 text-[13px] rounded-xl border transition-all flex items-center gap-1 ${
+                            isExisting
+                              ? 'border-slate-200 bg-slate-100 text-slate-500 font-semibold cursor-default opacity-85'
+                              : isNew
+                                ? 'border-red-400 bg-red-500 hover:bg-red-600 text-white font-bold shadow-xs ring-1 ring-red-400/50 cursor-pointer'
+                                : 'border-slate-100 bg-[#F8FAFC] text-slate-600 font-semibold hover:bg-slate-100 cursor-pointer'
                           }`}
-                      >
-                        <span>{part}</span>
-                        {isExisting && (
-                          <span className="text-[9px] bg-slate-300 text-slate-600 font-semibold px-1 rounded-xs leading-none py-0.5">
-                            기존
-                          </span>
-                        )}
-                        {isNew && (
-                          <span className="text-[9px] bg-white text-red-600 font-black px-1 rounded-xs leading-none py-0.5">
-                            신규
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
+                        >
+                          <span>{part}</span>
+                          {isExisting && (
+                            <span className="text-[9px] bg-slate-300 text-slate-600 font-semibold px-1 rounded-xs leading-none py-0.5">
+                              기존
+                            </span>
+                          )}
+                          {isNew && (
+                            <span className="text-[9px] bg-white text-red-600 font-black px-1 rounded-xs leading-none py-0.5">
+                              신규
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* TAB 2: RETURN MODE */}
+          {/* TAB 3: RETURN MODE */}
           {activeTab === 'return' && (
-            <div className="space-y-3 animate-fade-in">
+            <div className="space-y-4 animate-fade-in">
               {/* Meter Inputs */}
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[13px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[13px] font-bold text-slate-700 mb-1.5">
                     반납 총 주행거리 (km)
                   </label>
                   <input
@@ -1189,11 +1456,11 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     value={formatNumberWithComma(returnTotalKm)}
                     onChange={(e) => setReturnTotalKm(sanitizeNumericInput(e.target.value))}
                     placeholder="예: 15,048"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
+                    className="w-full px-4 py-3.5 bg-white border border-slate-100/90 rounded-2xl shadow-[0_3px_12px_rgba(15,23,42,0.04)] font-black text-slate-900 text-[15px] placeholder:font-medium placeholder:text-slate-400 focus:border-[#0055FF] outline-none transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-[13px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[13px] font-bold text-slate-700 mb-1.5">
                     반납 주행가능거리 (km)
                   </label>
                   <input
@@ -1202,18 +1469,18 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     value={formatNumberWithComma(returnDte)}
                     onChange={(e) => setReturnDte(sanitizeNumericInput(e.target.value))}
                     placeholder="예: 180"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
+                    className="w-full px-4 py-3.5 bg-white border border-slate-100/90 rounded-2xl shadow-[0_3px_12px_rgba(15,23,42,0.04)] font-black text-slate-900 text-[15px] placeholder:font-medium placeholder:text-slate-400 focus:border-[#0055FF] outline-none transition-all"
                   />
                 </div>
               </div>
 
-              {/* Task 4: Dashboard Photo Slot for Return */}
+              {/* Dashboard Photo Slot for Return */}
               <div>
-                <label className="block text-[13px] font-semibold text-slate-600 mb-1">
+                <label className="block text-[13px] font-bold text-slate-700 mb-1.5">
                   계기판 AI 자동 입력 ✨
                 </label>
                 {returnMeterPhoto ? (
-                  <div className="relative w-full h-28 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 group">
+                  <div className="relative w-full h-32 rounded-3xl overflow-hidden border border-slate-100/90 bg-white shadow-[0_3px_14px_rgba(15,23,42,0.04)] group">
                     <img
                       src={returnMeterPhoto}
                       alt="반납 계기판 사진"
@@ -1222,12 +1489,12 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleRemoveMeterPhoto('return')}
-                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-900/70 hover:bg-slate-900 text-white flex items-center justify-center transition-all shadow-md active:scale-90 cursor-pointer"
+                      className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-slate-900/70 hover:bg-slate-900 text-white flex items-center justify-center transition-all shadow-md active:scale-90 cursor-pointer"
                       title="사진 삭제"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-4 h-4" />
                     </button>
-                    <div className="absolute bottom-1.5 left-2 px-2 py-0.5 rounded bg-slate-900/60 backdrop-blur-xs text-[10px] text-white font-medium">
+                    <div className="absolute bottom-2 left-2.5 px-2.5 py-0.5 rounded-full bg-slate-900/60 backdrop-blur-xs text-[10px] text-white font-semibold">
                       로컬 미리보기 (DB 업로드 없음)
                     </div>
                   </div>
@@ -1243,10 +1510,15 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     <button
                       type="button"
                       onClick={() => returnPhotoInputRef.current?.click()}
-                      className="w-full py-2.5 px-3 rounded-xl border border-dashed border-slate-300 hover:border-[#1E60F3] bg-slate-50 hover:bg-blue-50/20 text-slate-500 hover:text-[#1E60F3] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      className="w-full py-3.5 px-4 rounded-2xl border border-slate-100/90 bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)] hover:border-blue-200 text-slate-700 hover:text-[#0055FF] flex items-center justify-center gap-2.5 transition-all cursor-pointer active:scale-[0.99]"
                     >
-                      <Camera className="w-4 h-4 text-slate-400 shrink-0" />
-                      <span className="text-sm font-semibold">계기판 사진 등록</span>
+                      <img
+                        src="/images/icons/driver_ui/icon_camera.png"
+                        alt="카메라"
+                        className="w-7 h-7 object-contain shrink-0"
+                        draggable={false}
+                      />
+                      <span className="text-[14px] font-extrabold">계기판 사진 등록</span>
                     </button>
                   </div>
                 )}
@@ -1254,123 +1526,125 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
               {/* OCR Analysis State & Feedback Banner */}
               {isOcrAnalyzing && (
-                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-blue-50/70 border border-blue-200/80 text-blue-700 text-sm animate-pulse">
-                  <Sparkles className="w-4 h-4 text-[#1E60F3] shrink-0 animate-spin" />
+                <div className="flex items-center gap-2 p-3 rounded-2xl bg-[#EBF3FF]/80 border border-blue-200/80 text-[#0055FF] text-sm font-semibold animate-pulse">
+                  <Sparkles className="w-4 h-4 text-[#0055FF] shrink-0 animate-spin" />
                   <span>Gemini Vision이 반납 계기판을 분석 중입니다...</span>
                 </div>
               )}
               {ocrFeedback && !isOcrAnalyzing && (
-                <div className="flex items-start gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-sm">
-                  <Sparkles className="w-3.5 h-3.5 text-[#1E60F3] shrink-0 mt-0.5" />
+                <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] text-slate-700 text-sm">
+                  <Sparkles className="w-4 h-4 text-[#0055FF] shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <p className="font-semibold text-slate-800">반납 계기판 인식 완료</p>
-                    <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">{ocrFeedback}</p>
+                    <p className="font-bold text-slate-900">반납 계기판 인식 완료</p>
+                    <p className="text-xs text-slate-500 leading-relaxed mt-0.5">{ocrFeedback}</p>
                   </div>
                 </div>
               )}
 
               {/* 2D Top-Down Interactive Vehicle Inspection Viewer with Receipt Data Inheritance */}
-              <div className="space-y-1 pt-0.5">
-                <div className="flex items-center justify-between">
-                  <label className="block text-[13px] font-semibold text-slate-600">
-                    차량 외관 2D 탑뷰 점검
-                  </label>
-                  {existingDamageParts.length > 0 && (
-                    <div className="flex items-center gap-2 text-[10px] font-medium text-slate-500">
-                      <span className="flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#1E60F3]" />
-                        수령 기존
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                        반납 신규
-                      </span>
-                    </div>
-                  )}
+              <div className="p-4 rounded-3xl bg-white border border-slate-100/90 shadow-[0_3px_14px_rgba(15,23,42,0.04)] space-y-3.5">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[13px] font-bold text-slate-700">
+                      차량 외관 2D 탑뷰 점검
+                    </label>
+                    {existingDamageParts.length > 0 && (
+                      <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-500">
+                        <span className="flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#0055FF]" />
+                          수령 기존
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                          반납 신규
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <VehicleTopDownViewer
+                    selectedParts={returnSelectedParts}
+                    onTogglePart={(part) => handleToggleDamageChip(part, 'return')}
+                    existingParts={existingDamageParts}
+                    mode="return"
+                  />
                 </div>
-                <VehicleTopDownViewer
-                  selectedParts={returnSelectedParts}
-                  onTogglePart={(part) => handleToggleDamageChip(part, 'return')}
-                  existingParts={existingDamageParts}
-                  mode="return"
-                />
-              </div>
 
-              {/* Task 3: Outer Damage Quick Chip Selector & Input */}
-              <div className="space-y-1 pt-1">
-                <div className="flex items-center justify-between">
-                  <label className="block text-[13px] font-semibold text-slate-600">
+                {/* Outer Damage Quick Chip Selector & Input */}
+                <div className="space-y-2 pt-1">
+                  <label className="block text-[13px] font-bold text-slate-700">
                     외관 부위별 빠른 선택
                   </label>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {/* Clean reset chip */}
-                  <button
-                    type="button"
-                    onClick={() => handleResetDamageToClean('return')}
-                    className={`px-2.5 py-1 text-sm rounded-lg border transition-all cursor-pointer flex items-center ${isReturnClean
-                      ? 'border-[#1E60F3]/40 bg-blue-50/70 text-slate-800 font-bold shadow-xs'
-                      : 'border-slate-200 bg-white text-slate-400 font-medium hover:bg-slate-50'
+                  <div className="flex flex-wrap gap-1.5">
+                    {/* Clean reset chip */}
+                    <button
+                      type="button"
+                      onClick={() => handleResetDamageToClean('return')}
+                      className={`px-3 py-1.5 text-[13px] rounded-xl border transition-all cursor-pointer flex items-center ${
+                        isReturnClean
+                          ? 'border-[#0055FF] bg-[#EBF3FF]/70 text-[#0055FF] font-extrabold'
+                          : 'border-slate-100 bg-[#F8FAFC] text-slate-500 font-semibold hover:bg-slate-100'
                       }`}
-                  >
-                    <span className={isReturnClean ? 'text-[#1E60F3] font-black text-sm mr-1' : 'text-slate-300 text-sm mr-1'}>
-                      ✓
-                    </span>
-                    <span>이상 없음 (무)</span>
-                  </button>
+                    >
+                      <span className={isReturnClean ? 'text-[#0055FF] font-black text-sm mr-1' : 'text-slate-300 text-sm mr-1'}>
+                        ✓
+                      </span>
+                      <span>이상 없음 (무)</span>
+                    </button>
 
-                  {/* Body part chips with Receipt vs New damage color differentiation */}
-                  {DAMAGE_PART_CHIPS.map((part) => {
-                    const isSelected = returnSelectedParts.includes(part);
-                    const isExisting = existingDamageParts.includes(part);
-                    const isNew = isSelected && !isExisting;
+                    {/* Body part chips with Receipt vs New damage color differentiation */}
+                    {DAMAGE_PART_CHIPS.map((part) => {
+                      const isSelected = returnSelectedParts.includes(part);
+                      const isExisting = existingDamageParts.includes(part);
+                      const isNew = isSelected && !isExisting;
 
-                    return (
-                      <button
-                        key={part}
-                        type="button"
-                        onClick={() => handleToggleDamageChip(part, 'return')}
-                        className={`px-2.5 py-1 text-sm rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${isNew
-                          ? 'border-red-400 bg-red-500 hover:bg-red-600 text-white font-bold shadow-xs ring-1 ring-red-400/50'
-                          : isSelected
-                            ? 'border-[#1E60F3]/40 bg-[#1E60F3]/85 hover:bg-[#1E60F3]/90 text-white font-bold shadow-xs'
-                            : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
+                      return (
+                        <button
+                          key={part}
+                          type="button"
+                          onClick={() => handleToggleDamageChip(part, 'return')}
+                          className={`px-3 py-1.5 text-[13px] rounded-xl border transition-all cursor-pointer flex items-center gap-1 ${
+                            isNew
+                              ? 'border-red-400 bg-red-500 hover:bg-red-600 text-white font-bold shadow-xs ring-1 ring-red-400/50'
+                              : isSelected
+                                ? 'border-[#0055FF] bg-[#0055FF] text-white font-bold shadow-[0_2px_8px_rgba(0,85,255,0.2)]'
+                                : 'border-slate-100 bg-[#F8FAFC] text-slate-600 font-semibold hover:bg-slate-100'
                           }`}
-                      >
-                        <span>{part}</span>
-                        {isNew && (
-                          <span className="text-[9px] bg-white text-red-600 font-black px-1 rounded-xs leading-none py-0.5">
-                            신규
-                          </span>
-                        )}
-                        {isExisting && isSelected && (
-                          <span className="text-[9px] text-blue-100 font-normal">
-                            기존
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                        >
+                          <span>{part}</span>
+                          {isNew && (
+                            <span className="text-[9px] bg-white text-red-600 font-black px-1 rounded-xs leading-none py-0.5">
+                              신규
+                            </span>
+                          )}
+                          {isExisting && isSelected && (
+                            <span className="text-[9px] text-blue-100 font-normal">
+                              기존
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                <div className="pt-1">
-                  <label className="block text-[13px] font-semibold text-slate-600 mb-1">
-                    외관 데미지 상세 (직접 수정 가능)
-                  </label>
-                  <input
-                    type="text"
-                    value={returnDamage}
-                    onChange={(e) => setReturnDamage(e.target.value)}
-                    placeholder="예: 조수석 뒷 휠 기스 (수령 시와 동일)"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors text-sm"
-                  />
+                  <div className="pt-1.5">
+                    <label className="block text-[13px] font-bold text-slate-700 mb-1.5">
+                      외관 데미지 상세 (직접 수정 가능)
+                    </label>
+                    <input
+                      type="text"
+                      value={returnDamage}
+                      onChange={(e) => setReturnDamage(e.target.value)}
+                      placeholder="예: 조수석 뒷 휠 기스 (수령 시와 동일)"
+                      className="w-full px-4 py-3 bg-[#F8FAFC] border border-slate-100 rounded-2xl text-slate-800 font-medium text-[14px] focus:bg-white focus:border-[#0055FF] outline-none transition-all"
+                    />
+                  </div>
                 </div>
               </div>
 
               {/* Parking & Key Location */}
-              <div className="grid grid-cols-2 gap-2.5 pt-1">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[13px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[13px] font-bold text-slate-700 mb-1.5">
                     주차위치 (선택)
                   </label>
                   <input
@@ -1378,11 +1652,11 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     value={parkingLocation}
                     onChange={(e) => setParkingLocation(e.target.value)}
                     placeholder="예: B5 기둥 F"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors text-sm"
+                    className="w-full px-4 py-3.5 bg-white border border-slate-100/90 rounded-2xl shadow-[0_3px_12px_rgba(15,23,42,0.04)] text-slate-800 font-semibold text-[14px] focus:border-[#0055FF] outline-none transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-[13px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[13px] font-bold text-slate-700 mb-1.5">
                     차키위치 (선택)
                   </label>
                   <input
@@ -1390,53 +1664,71 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     value={keyLocation}
                     onChange={(e) => setKeyLocation(e.target.value)}
                     placeholder="예: 운전석 뒷바퀴 위"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors text-sm"
+                    className="w-full px-4 py-3.5 bg-white border border-slate-100/90 rounded-2xl shadow-[0_3px_12px_rgba(15,23,42,0.04)] text-slate-800 font-semibold text-[14px] focus:border-[#0055FF] outline-none transition-all"
                   />
                 </div>
               </div>
             </div>
           )}
 
-          {/* Task 2: Live Standard Report Preview Box with Minimal Icon Copy Button */}
-          <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-3 space-y-1.5">
-            <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500">
+          {/* Live Standard Report Preview Box */}
+          <div className="bg-white border border-slate-100/90 rounded-3xl p-4 shadow-[0_3px_14px_rgba(15,23,42,0.04)] space-y-2.5">
+            <div className="flex items-center justify-between text-[12px] font-bold text-slate-400">
               <span>카카오톡 전송 양식 미리보기</span>
               <button
                 type="button"
                 onClick={handleCopyMinimal}
-                className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all active:scale-90 cursor-pointer"
+                className="w-8 h-8 rounded-full flex items-center justify-center bg-[#F4F7FC] hover:bg-slate-200/70 text-slate-600 transition-all active:scale-90 cursor-pointer"
                 title="양식 복사"
                 aria-label="양식 복사"
               >
                 {copySuccess ? (
-                  <Check className="w-4 h-4 text-[#1E60F3]" />
+                  <Check className="w-4 h-4 text-[#0055FF]" />
                 ) : (
                   <Copy className="w-4 h-4 text-slate-600" />
                 )}
               </button>
             </div>
-            <pre className="p-3 bg-white border border-slate-200 rounded-xl text-sm font-mono text-slate-800 whitespace-pre-wrap leading-relaxed select-all shadow-inner">
+            <pre className="p-3.5 bg-[#F8FAFC] border border-slate-100 rounded-2xl text-[13px] font-sans font-semibold text-slate-800 whitespace-pre-wrap leading-relaxed select-all">
               {previewText}
             </pre>
           </div>
         </div>
 
-        {/* Task 5: 2-Split Action Buttons Footer (FlightModal Kakao Standard) */}
-        <div className="p-4 border-t border-slate-100 bg-white flex items-center gap-2.5 shrink-0">
+        {/* 2-Split Action Buttons Footer */}
+        <div className="px-5 py-4 border-t border-slate-200/60 bg-[#F6F8FC] flex items-center gap-2.5 shrink-0">
           {/* Left: '확인' Button (Cobalt Blue, larger width) */}
           <button
             type="button"
             onClick={handleConfirmSave}
-            className="flex-[2] py-3.5 rounded-xl bg-[#1E60F3] hover:bg-[#1650D6] text-white font-bold text-sm transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] cursor-pointer text-center flex items-center justify-center"
+            disabled={
+              custodySaving ||
+              (serverMode &&
+                activeTab !== 'daily' &&
+                (pendingCustody ||
+                  !custody.ready ||
+                  isOcrAnalyzing ||
+                  (activeTab === 'return' ? !activeCustody : Boolean(activeCustody))))
+            }
+            className="flex-[2] py-3.5 rounded-2xl bg-[#0055FF] hover:bg-[#0044CC] disabled:opacity-40 text-white font-bold text-[15px] transition-all shadow-[0_4px_14px_rgba(0,85,255,0.25)] active:scale-[0.98] cursor-pointer text-center flex items-center justify-center"
           >
-            점검 완료
+            {custodySaving
+              ? '서버 저장 확인 중…'
+              : serverMode && activeTab !== 'daily'
+                ? activeTab === 'return'
+                  ? '반납 기록 저장'
+                  : selectedBooking &&
+                      carNumber.replace(/\s/g, '') !== selectedBooking.vehicle_plate.replace(/\s/g, '')
+                    ? '차량 불일치 확인 요청'
+                    : '이 차량이 맞아요 · 인수 저장'
+                : '이 기기에 점검 저장'}
           </button>
 
           {/* Right: '카톡' Button (Compact Brand Button) */}
           <button
             type="button"
             onClick={handleKakaoLaunch}
-            className="flex-1 py-3.5 rounded-xl bg-[#FEE500] hover:bg-[#FDD800] text-[#191919] font-bold text-sm flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-[0.98] cursor-pointer"
+            className="flex-1 py-3.5 rounded-2xl bg-[#FEE500] hover:bg-[#FDD800] text-[#191919] font-extrabold text-[15px] flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-[0.98] cursor-pointer"
           >
             {/* Authentic Kakao Speech Bubble Icon */}
             <svg className="w-4 h-4 fill-[#191919] shrink-0" viewBox="0 0 24 24">
