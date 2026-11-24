@@ -1,0 +1,12 @@
+# Public (unbound) shared report link — PR #46
+
+Requested operating mode: HQ issues a random company-wide link. Anyone who has the link can submit a report without driver-specific login or UUID binding. The real performer name is **unverified text parsed from the report**, not an authenticated identity. Driver-specific login/report history routes remain intact for later use, but this shared path is the simple default.
+
+- HQ: /hq?tab=excel_import → 공용 운행보고 링크. 256-bit random token, SHA-256 hash at rest, 180-day expiry, one active token per organization, immediate revoke/rotation. Existing URL becomes invalid on reissue. The raw URL is shown only in the issuance response.
+- Guest: /report#key=... . URL fragment is removed from the address bar and stored in sessionStorage for reload within that tab. The server receives the credential only in the POST body, never a query string. No guest GET/history endpoint exists.
+- Guest can POST one report to /api/public-report, not read submissions or workbooks, edit others' records, or access HQ. Normal same-origin guard, length limit, duplicate request ID, hashed rate limits (per link and per observed network).
+- The existing report parser, durable DB queue, Excel auto-append and HQ review are reused. A reserved *technical* UUID is used as report intake source because the existing database schema requires a UUID on submission/messages. It is **not** a driver account and must never be mapped to a real person; parsed draft.driver carries the human name as an unverified declaration. The public endpoint never returns other reports.
+- HQ DB migration required: 20261104150000_shared_report_links.sql, **after** PR #46 report chat / invite / operations migrations. Do not run on production without approval.
+- A share link does not fix a missing database schema or missing registered annual Excel workbook. Submission is accepted once the DB is ready; Excel may be pending until an annual workbook and approved month are registered.
+- Test on a *separate* Supabase project: verify 201 submit without session, 403 invalid/revoked/expired link, two contributors cannot see each other's submissions, 401/403 HQ APIs, idempotent duplicate submit, HQ inbox shows the unverified reported driver name, Excel appends once, and no operational DB changes.
+- This design deliberately favors low-friction submission over verified attribution. Treat all report content as unverified and allow HQ review before operational use.

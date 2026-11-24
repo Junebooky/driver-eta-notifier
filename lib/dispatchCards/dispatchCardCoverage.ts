@@ -1,0 +1,124 @@
+import { resolveDispatchCardPhotos } from './dispatchCardAssets';
+import { validateDispatchCardProfile } from './chauffeurIdentity';
+import { resolveDispatchCardEnglishName } from '@/utils/koreanNameRomanization';
+import { isDispatchCardAssetStale, isGeneratedDispatchCardFileName } from './cardRevision';
+import type { VipRealVehicle } from '@/utils/vehicleData';
+
+type DbDriver = { id: string; driver_name: string | null; phone: string | null; driver_meta: unknown };
+type ExistingCard = { driver_id: string; vehicle_id: string; variant: string; created_at?: string | null; file_name?: string | null };
+type DriverPortrait = { driver_id: string; created_at?: string | null };
+
+export interface DispatchCardCoverageSlot {
+  vehicleId: string;
+  plate: string;
+  pc: boolean;
+  mobile: boolean;
+  /** Rendering source images exist; independent of already-saved cards. */
+  imageReady?: boolean;
+}
+export interface DispatchCardCoverageDriver {
+  id: string;
+  name: string;
+  portraitReady: boolean;
+  englishNameReady: boolean;
+  positionReady: boolean;
+  identityReady: boolean;
+  missingVariants: number;
+  savedVariants: number;
+  imageReadyVehicles?: number;
+  imageMissingVehicles?: number;
+  slots: DispatchCardCoverageSlot[];
+}
+export interface DispatchCardCoverage {
+  vehicles: VipRealVehicle[];
+  drivers: DispatchCardCoverageDriver[];
+  requiredVariants: number;
+  savedVariants: number;
+  missingVariants: number;
+  /** All registered, non-archived fleet entries; NOT only photo-ready ones. */
+  totalVehicles?: number;
+  imageReadyVehicles?: number;
+  imageMissingVehicles?: number;
+}
+const record = (value: unknown): Record<string,unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string,unknown> : {};
+
+/**
+ * All registered vehicles count in the denominator, regardless of photos.
+ * DO NOT create dummy database asset rows; missing slots are only created
+ * only when a valid image is rendered and uploaded. Photo readiness is separate.
+ * Existing cards are never rewritten merely to rebuild this matrix.
+ */
+export function buildDispatchCardCoverage(
+  drivers: DbDriver[],
+  fleet: VipRealVehicle[],
+  portraits: DriverPortrait[],
+  cards: ExistingCard[],
+): DispatchCardCoverage {
+  const seen = new Set<string>();
+  const vehicles = fleet.filter(vehicle => {
+    if (!vehicle.uuid || seen.has(vehicle.uuid)) return false;
+    seen.add(vehicle.uuid);
+    return true;
+  });
+  const imageReadyByVehicle=new Map(vehicles.map(vehicle=>[
+    vehicle.uuid,Boolean(resolveDispatchCardPhotos(vehicle)),
+  ]));
+  const imageReadyVehicles=vehicles.filter(vehicle=>imageReadyByVehicle.get(vehicle.uuid)).length;
+  const imageMissingVehicles=vehicles.length-imageReadyVehicles;
+  const photoDrivers = new Set(portraits.map(p => p.driver_id));
+  const portraitsByDriver = new Map(portraits.map(p => [p.driver_id, p.created_at]));
+  const revisions = new Map(drivers.map(driver => [
+    driver.id,
+    record(driver.driver_meta).dispatch_card_revision_at,
+  ]));
+  const saved = new Set(cards
+    .filter(card => (card.variant === 'pc' || card.variant === 'mobile') &&
+      (card.file_name == null || isGeneratedDispatchCardFileName(card.file_name)) &&
+      !isDispatchCardAssetStale(revisions.get(card.driver_id), card.created_at) &&
+      !isDispatchCardAssetStale(portraitsByDriver.get(card.driver_id), card.created_at))
+    .map(card => [card.driver_id,card.vehicle_id,card.variant].join(':')));
+  const coverage = drivers.map(driver => {
+    const meta = record(driver.driver_meta), cardIdentity = record(meta.dispatch_card_identity);
+    const koreanName = typeof cardIdentity.koreanName === 'string' && cardIdentity.koreanName.trim()
+      ? cardIdentity.koreanName : driver.driver_name || '';
+    const englishName = resolveDispatchCardEnglishName(
+      koreanName, typeof cardIdentity.englishName === 'string' ? cardIdentity.englishName : '',
+    );
+    const approved = validateDispatchCardProfile({
+      koreanName,
+      englishName,
+      positionCode: cardIdentity.positionCode ?? '',
+      phone: cardIdentity.phone ?? driver.phone ?? '',
+    });
+    const englishNameReady = !!englishName;
+    const positionReady = cardIdentity.positionCode === 'chauffeur' || cardIdentity.positionCode === 'senior_chauffeur';
+    const portraitReady = photoDrivers.has(driver.id);
+    const slots = vehicles.map(vehicle => ({
+      vehicleId: vehicle.uuid,
+      plate: vehicle.plate,
+      pc: saved.has([driver.id,vehicle.uuid,'pc'].join(':')),
+      mobile: saved.has([driver.id,vehicle.uuid,'mobile'].join(':')),
+      imageReady: imageReadyByVehicle.get(vehicle.uuid)===true,
+    }));
+    const savedVariants = slots.reduce((count,slot)=>count+Number(slot.pc)+Number(slot.mobile),0);
+    return {
+      id:driver.id,
+      name:driver.driver_name || '',
+      portraitReady,
+      englishNameReady,
+      positionReady,
+      identityReady:!!approved && portraitReady,
+      missingVariants:slots.length*2-savedVariants,
+      savedVariants,
+      imageReadyVehicles,
+      imageMissingVehicles,
+      slots,
+    };
+  });
+  const requiredVariants=drivers.length*vehicles.length*2;
+  const savedVariants=coverage.reduce((n,d)=>n+d.savedVariants,0);
+  return {vehicles,drivers:coverage,requiredVariants,savedVariants,
+    missingVariants:requiredVariants-savedVariants,
+    totalVehicles:vehicles.length,imageReadyVehicles,imageMissingVehicles};
+}

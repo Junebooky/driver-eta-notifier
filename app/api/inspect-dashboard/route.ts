@@ -1,3 +1,4 @@
+import { verifyServerAuth } from '@/lib/auth/serverAuth';
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { resolveFuelTypeFromModel, resolveFuelTypeFromTachometer } from '@/utils/fuelCalculation';
@@ -9,6 +10,8 @@ interface InspectRequestBody {
 }
 
 export async function POST(req: NextRequest) {
+  const apiAuth = await verifyServerAuth(req);
+  if (!apiAuth.ok) return NextResponse.json({ ok: false, error: apiAuth.error }, { status: apiAuth.statusCode });
   try {
     const body: InspectRequestBody = await req.json();
     const { image, carModel = '', vehicleNo = '' } = body;

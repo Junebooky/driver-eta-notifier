@@ -1,3 +1,4 @@
+import { verifyServerAuth } from '@/lib/auth/serverAuth';
 import { NextRequest, NextResponse } from 'next/server';
 import { toKatec, toWgs84 } from '@/utils/coordinate';
 import { GasStation, GasPrices } from '@/types';
@@ -219,6 +220,8 @@ function getFallbackStations(lat: number, lng: number): GasStation[] {
 }
 
 export async function GET(req: NextRequest) {
+  const apiAuth = await verifyServerAuth(req);
+  if (!apiAuth.ok) return NextResponse.json({ ok: false, error: apiAuth.error }, { status: apiAuth.statusCode });
   const { searchParams } = new URL(req.url);
 
   // [태스크 1 & 2] Parse dynamic coordinates from client request without hardcoded Seoul fallback

@@ -1,0 +1,24 @@
+/** Local-only copy QA. Never commit company workbooks or print their contents. */
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import {unzipSync,strFromU8} from 'fflate';
+import {appendKakaoExcelReport,workbookFromFile} from '../utils/kakaoExcelWorkbook';
+import {blankKakaoExcelDraft} from '../utils/kakaoExcelImport';
+const [input,output]=process.argv.slice(2);
+if (!input || !output || fs.existsSync(output)) throw new Error('Usage: npx tsx scripts/verify-kakao-workbook.ts INPUT.xlsx NEW_COPY.xlsx (output must not exist)');
+const original=new Uint8Array(fs.readFileSync(input));
+const draft={...blankKakaoExcelDraft(),date:'2026-04-05',plate:'700호1458',model:'스프린터',customer:'자동검증_가상거래처',driver:'자동검증_가상기사',time:'17:30~24:20'};
+const result=appendKakaoExcelReport(original,draft);
+const a=unzipSync(original),b=unzipSync(result.bytes);
+assert.deepEqual(Object.keys(a).sort(),Object.keys(b).sort());
+const changed=Object.keys(a).filter(n=>Buffer.compare(a[n],b[n])!==0);
+assert.equal(changed.length,1); assert.match(changed[0],/^xl\/worksheets\/.+\.xml$/);
+const stripDimension=(s:string)=>s.replace(/<dimension\b[^>]*\/>/,'');
+const row=new RegExp(`<row r="${result.rowNumber}">[\\s\\S]*?<\\/row>`);
+assert.equal(stripDimension(strFromU8(a[changed[0]])),stripDimension(strFromU8(b[changed[0]]).replace(row,'')));
+assert.throws(()=>appendKakaoExcelReport(result.bytes,draft),/중복/);
+assert.throws(()=>appendKakaoExcelReport(original,{...draft,date:'2026-10-24'}),/승인/);
+assert.equal(workbookFromFile(result.bytes).Sheets[result.sheetName].cells['D'+result.rowNumber].v,draft.customer);
+fs.writeFileSync(output,result.bytes,{flag:'wx'});
+assert.deepEqual(new Uint8Array(fs.readFileSync(input)),original);
+console.log(`PASS: ${result.sheetName} row ${result.rowNumber}; original records and all other ZIP members preserved; duplicate blocked; input unchanged. QA copy contains fictional test data, not a production ledger.`);
