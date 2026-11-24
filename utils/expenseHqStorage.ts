@@ -254,7 +254,7 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     time: '17:40',
     driverName: '강원우',
     vehicleModel: '제네시스 G90L',
-    vehiclePlate: '116호 1336',
+    vehiclePlate: '116허 1336',
     customerName: 'Hyundai',
     customerId: 'cust-hyundai',
     category: 'other',

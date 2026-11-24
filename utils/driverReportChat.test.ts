@@ -54,3 +54,15 @@ test('odometer and expense lines remain in raw text but are not mapped to Excel 
  for(const marker of ['43,780','43,965','185 km','통행료','18,000'])assert.equal(parsed.draft.route.includes(marker),false);
  assert.ok(message.includes('일일운행합 : 185 km'));
 });
+
+test('116허 1336 matches G90 LWB cleanly with or without space in driving log reports',()=>{
+ for(const plateInput of ['116허1336','116허 1336']){
+  const message=`기사 · 11월23일(월)\n수행담당 : 김승준\n차량번호 : ${plateInput}\n고객명 : 발렌시아가\n시작 시간 : 10:10\n종료 시간 : 17:40\n운행일지\n09:10 -> 차고지 -> 09:50 인천공항 T2 -> 17:40 파르나스 호텔 / 업무종료 -> 19:25 차고지`;
+  const parsed=parseDriverReport(message,'김승준',new Date('2026-11-23T20:00:00+09:00'),{workbookYear:2026});
+  assert.deepEqual(parsed.reviewReasons,[]);
+  assert.deepEqual(parsed.warnings,[]);
+  assert.equal(parsed.vehicleUuid,'e0f7c22a-0001-4c12-8800-000000002269');
+  assert.equal(parsed.draft.plate,'116허 1336');
+  assert.equal(parsed.draft.model,'G90 LWB');
+ }
+});

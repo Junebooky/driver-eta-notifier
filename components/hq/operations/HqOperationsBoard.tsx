@@ -447,7 +447,7 @@ const DEFAULT_OPERATIONAL_EVENTS: EventGroup[] = [
         customerName: 'CHANEL',
         driverName: 'QA 테스트 기사',
         driverPhone: '010-3342-9910',
-        vehiclePlate: '116호 1336',
+        vehiclePlate: '116허 1336',
         vehicleModel: '제네시스 G90L',
         startDate: '2026-11-04',
         startTime: '09:00',

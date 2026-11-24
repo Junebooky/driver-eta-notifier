@@ -150,7 +150,7 @@ export const INITIAL_HQ_DRIVING_LOGS: HqDrivingLog[] = [
     driverName: '이호준',
     customerName: 'LG전자',
     vehicleModel: '제네시스 G90L',
-    vehiclePlate: '116호 1336',
+    vehiclePlate: '116허 1336',
     clockIn: '09:00',
     clockOut: '18:00',
     totalDutyHours: '9시간 0분',

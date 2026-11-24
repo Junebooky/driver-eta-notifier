@@ -25,7 +25,7 @@ A `.gitkeep` is just a Git folder placeholder, **not** an image.
 | `hyundai/staria-limousine/` | **7665, 9037, 8407, 1514** | **one shared photo set for all four vehicles** |
 | `kia/carnival-hi-limousine/` | **5336, 7681** | **one shared photo set for both vehicles** |
 | `genesis/gv80/5947/` | 5947 | vehicle-specific |
-| `genesis/g90-lwb/navy/1336/` | 116호 1336 | G90 LWB, navy interior/exterior |
+| `genesis/g90-lwb/navy/1336/` | 116허 1336 | G90 LWB, navy interior/exterior |
 | `genesis/g90-lwb/black/4280/` | 107부 4280 | G90 LWB, black interior/exterior |
 | `genesis/g90-standard/8839/` | 8839 | standard G90, vehicle-specific |
 | `bus/limousine-bus/` | Not registered | placeholder only |
@@ -34,7 +34,7 @@ This covers **20 registered vehicles** with **14 vehicle-specific folders + 2 sh
 
 ## Genesis G90 long-wheelbase (LWB) colors
 
-Both **107부 4280** and **116호 1336** are **G90 LWB**, but their photos must remain distinct:
+Both **107부 4280** and **116허 1336** are **G90 LWB**, but their photos must remain distinct:
 
 ```text
 genesis/g90-lwb/
