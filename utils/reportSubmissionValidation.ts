@@ -1,5 +1,5 @@
 import {parseDiaryRoute} from './reportDiaryRoute';
-import {readReportField,reportFieldValues} from './reportFieldLabels';
+import {reportFieldValues} from './reportFieldLabels';
 export type ReportInputCheck={accepted:boolean;needsTemplate:boolean;reply:string;missing:string[]};
 const LABELS=['수행담당','차량번호','고객명','시작 시간','종료 시간'] as const;
 const SIMPLE='운행보고 양식에 맞춰 작성해 주세요.\n아래 + 버튼에서 보고 양식을 불러올 수 있어요.';
@@ -13,12 +13,13 @@ const SIMPLE='운행보고 양식에 맞춰 작성해 주세요.\n아래 + 버�
 export function validateReportInput(raw:string):ReportInputCheck{
  const text=raw.replace(/\r/g,'').trim();
  const missing:string[]=[];
- const anyReportField=LABELS.some(label=>reportFieldValues(text,label).length>0)||parseDiaryRoute(text).present;
+ const fields=LABELS.map(label=>({label,values:reportFieldValues(text,label)}));
+ const diary=parseDiaryRoute(text);
+ const anyReportField=fields.some(field=>field.values.length>0)||diary.present;
  if(!/(?:20\d{2}\s*년\s*)?\d{1,2}\s*월\s*\d{1,2}\s*일/.test(text))missing.push('날짜');
- for(const label of LABELS)if(!readReportField(text,label))missing.push(label);
+ for(const {label,values} of fields)if(!values.some(Boolean))missing.push(label);
  // Use the same parser as the Excel writer; a valid 2-stop diary cannot be
  // rejected merely for writing >, standalone -, or explicit next-day times.
- const diary=parseDiaryRoute(text);
  const stops=diary.stops.map(stop=>stop.place);
  if(!diary.present||stops.length<2||stops.some(stop=>!/[\p{L}0-9]/u.test(stop)))missing.push('운행일지(경유지 2곳 이상)');
  if(!missing.length)return {accepted:true,needsTemplate:false,reply:'',missing:[]};

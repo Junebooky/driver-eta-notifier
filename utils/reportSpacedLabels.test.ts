@@ -67,19 +67,24 @@ test('fully spaced labels and tilde arrows pass both intake and Excel parsing',(
  assert.equal(report.draft.overtime,'');
 });
 
-test('spacing tolerance does not accept empty or duplicate required labels',()=>{
+test('spacing tolerance rejects empty fields and sends ambiguous duplicates for review',()=>{
  for(const changed of [
   raw.replace('고   객   명 : 테스트 고객','고   객   명 : '),
-  raw.replace('수 행 담 당 : 검증 기사','수 행 담 당 : 검증 기사\n수행담당 : 다른 기사'),
-  raw.replace('차 량 번 호 : 125호9982','차 량 번 호 : 125호9982\n차량번호 : 700호1458'),
   raw.replace('시 작 시 간 : 15:40','시 작\n시 간 : 15:40'),
  ]){
   assert.equal(validateReportInput(changed).accepted,false);
  }
+ for(const duplicate of [
+  raw.replace('수 행 담 당 : 검증 기사','수 행 담 당 : 검증 기사\n수행담당 : 다른 기사'),
+  raw.replace('차 량 번 호 : 125호9982','차 량 번 호 : 125호9982\n차량번호 : 700호1458'),
+ ]){
+  assert.equal(validateReportInput(duplicate).accepted,true);
+  assert.ok(parseDriverReport(duplicate,undefined,new Date('2026-11-25'),{workbookYear:2026}).reviewReasons.length);
+ }
  const multiple=raw.replace('125호9982','125호9982/700호1458');
  assert.equal(parseKakaoExcelReport(multiple,2026).draft.plate,'');
  assert.ok(parseDriverReport(multiple,undefined,new Date('2026-11-25'),{workbookYear:2026}).reviewReasons.length);
- const inconsistent=raw.replace('2시간20분','2시간30분');
+ const inconsistent=raw.replace('2시간20분','2시간30분(기재 오류)');
  assert.ok(parseDriverReport(inconsistent,undefined,new Date('2026-11-25'),{workbookYear:2026}).reviewReasons.some(x=>x.includes('총시간')));
 });
 

@@ -107,7 +107,7 @@ export function parseKakaoExcelReport(raw: string, assumedYear = currentReportYe
   const overnightUnclear = start && end && end <= start;
   const time = start && end && !overnightUnclear ? start + '~' + end : '';
   if (overnightUnclear) warnings.push('종료 시각이 시작 이전입니다. 익일 여부 확인 후 24:20처럼 명시해 주세요.');
-  const expected = getLine(src, '운행총시간').match(/^(\d+)\s*시간\s*(\d+)\s*분$/u);
+  const expected = getLine(src, '운행총시간').match(/^(\d+)\s*시간\s*(\d+)\s*분/u);
   if (start && end && expected) {
     const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
     const actual = (toMin(end) - toMin(start) + 1440) % 1440;
