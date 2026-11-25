@@ -4,6 +4,7 @@
  */
 import { VIP_REAL_VEHICLES } from '@/utils/vehicleData';
 import {parseDiaryRoute,statedReportTime} from './reportDiaryRoute';
+import {readReportField as getLine,reportFieldValues} from './reportFieldLabels';
 
 export interface KakaoExcelDraft {
   date: string; // yyyy-mm-dd
@@ -61,12 +62,6 @@ export function excelVehicleModel(plate: string): string {
   return vehicle.model;
 }
 
-function getLine(src: string, label: string): string {
-  const pattern = new RegExp('^[\\t ]*' + label + '[\\t ]*[:：][\\t ]*(.*?)[\\t ]*$', 'gim');
-  const values = [...src.matchAll(pattern)].map(m => m[1].trim());
-  return values.length === 1 ? values[0] : '';
-}
-
 export function checkedTime(value: string): string {
   const m = value.trim().match(/^(\d{1,2}):(\d{2})$/);
   if (!m) return '';
@@ -97,22 +92,22 @@ export function parseKakaoExcelReport(raw: string, assumedYear = currentReportYe
   // When year is omitted, the selected company workbook year is authoritative.
   // Do not show a redundant "assumed year" warning for every daily report.
 
-  const plates = [...src.matchAll(/^[\t ]*차량[\t ]*번호[\t ]*[:：][\t ]*(.*?)[\t ]*$/gm)].map(m => m[1]);
+  const plates = reportFieldValues(src, '차량번호');
   const plate = plates.length === 1 && !/[\/,+·]|및|대체/.test(plates[0]) ? plates[0] : '';
   if (plates.length && !plate) warnings.push('복수 차량번호입니다. 실제 운행 차량을 확인한 후 한 대씩 입력해 주세요.');
   const vehicle = findExactFleetVehicle(plate);
   if (plate && !vehicle) warnings.push('전체 차량번호와 등록 차량이 정확히 일치하지 않습니다. 차종을 직접 확인해 주세요.');
 
-  const start = statedReportTime(getLine(src, '시작\\s*시간'));
-  const end = statedReportTime(getLine(src, '종료\\s*시간'));
-  const dutyStart = statedReportTime(getLine(src, '출\\s*근'));
+  const start = statedReportTime(getLine(src, '시작시간'));
+  const end = statedReportTime(getLine(src, '종료시간'));
+  const dutyStart = statedReportTime(getLine(src, '출근시간') || getLine(src, '출근'));
   const from = getLine(src, '출발지');
-  const to = getLine(src, '최종\\s*도착지');
+  const to = getLine(src, '최종도착지');
   if ((!start || !end) && dutyStart) warnings.push('고객 서비스 시작·종료시간이 불완전하여 출근시간으로 대체하지 않았습니다.');
   const overnightUnclear = start && end && end <= start;
   const time = start && end && !overnightUnclear ? start + '~' + end : '';
   if (overnightUnclear) warnings.push('종료 시각이 시작 이전입니다. 익일 여부 확인 후 24:20처럼 명시해 주세요.');
-  const expected = src.match(/운행총시간\s*[:：]\s*(\d+)\s*시간\s*(\d+)\s*분/);
+  const expected = getLine(src, '운행총시간').match(/^(\d+)\s*시간\s*(\d+)\s*분/u);
   if (start && end && expected) {
     const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
     const actual = (toMin(end) - toMin(start) + 1440) % 1440;
@@ -130,7 +125,7 @@ export function parseKakaoExcelReport(raw: string, assumedYear = currentReportYe
   const draft: KakaoExcelDraft = {
     date, plate, model: excelVehicleModel(plate),
     customer: getLine(src, '고객명'),
-    driver: getLine(src, '수행\\s*담당'),
+    driver: getLine(src, '수행담당'),
     time, route, serviceType: '', overtime: '', amount: '', payment: '', totalWithVat: '',
   };
   const missing = [
