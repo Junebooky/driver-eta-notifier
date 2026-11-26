@@ -15,6 +15,7 @@ import { verifyTenantRegistry } from './taas-tenant-registry.integration';
 import { verifyTenantEnrollment } from './taas-driver-enrollment.integration';
 import { verifyTenantStandardReporting } from './taas-standard-reporting.integration';
 import { verifyTenantSettlementReads } from './taas-settlement-reads.integration';
+import { verifyTenantBranding } from './taas-white-label-branding.integration';
 
 async function main() {
   const connectionString = process.env.TEST_DATABASE_URL;
@@ -89,6 +90,7 @@ async function main() {
       await verifyTenantEnrollment(admin);
       await verifyTenantStandardReporting(admin);
       await verifyTenantSettlementReads(admin);
+      await verifyTenantBranding(admin);
     }
     await a.connect(); await b.connect();
     await Promise.all([a.query('SET ROLE service_role'),b.query('SET ROLE service_role')]);
