@@ -142,7 +142,13 @@ export async function verifyReportingFlow(admin:Client,writer:Client,reader:Clie
     assert.equal((await post(acknowledgment,'/api/schedules/ack',{scheduleId:booking,version:1})).status,200);
     const hqRequest=()=>new NextRequest('http://localhost/api/schedules?role=hq',{headers:{authorization:'Bearer '+token('hq_admin')}});
     let scheduleView=await (await readSchedules(hqRequest())).json();assert.equal(scheduleView.schedules.find((row:{id:string})=>row.id===booking).end_time,'12:00');assert.equal(scheduleView.schedules.find((row:{id:string})=>row.id===booking).end_date,'2026-12-12');assert.equal(scheduleView.schedules.find((row:{id:string})=>row.id===booking).isAcknowledged,true);
-    await writer.query("UPDATE cockpit.schedules SET schedule_meta=jsonb_set(schedule_meta,'{version}','2'),updated_at=clock_timestamp() WHERE id=$1",[booking]);
+    // Historical fixture has metadata-only version; expanded fixture mirrors the
+    // live physical version column. Production dispatch writes both representations.
+    const hasVersion=(await admin.query("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='cockpit' AND table_name='schedules' AND column_name='version') AS present")).rows[0].present;
+    await writer.query("UPDATE cockpit.schedules SET "+(hasVersion?"version=2,":"")+"schedule_meta=jsonb_set(schedule_meta,'{version}','2'),updated_at=clock_timestamp() WHERE id=$1",[booking]);
+    const revision=(await reader.query("SELECT to_jsonb(s) AS row FROM cockpit.schedules s WHERE id=$1",[booking])).rows[0].row;
+    assert.equal(revision.schedule_meta.version,2);
+    if(hasVersion)assert.equal(revision.version,2);
     scheduleView=await (await readSchedules(hqRequest())).json();assert.equal(scheduleView.schedules.find((row:{id:string})=>row.id===booking).isAcknowledged,false);
     assert.equal((await post(acknowledgment,'/api/schedules/ack',{scheduleId:booking,version:1})).status,409);
     assert.equal((await post(acknowledgment,'/api/schedules/ack',{scheduleId:booking,version:2})).status,200);

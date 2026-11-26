@@ -10,6 +10,7 @@ import { verifyReportLedgerReplacement } from './report-ledger-replace.integrati
 import { verifyDormantTenantFoundation } from './taas-organization-foundation.integration';
 import { verifyResourceOwnership } from './taas-resource-ownership.integration';
 import { verifyTenantDraft } from './taas-atomic-draft.integration';
+import { verifyTenantPublish } from './taas-dispatch-publication.integration';
 
 async function main() {
   const connectionString = process.env.TEST_DATABASE_URL;
@@ -79,6 +80,7 @@ async function main() {
       await verifyDormantTenantFoundation(admin);
       await verifyResourceOwnership(admin);
       await verifyTenantDraft(admin);
+      await verifyTenantPublish(admin);
     }
     await a.connect(); await b.connect();
     await Promise.all([a.query('SET ROLE service_role'),b.query('SET ROLE service_role')]);
