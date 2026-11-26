@@ -8,6 +8,7 @@ export async function verifyTenantStandardReporting(admin:Client){
  const snapshot=async()=>{const out=[];for(const t of ['driving_logs','expenses','report_messages','report_submissions','report_workbook_versions'])out.push((await admin.query('SELECT to_jsonb(t) AS row FROM cockpit.'+t+' t ORDER BY id')).rows);return out;};
  const before=await snapshot();
  await admin.query(readFileSync('supabase/proposals/taas_standard_reporting.sql','utf8'));
+ await admin.query(readFileSync('supabase/proposals/taas_verified_receipts.sql','utf8'));
  const owner=randomUUID(),ownerSession=randomUUID(),user=randomUUID(),session=randomUUID(),d1=randomUUID(),d2=randomUUID(),d3=randomUUID();
  const date='2027-01-12';
  const call=(org:string,cmd:unknown,u=user,s=session)=>admin.query('SELECT cockpit.tenant_standard_report_v1($1,$2,$3,$4::jsonb) result',[org,u,s,JSON.stringify(cmd)]);
@@ -75,6 +76,26 @@ export async function verifyTenantStandardReporting(admin:Client){
   for(const [p,valid] of [[path,true],[path.replace(ch,vip),false],[path.replace(d2,d1),false],[path.replace('/01/','/13/'),false],[path+'/../x',false],[path.replace('/01/','/%2e%2e/'),false]] as const){
    assert.equal((await admin.query('SELECT cockpit.tenant_receipt_path_valid_v1($1,$2,$3) valid',[ch,d2,p])).rows[0].valid,valid);
   }
+  // Synthetic trusted-server attestation; byte-level verification is exercised
+  // separately in the adapter tests. No object storage is touched by this DB test.
+  const receipt=(org:string,id:string,op:string,p:unknown=null,u=user,s=session)=>admin.query('SELECT cockpit.tenant_receipt_v1($1,$2,$3,$4,$5,$6::jsonb) result',[org,u,s,id,op,JSON.stringify(p)]);
+  const draftExpense=(await call(ch,exp({submit:false,amount:3000}))).rows[0].result;
+  const r0=(await receipt(ch,draftExpense.id,'prepare')).rows[0].result;
+  const p={path,sha256:'a'.repeat(64),size:100,mime:'image/jpeg',revision:r0.revision};
+  await fails(()=>receipt(vip,draftExpense.id,'prepare'),'42501');
+  await fails(()=>receipt(ch,draftExpense.id,'read'),'42501');
+  await fails(()=>receipt(ch,draftExpense.id,'attach',{...p,path:path.replace(ch,vip)}),'22023');
+  await fails(()=>receipt(ch,draftExpense.id,'attach',{...p,revision:'b'.repeat(64)}),'40001');
+  await receipt(ch,draftExpense.id,'attach',p);
+  assert.equal((await receipt(ch,draftExpense.id,'attach',p)).rows[0].result.attached,true);
+  await fails(()=>receipt(ch,draftExpense.id,'attach',{...p,size:101}),'42501');
+  assert.equal((await receipt(ch,draftExpense.id,'read',null,owner,ownerSession)).rows[0].result.sha256,p.sha256);
+  const withReceipt=(await records('expense')).find((x:{id:string})=>x.id===draftExpense.id);
+  await call(ch,mutation('expense','update',withReceipt,{submit:true}));
+  const pendingReceipt=(await records('expense')).find((x:{id:string})=>x.id===draftExpense.id);
+  await call(ch,mutation('expense','review',pendingReceipt,{status:'승인 완료'}),owner,ownerSession);
+  assert.equal((await records('expense')).find((x:{id:string})=>x.id===draftExpense.id).status,'승인 완료');
+  await fails(()=>receipt(ch,draftExpense.id,'prepare'),'42501');
   await admin.query('RESET ROLE');
   await admin.query("UPDATE cockpit.organization_members SET status='revoked' WHERE org_id=$1 AND user_id=$2",[ch,user]);
   await admin.query('SET LOCAL ROLE service_role');await fails(()=>call(ch,{kind:'log',op:'list'}),'42501');await fails(()=>call(ch,exp()),'42501');
