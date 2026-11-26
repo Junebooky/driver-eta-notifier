@@ -1,0 +1,7 @@
+# P1-05f — Browser session coordination candidate
+
+Parent #152 observed at f35bf8cc002ed9893bce2546583cf210e82160ba, open Draft. Workflow and combined-status connectors returned no records; its CI result is not verified in this session. This separate Draft is for review only and must not be merged or activated until parent and child CI are confirmed.
+
+Use a fixed origin-scoped exclusive Web Lock for all future tenant cookie mutations. Re-read the current cookie session while holding the lock, rotate only on explicit REFRESH_REQUIRED, and never fall back to an unlocked mutation or retry a failed rotation automatically. No token messages or persistent storage changes. Unsupported/insecure browsers fail closed; browser compatibility and recovery UX require real device testing. The lock is cooperative only and does not replace server authorization or provider-side reuse protection.
+
+Synthetic tests exercise two simultaneous tabs (one rotation), logout before queued refresh, failure/unsupported lock and independent origins. A later adapter must use the same lock for login/logout/refresh, reconcile identity against the current server session and invalidate old cache leases before rendering, handle stale-tab logout and ambiguous network results, and test real browser cookie behavior across tabs and installed PWA. Server-side concurrent revocation/refresh, ingress verification, real authentication and all P0 release gates remain outstanding. No existing files, runtime route, live database, auth, DNS or deployments changed.
