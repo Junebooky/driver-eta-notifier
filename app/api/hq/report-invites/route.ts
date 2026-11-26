@@ -1,3 +1,4 @@
+import {hasLegacyExcelAccess} from '@/lib/driverReports/legacyExcelPolicy';
 import {NextRequest} from 'next/server';
 import {requireHqAdmin} from '@/lib/auth/serverAuth';
 import {supabaseAdmin as db} from '@/lib/supabase/server';
@@ -5,6 +6,7 @@ import {boundedBody,sameOrigin,UUID,privateJson,failure} from '@/lib/driverRepor
 import {newDeviceSecret,tokenHash} from '@/lib/driverDevices/tokens';
 export async function GET(req:NextRequest){
  const auth=await requireHqAdmin(req);if(!auth.ok||!auth.session)return privateJson({ok:false},auth.statusCode);
+ if(!hasLegacyExcelAccess(auth.session.org))return privateJson({ok:false,error:'이 업체는 Excel 운행보고를 사용할 수 없습니다.'},403);
  try{
   const id=req.nextUrl.searchParams.get('driverId');if(!id||!UUID.test(id))throw new Error('기사 UUID를 확인해 주세요.');
   const scope=await db.rpc('report_driver_scope',{p_org:auth.session.org,p_driver:id});if(scope.error)return privateJson({ok:false,error:['42P01','PGRST202','PGRST205'].includes(scope.error.code)?'운행보고 데이터베이스가 준비되지 않았습니다. 별도 테스트 DB 마이그레이션을 확인해 주세요.':'기사 연결 상태를 조회하지 못했습니다.'},503);
@@ -19,6 +21,7 @@ export async function GET(req:NextRequest){
 }
 export async function POST(req:NextRequest){
  const auth=await requireHqAdmin(req);if(!auth.ok||!auth.session)return privateJson({ok:false},auth.statusCode);
+ if(!hasLegacyExcelAccess(auth.session.org))return privateJson({ok:false,error:'이 업체는 Excel 운행보고를 사용할 수 없습니다.'},403);
  if(!sameOrigin(req))return privateJson({ok:false},403);
  try{
   const b=JSON.parse(new TextDecoder().decode(await boundedBody(req,2048))),s=auth.session;if(!UUID.test(b.driverId||''))throw new Error('실제 기사 UUID를 선택해 주세요.');

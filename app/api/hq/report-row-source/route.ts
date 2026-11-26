@@ -1,3 +1,4 @@
+import {hasLegacyExcelAccess} from '@/lib/driverReports/legacyExcelPolicy';
 import { NextRequest } from 'next/server';
 import { requireHqAdmin } from '@/lib/auth/serverAuth';
 import { supabaseAdmin as db } from '@/lib/supabase/server';
@@ -18,6 +19,7 @@ export async function GET(req: NextRequest) {
   if (!auth.ok || !auth.session) {
     return privateJson({ ok: false, error: 'HQ 관리자 권한이 필요합니다.' }, auth.statusCode);
   }
+  if(!hasLegacyExcelAccess(auth.session.org))return privateJson({ok:false,error:'이 업체는 Excel 운행보고를 사용할 수 없습니다.'},403);
   const params = req.nextUrl.searchParams;
   const year = Number(params.get('year'));
   const month = params.get('month') || '';

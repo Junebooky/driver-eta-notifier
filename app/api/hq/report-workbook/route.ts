@@ -1,3 +1,4 @@
+import {hasLegacyExcelAccess} from '@/lib/driverReports/legacyExcelPolicy';
 import {NextRequest,NextResponse} from 'next/server';
 import {requireHqAdmin} from '@/lib/auth/serverAuth';
 import {supabaseAdmin as db} from '@/lib/supabase/server';
@@ -15,6 +16,7 @@ import {boundedBody,UUID,privateJson,failure,sameOrigin} from '@/lib/driverRepor
 export const dynamic='force-dynamic';export const runtime='nodejs';
 export async function GET(req:NextRequest){
  const a=await requireHqAdmin(req);if(!a.ok||!a.session)return privateJson({ok:false},a.statusCode);
+ if(!hasLegacyExcelAccess(a.session.org))return privateJson({ok:false,error:'이 업체는 Excel 운행보고를 사용할 수 없습니다.'},403);
  try{
   const org=a.session.org,y=req.nextUrl.searchParams.get('year'),year=y?Number(y):undefined;
   if(year&&(!Number.isInteger(year)||year<2000||year>2099))throw new Error('연도를 확인해 주세요.');
@@ -65,7 +67,8 @@ export async function GET(req:NextRequest){
  }catch(e){return failure(e);}
 }
 export async function POST(req:NextRequest){
- const a=await requireHqAdmin(req);if(!a.ok||!a.session)return privateJson({ok:false},a.statusCode);if(!sameOrigin(req))return privateJson({ok:false},403);
+ const a=await requireHqAdmin(req);if(!a.ok||!a.session)return privateJson({ok:false},a.statusCode);
+ if(!hasLegacyExcelAccess(a.session.org))return privateJson({ok:false,error:'이 업체는 Excel 운행보고를 사용할 수 없습니다.'},403);if(!sameOrigin(req))return privateJson({ok:false},403);
  try{
   const s=a.session;
   let replacement:null|Awaited<ReturnType<typeof replaceWorkbook>>=null;

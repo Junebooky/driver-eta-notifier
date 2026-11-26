@@ -1,3 +1,4 @@
+import {hasLegacyExcelAccess} from '@/lib/driverReports/legacyExcelPolicy';
 import {tokenHash} from '@/lib/driverDevices/tokens';
 import {NextRequest} from 'next/server';
 import {verifyServerAuth} from '@/lib/auth/serverAuth';
@@ -9,6 +10,7 @@ export const dynamic='force-dynamic';
 export async function GET(req:NextRequest) {
   const auth=await verifyServerAuth(req,'driver');
   if(!auth.ok||!auth.session?.driverId)return privateJson({ok:false,error:'기사 로그인이 필요합니다.'},auth.ok?403:auth.statusCode);
+ if(!hasLegacyExcelAccess(auth.session.org))return privateJson({ok:false,error:'이 업체는 Excel 운행보고를 사용할 수 없습니다.'},403);
   const s=auth.session,driver=req.nextUrl.searchParams.get('driverId'),before=req.nextUrl.searchParams.get('before');
   if(driver&&driver!==s.driverId)return privateJson({ok:false,error:'본인 대화만 볼 수 있습니다.'},403);
   if(before&&!/^\d{1,15}$/.test(before))return privateJson({ok:false,error:'대화 위치가 올바르지 않습니다.'},400);
@@ -22,6 +24,7 @@ export async function GET(req:NextRequest) {
 export async function POST(req:NextRequest) {
   const auth=await verifyServerAuth(req,'driver');
   if(!auth.ok||!auth.session?.driverId)return privateJson({ok:false,error:'기사 로그인이 필요합니다.'},auth.ok?403:auth.statusCode);
+ if(!hasLegacyExcelAccess(auth.session.org))return privateJson({ok:false,error:'이 업체는 Excel 운행보고를 사용할 수 없습니다.'},403);
   if(!sameOrigin(req))return privateJson({ok:false,error:'허용되지 않은 요청입니다.'},403);
   try {
     const rate=await db.rpc('allow_report_link_attempt',{p_bucket:tokenHash('report-submit:'+auth.session.org+':'+auth.session.driverId)});

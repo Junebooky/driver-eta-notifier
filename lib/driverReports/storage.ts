@@ -1,8 +1,10 @@
+import {assertLegacyExcelAccess} from './legacyExcelPolicy';
 import {createHash,randomUUID} from 'node:crypto';
 import {supabaseAdmin as db} from '@/lib/supabase/server';
 export type WorkbookStorage={hex?:string;path?:string;sha256:string;size:number};
 const sha=(b:Uint8Array)=>createHash('sha256').update(b).digest('hex');
 export async function storeWorkbook(org:string,bytes:Uint8Array):Promise<WorkbookStorage>{
+ assertLegacyExcelAccess(org);
  const info={sha256:sha(bytes),size:bytes.length};
  if(process.env.REPORT_STORAGE_MODE!=='object')return {...info,hex:Buffer.from(bytes).toString('hex')};
  const bucket=process.env.REPORT_STORAGE_BUCKET||'report-workbooks';
