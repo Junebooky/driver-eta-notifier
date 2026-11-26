@@ -7,6 +7,7 @@ import {verifyReportCompletion} from './report-completion.integration';
 import { verifyDriverReportChat } from './driver-report-chat.integration';
 import { verifyReportingFlow } from './reporting-flow.integration';
 import { verifyReportLedgerReplacement } from './report-ledger-replace.integration';
+import { verifyDormantTenantFoundation } from './taas-organization-foundation.integration';
 
 async function main() {
   const connectionString = process.env.TEST_DATABASE_URL;
@@ -72,6 +73,7 @@ async function main() {
     await assert.rejects(admin.query('SELECT * FROM cockpit.vehicles'), { code: '42501' });
     await admin.query('RESET ROLE');
     console.log('PASS existing fleet schema migration and default DB fleet initialized with 20 stable UUIDs');
+    if(process.env.TEST_TAAS_FOUNDATION==='1') await verifyDormantTenantFoundation(admin);
     await a.connect(); await b.connect();
     await Promise.all([a.query('SET ROLE service_role'),b.query('SET ROLE service_role')]);
     const vehicle = randomUUID(); const driver = randomUUID();
