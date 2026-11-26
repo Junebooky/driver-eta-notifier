@@ -46,7 +46,7 @@ BEGIN
     patch:=item->'row';
     IF jsonb_typeof(patch) IS DISTINCT FROM 'object' THEN RAISE EXCEPTION 'INVALID_ROW' USING ERRCODE='22023'; END IF;
     FOR k IN SELECT jsonb_object_keys(patch) LOOP
-      IF k NOT IN ('id','date','pickup_time','end_date','end_time','origin','destination','driver_id','vehicle_id','customer_id','routeWaypoints','group_id','serviceMode') THEN
+      IF k NOT IN ('id','date','pickup_time','end_date','end_time','origin','destination','driver_id','vehicle_id','customer_id','routeWaypoints','group_id','serviceMode','requestedLanguage') THEN
         RAISE EXCEPTION 'INVALID_ROW_FIELD' USING ERRCODE='22023';
       END IF;
     END LOOP;
@@ -63,6 +63,7 @@ BEGIN
       OR length(btrim(coalesce(patch->>'destination',''))) NOT BETWEEN 1 AND 1000
       OR (patch?'group_id' AND length(coalesce(patch->>'group_id',''))>160)
       OR coalesce(patch->>'serviceMode','with_driver') NOT IN ('with_driver','vehicle_only')
+      OR coalesce(patch->>'requestedLanguage','ko') NOT IN ('ko','en','other')
       THEN RAISE EXCEPTION 'INVALID_DRAFT' USING ERRCODE='22023'; END IF;
     -- A complete replacement must supply the route explicitly; never silently drop stops.
     points:=patch->'routeWaypoints';
@@ -107,7 +108,7 @@ BEGIN
     END IF;
     meta:=coalesce(old_row.schedule_meta,'{}'::jsonb)||jsonb_build_object(
       'taasDraftV1',true,'routeWaypoints',points,'serviceMode',coalesce(patch->>'serviceMode','with_driver'),
-      'groupId',patch->>'group_id','dispatchStatus','draft');
+      'groupId',patch->>'group_id','dispatchStatus','draft','requestedLanguage',coalesce(patch->>'requestedLanguage','ko'));
     IF old_row.id IS NULL THEN
       INSERT INTO cockpit.schedules(id,org_id,date,pickup_time,end_date,end_time,time_display,origin,destination,
         driver_id,driver_name,vehicle_id,vehicle_plate,vehicle_no,customer_id,group_id,status,dispatch_status,schedule_meta,updated_at)

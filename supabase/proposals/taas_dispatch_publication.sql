@@ -156,7 +156,7 @@ CREATE TRIGGER guard_dispatch_schedule BEFORE INSERT OR UPDATE ON cockpit.schedu
 CREATE FUNCTION cockpit.publish_tenant_dispatch_v1(p_org text,p_user uuid,p_session uuid,p_request text,p_items jsonb)
 RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
 DECLARE item jsonb; s cockpit.schedules; saved cockpit.schedules; prior cockpit.dispatch_requests;
- req text; payload jsonb; result jsonb:='[]'::jsonb; sid uuid;
+ req text; payload jsonb; result jsonb:='[]'::jsonb; sid uuid; at_time timestamptz; next_version integer;
 BEGIN
  IF current_user<>'service_role' OR p_org IS NULL OR p_user IS NULL OR p_session IS NULL THEN
   RAISE EXCEPTION 'FORBIDDEN' USING ERRCODE='42501';
@@ -189,9 +189,12 @@ BEGIN
   END IF;
   IF s.updated_at IS DISTINCT FROM (item->>'expected_updated_at')::timestamptz THEN RAISE EXCEPTION 'DRAFT_CHANGED' USING ERRCODE='40001'; END IF;
   PERFORM cockpit.assert_tenant_dispatch_ready_v1(s);
+  at_time:=clock_timestamp(); next_version:=coalesce(s.version,0)+1;
   UPDATE cockpit.schedules SET status='scheduled',dispatch_status='published',
-   schedule_meta=s.schedule_meta||jsonb_build_object('dispatchStatus','published'),
-   updated_at=clock_timestamp()
+   version=next_version,last_ack_version=0,last_ack_at=NULL,published_at=at_time,published_by=p_user::text,
+   schedule_meta=s.schedule_meta||jsonb_build_object('dispatchStatus','published','version',next_version,
+     'lastAckVersion',0,'lastAckAt',NULL,'publishedAt',at_time,'publishedBy',p_user::text),
+   updated_at=at_time
    WHERE id=sid AND org_id=p_org RETURNING * INTO saved;
   result:=result||jsonb_build_array(jsonb_build_object('id',saved.id,'org_id',saved.org_id,'dispatch_status',saved.dispatch_status,'updated_at',saved.updated_at));
  END LOOP;

@@ -5,6 +5,8 @@ import type {Client} from 'pg';
 
 export async function verifyTenantPublish(admin:Client){
  const vip='vip_limousine_korea',ch='chauffeur_service';
+ // Mirror existing live columns absent from the minimal historical CI fixture.
+ await admin.query('ALTER TABLE cockpit.schedules ADD COLUMN IF NOT EXISTS version integer DEFAULT 1, ADD COLUMN IF NOT EXISTS published_at timestamptz, ADD COLUMN IF NOT EXISTS published_by text');
  const before=(await admin.query('SELECT to_jsonb(s) AS row FROM cockpit.schedules s ORDER BY id')).rows;
  const oldGuard=(await admin.query("SELECT pg_get_functiondef('cockpit.guard_dispatch_schedule()'::regprocedure) def")).rows[0].def;
  await admin.query(readFileSync('supabase/proposals/taas_dispatch_publication.sql','utf8'));
@@ -50,8 +52,8 @@ export async function verifyTenantPublish(admin:Client){
   await fails(()=>publish([ref(b)],key),'40001');
   await fails(()=>publish([ref(b)]),'23P01');
   assert.equal((await publish([ref(c)])).rows[0].result[0].dispatch_status,'published');
-  const saved=(await admin.query('SELECT schedule_meta,org_id FROM cockpit.schedules WHERE id=$1',[a.id])).rows[0];
-  assert.deepEqual(saved.schedule_meta.routeWaypoints,route(date));assert.equal(saved.org_id,ch);
+  const saved=(await admin.query('SELECT schedule_meta,org_id,version,last_ack_version,last_ack_at,published_at,published_by FROM cockpit.schedules WHERE id=$1',[a.id])).rows[0];
+  assert.deepEqual(saved.schedule_meta.routeWaypoints,route(date));assert.equal(saved.org_id,ch);assert.equal(saved.version,2);assert.equal(saved.last_ack_version,0);assert.equal(saved.last_ack_at,null);assert.ok(saved.published_at);assert.equal(saved.published_by,user);assert.equal(saved.schedule_meta.version,saved.version);
   await fails(()=>admin.query('UPDATE cockpit.schedules SET org_id=$1 WHERE id=$2',[vip,a.id]),'42501');
   const bad=await save(draft(randomUUID(),'16:00','17:00',{routeWaypoints:[{location:'unverified'}]}));
   await fails(()=>publish([ref(bad)]),'23514');
@@ -67,6 +69,11 @@ export async function verifyTenantPublish(admin:Client){
   await admin.query("UPDATE cockpit.drivers SET unavailable_windows='[{\"start_at\":\"2027-04-10T16:00:00+09:00\",\"end_at\":\"2027-04-10T19:00:00+09:00\"}]' WHERE id=$1",[driver]);
   await fails(()=>publish([ref(free)]),'23P01');
   await admin.query("UPDATE cockpit.drivers SET unavailable_windows='[]' WHERE id=$1",[driver]);
+  const english=await save(draft(randomUUID(),'19:00','20:00',{requestedLanguage:'en'}));
+  await admin.query('UPDATE cockpit.drivers SET english_available=false WHERE id=$1',[driver]);
+  await fails(()=>publish([ref(english)]),'23514');
+  await admin.query('UPDATE cockpit.drivers SET english_available=true WHERE id=$1',[driver]);
+  assert.equal((await publish([ref(english)])).rows[0].result[0].dispatch_status,'published');
   await admin.query('RESET ROLE');
   await admin.query("UPDATE cockpit.organization_members SET status='revoked' WHERE org_id=$1 AND user_id=$2",[ch,user]);
   await admin.query('SET LOCAL ROLE service_role');
