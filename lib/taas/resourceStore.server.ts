@@ -37,7 +37,7 @@ export async function readTenantFleetCandidate(orgId: string) {
     if (lastId && next<=lastId) throw new Error('Fleet pagination stalled');
     all.push(...page);
     lastId=next;
-    if (page.length<size) break;
+    // Continue until an empty page: a provider-side row limit may be smaller than size.
   }
   return validateScopedFleetRows(orgId,all);
 }

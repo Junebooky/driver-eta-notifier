@@ -15,7 +15,8 @@ export async function verifyResourceOwnership(admin:Client){
  const snapshot=async()=> {
   const out=[];
   for(const table of ['drivers','customers','vehicles','schedules','report_messages']){
-   const r=await admin.query("SELECT count(*)::text n, md5(coalesce(string_agg((to_jsonb(t)-'org_id')::text,chr(10) ORDER BY (to_jsonb(t)-'org_id')::text),'')) digest FROM cockpit."+table+' t');
+   const rowExpression=table==='drivers'||table==='customers'?"(to_jsonb(t)-'org_id')":"to_jsonb(t)";
+   const r=await admin.query("SELECT count(*)::text n, md5(coalesce(string_agg("+rowExpression+"::text,chr(10) ORDER BY "+rowExpression+"::text),'')) digest FROM cockpit."+table+' t');
    out.push(r.rows[0]);
   }
   return out;
