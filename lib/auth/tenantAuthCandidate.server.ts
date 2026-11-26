@@ -49,3 +49,18 @@ export async function verifyTenantAuthCandidate(
   if (!TENANT_RUNTIME_RELEASED) return null;
   return evaluateTenantIdentity(trustedHostname, accessToken, dependencies);
 }
+
+// The signed refresh ticket supplies identity only; no provider authorization
+// is inferred. After rotation the caller must verify the fresh JWT normally.
+export async function checkTenantRefreshCandidate(i:Pick<TenantIdentity,'hostname'|'orgId'|'userId'|'sessionId'|'role'|'driverId'>):Promise<boolean>{
+ if(!TENANT_RUNTIME_RELEASED)return false;
+ try{
+  const d=await dependencies.getDomain(i.hostname);
+  if(!d||d.hostname!==i.hostname||d.org_id!==i.orgId||d.status!=='verified'||typeof d.verified_at!=='string'||!(Date.parse(d.verified_at)<=Date.now()))return false;
+  const o=await dependencies.getOrganization(i.orgId);
+  if(!o||o.id!==i.orgId||o.status!=='active'||o.runtime_enabled!==true||!await dependencies.isSessionActive(i.userId,i.sessionId))return false;
+  const m=await dependencies.getMembership(i.userId,i.orgId);
+  if(!m||m.org_id!==i.orgId||m.user_id!==i.userId||m.status!=='active'||m.role!==i.role||m.driver_id!==i.driverId)return false;
+  return i.role==='driver'?!!i.driverId&&await dependencies.ownsActiveDriver(i.orgId,i.driverId):i.driverId===null&&(i.role==='company_admin'||i.role==='company_owner');
+ }catch{return false;}
+}

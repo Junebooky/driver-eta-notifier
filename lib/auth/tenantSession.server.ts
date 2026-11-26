@@ -2,9 +2,9 @@ import {createHmac} from 'node:crypto';
 import {supabaseAdmin as db} from '../supabase/server';
 import {createUserAuthClient} from './userAuthClient';
 import {getAuthSecret} from './serverAuth';
-import {verifyTenantAuthCandidate} from './tenantAuthCandidate.server';
+import {verifyTenantAuthCandidate,checkTenantRefreshCandidate} from './tenantAuthCandidate.server';
 import {tenantBrandCandidate} from '../taas/tenantBranding.server';
-import {loginTenantSession,readTenantSession,logoutTenantSession,type TenantSessionDependencies} from './tenantSession';
+import {loginTenantSession,readTenantSession,logoutTenantSession,refreshTenantSession,type TenantSessionCookies,type TenantSessionDependencies} from './tenantSession';
 const secret=()=>getAuthSecret()||process.env.SUPABASE_SERVICE_ROLE_KEY||null;
 const deps:TenantSessionDependencies={
  secret,now:()=>Math.floor(Date.now()/1000),
@@ -29,7 +29,18 @@ const deps:TenantSessionDependencies={
    if(r.error||!r.data){await client.auth.signOut({scope:'local'});return {kind:'mfa'};}
    provider=r.data;
   }
-  return {kind:'ok',token:provider.access_token};
+  return {kind:'ok',token:provider.access_token,refreshToken:provider.refresh_token};
+ },
+ checkRefresh:checkTenantRefreshCandidate,
+ async refresh(refreshToken){
+  const r=await createUserAuthClient().auth.refreshSession({refresh_token:refreshToken});
+  if(r.error||!r.data.session)return {kind:r.error&&typeof r.error.status==='number'&&r.error.status>=500?'unavailable':'invalid'};
+  return {kind:'ok',token:r.data.session.access_token,refreshToken:r.data.session.refresh_token};
+ },
+ async revokeBound(i){
+  // Verified signed ticket; revoke only its provider session, even if access expired.
+  const r=await db.from('revoked_auth_sessions').upsert({session_id:i.sessionId,user_id:i.userId},{onConflict:'session_id'});
+  return !r.error;
  },
  async discard(token){await db.auth.admin.signOut(token,'local');},
  async revoke(i,token){
@@ -44,5 +55,7 @@ const deps:TenantSessionDependencies={
 };
 // Not a public route. Brand and identity dependencies both remain hard-disabled.
 export const loginTenantSessionCandidate=(host:string,ip:string,origin:unknown,raw:unknown)=>loginTenantSession(host,ip,origin,raw,deps);
-export const readTenantSessionCandidate=(host:string,cookies:{access?:string;binding?:string})=>readTenantSession(host,cookies,deps);
-export const logoutTenantSessionCandidate=(host:string,origin:unknown,cookies:{access?:string;binding?:string})=>logoutTenantSession(host,origin,cookies,deps);
+export const readTenantSessionCandidate=(host:string,cookies:TenantSessionCookies)=>readTenantSession(host,cookies,deps);
+export const logoutTenantSessionCandidate=(host:string,origin:unknown,cookies:TenantSessionCookies)=>logoutTenantSession(host,origin,cookies,deps);
+
+export const refreshTenantSessionCandidate=(host:string,origin:unknown,cookies:TenantSessionCookies)=>refreshTenantSession(host,origin,cookies,deps);
