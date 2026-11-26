@@ -92,86 +92,7 @@ BEGIN
  f:=p_command->'fields';
  IF op IN ('update','review') THEN
   rid:=(p_command->>'id')::uuid;
-  IF rid IS NULL OR coalesce(p_command->>'revision','')!~'^[0-9a-f]{64}
- IF jsonb_typeof(f) IS DISTINCT FROM 'object' THEN RAISE EXCEPTION 'INVALID_FIELDS' USING ERRCODE='22023'; END IF;
- FOR field_key IN SELECT jsonb_object_keys(f) LOOP
-  IF field_key NOT IN ('driverId','bookingId','vehicleId','date','submit')
-    AND NOT(kind='log' AND field_key IN ('clockIn','clockOut','startKm','endKm','stops','notes'))
-    AND NOT(kind='expense' AND field_key IN ('time','amount','category','merchant','paymentMethod','memo','drivingLogId')) THEN
-   RAISE EXCEPTION 'INVALID_FIELD' USING ERRCODE='22023';
-  END IF;
- END LOOP;
- IF f?'submit' AND jsonb_typeof(f->'submit') IS DISTINCT FROM 'boolean' THEN RAISE EXCEPTION 'INVALID_FIELDS' USING ERRCODE='22023'; END IF;
- submitted:=coalesce((f->>'submit')::boolean,false);
- driver_key:=coalesce(member.driver_id,(f->>'driverId')::uuid);
- IF driver_key IS NULL OR (f?'driverId' AND (f->>'driverId')::uuid IS DISTINCT FROM driver_key) THEN
-  RAISE EXCEPTION 'DRIVER_NOT_OWNED' USING ERRCODE='42501';
- END IF;
- SELECT * INTO driver FROM cockpit.drivers WHERE id=driver_key AND org_id=p_org AND driver_meta->>'status'='active' FOR SHARE;
- IF NOT FOUND THEN RAISE EXCEPTION 'DRIVER_NOT_OWNED' USING ERRCODE='42501'; END IF;
- day_value:=(f->>'date')::date;booking_key:=(f->>'bookingId')::uuid;vehicle_key:=(f->>'vehicleId')::uuid;
- IF day_value IS NULL OR NOT isfinite(day_value) THEN RAISE EXCEPTION 'INVALID_DATE' USING ERRCODE='22023'; END IF;
- IF booking_key IS NOT NULL THEN
-  SELECT * INTO booking FROM cockpit.schedules WHERE id=booking_key AND org_id=p_org AND driver_id=driver_key
-    AND dispatch_status='published' AND status NOT IN ('cancelled','draft')
-    AND day_value BETWEEN date AND coalesce(end_date,date) FOR SHARE;
-  IF NOT FOUND OR (vehicle_key IS NOT NULL AND vehicle_key IS DISTINCT FROM booking.vehicle_id) THEN
-   RAISE EXCEPTION 'BOOKING_NOT_OWNED' USING ERRCODE='42501';
-  END IF;
-  vehicle_key:=booking.vehicle_id;
- END IF;
- IF vehicle_key IS NOT NULL THEN
-  SELECT * INTO vehicle FROM cockpit.vehicles WHERE id=vehicle_key AND organization_id=p_org FOR SHARE;
-  IF NOT FOUND THEN RAISE EXCEPTION 'VEHICLE_NOT_OWNED' USING ERRCODE='42501'; END IF;
- END IF;
- IF booking.customer_id IS NOT NULL THEN
-  PERFORM 1 FROM cockpit.customers WHERE id=booking.customer_id AND org_id=p_org FOR SHARE;
-  IF NOT FOUND THEN RAISE EXCEPTION 'CUSTOMER_NOT_OWNED' USING ERRCODE='42501'; END IF;
- END IF;
- rid:=gen_random_uuid();
- IF kind='log' THEN
-  start_value:=(f->>'startKm')::integer;end_value:=(f->>'endKm')::integer;points:=coalesce(f->'stops','[]'::jsonb);
-  IF start_value<0 OR end_value<0 OR (start_value IS NOT NULL AND end_value IS NOT NULL AND end_value<start_value)
-    OR jsonb_typeof(points) IS DISTINCT FROM 'array' OR jsonb_array_length(points)>200
-    OR EXISTS(SELECT 1 FROM jsonb_array_elements(points) x WHERE jsonb_typeof(x) IS DISTINCT FROM 'object')
-    OR length(coalesce(f->>'notes',''))>10000 THEN RAISE EXCEPTION 'INVALID_LOG' USING ERRCODE='22023'; END IF;
-  INSERT INTO cockpit.driving_logs(id,organization_id,driver_id,driver_name,booking_id,vehicle_id,vehicle_plate,vehicle_model,customer_id,
-    driving_date,clock_in,clock_out,start_km,end_km,distance_km,stops,notes,status,submitted_at,submitted_by)
-  VALUES(rid,p_org,driver_key,driver.driver_name,booking_key,vehicle_key::text,vehicle.plate,vehicle.model,booking.customer_id,
-    day_value,(f->>'clockIn')::time,(f->>'clockOut')::time,start_value,end_value,end_value-start_value,points,f->>'notes',
-    CASE WHEN submitted THEN '검토 대기' ELSE 'draft' END,CASE WHEN submitted THEN clock_timestamp() END,CASE WHEN submitted THEN p_user::text END)
-  RETURNING * INTO logrow;
-  result:=jsonb_build_object('id',logrow.id,'status',logrow.status);
- ELSE
-  amount_value:=(f->>'amount')::integer;log_key:=(f->>'drivingLogId')::uuid;
-  IF amount_value IS NULL OR amount_value<=0 OR coalesce(f->>'category','') NOT IN ('fuel','meal','parking','toll','stay','wash','transit','other')
-   OR coalesce(f->>'paymentMethod','') NOT IN ('company_card','driver_personal','client_card','cash','other')
-   OR length(btrim(coalesce(f->>'merchant',''))) NOT BETWEEN 1 AND 500 OR f->>'time' IS NULL
-   OR length(coalesce(f->>'memo',''))>10000 THEN RAISE EXCEPTION 'INVALID_EXPENSE' USING ERRCODE='22023'; END IF;
-  IF log_key IS NOT NULL THEN
-   SELECT * INTO linked FROM cockpit.driving_logs WHERE id=log_key AND organization_id=p_org AND driver_id=driver_key
-     AND driving_date=day_value AND booking_id IS NOT DISTINCT FROM booking_key FOR SHARE;
-   IF NOT FOUND THEN RAISE EXCEPTION 'LOG_NOT_OWNED' USING ERRCODE='42501'; END IF;
-  END IF;
-  INSERT INTO cockpit.expenses(id,organization_id,driver_id,driver_name,booking_id,driving_log_id,vehicle_id,vehicle_plate,vehicle_model,customer_id,
-   expense_date,expense_time,amount,category,merchant,payment_method,memo,status,submitted_at,submitted_by)
-  VALUES(rid,p_org,driver_key,driver.driver_name,booking_key,log_key,vehicle_key::text,vehicle.plate,vehicle.model,booking.customer_id,
-   day_value,(f->>'time')::time,amount_value,f->>'category',btrim(f->>'merchant'),f->>'paymentMethod',f->>'memo',
-   CASE WHEN submitted THEN '검수 대기' ELSE 'draft' END,CASE WHEN submitted THEN clock_timestamp() END,CASE WHEN submitted THEN p_user::text END)
-  RETURNING * INTO expense;
-  result:=jsonb_build_object('id',expense.id,'status',expense.status);
- END IF;
- END IF;
- IF cockpit.is_active_auth_session(p_session,p_user) IS DISTINCT FROM true THEN RAISE EXCEPTION 'FORBIDDEN' USING ERRCODE='42501'; END IF;
- INSERT INTO cockpit.organization_reporting_requests(org_id,request_id,actor_id,command_digest,kind,operation,record_id,result)
- VALUES(p_org,req,p_user,digest,kind,op,rid,result);
- RETURN result;
-END;
-$$;
-REVOKE ALL ON FUNCTION cockpit.tenant_receipt_path_valid_v1(text,uuid,text),cockpit.tenant_standard_report_v1(text,uuid,uuid,jsonb) FROM PUBLIC,anon,authenticated;
-GRANT EXECUTE ON FUNCTION cockpit.tenant_receipt_path_valid_v1(text,uuid,text),cockpit.tenant_standard_report_v1(text,uuid,uuid,jsonb) TO service_role;
-COMMIT;
- OR jsonb_typeof(f) IS DISTINCT FROM 'object' OR f='{}'::jsonb THEN
+  IF rid IS NULL OR coalesce(p_command->>'revision','')!~'^[0-9a-f]{64}$' OR jsonb_typeof(f) IS DISTINCT FROM 'object' OR f='{}'::jsonb THEN
    RAISE EXCEPTION 'INVALID_MUTATION' USING ERRCODE='22023';
   END IF;
   -- Existing legacy records cannot be adopted or overwritten by a candidate command.
@@ -306,7 +227,10 @@ COMMIT;
   RETURNING * INTO expense;
   result:=jsonb_build_object('id',expense.id,'status',expense.status);
  END IF;
+ END IF;
  IF cockpit.is_active_auth_session(p_session,p_user) IS DISTINCT FROM true THEN RAISE EXCEPTION 'FORBIDDEN' USING ERRCODE='42501'; END IF;
+ INSERT INTO cockpit.organization_reporting_requests(org_id,request_id,actor_id,command_digest,kind,operation,record_id,result)
+ VALUES(p_org,req,p_user,digest,kind,op,rid,result);
  RETURN result;
 END;
 $$;
