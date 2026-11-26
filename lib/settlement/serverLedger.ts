@@ -143,6 +143,50 @@ export function calculateSettlement(source: SettlementSource, contract: Settleme
     throw new Error('정산금액이 허용 범위를 벗어났습니다.');
   return totals;
 }
+export interface SettlementScheduleRow {
+  id:string; org_id:string|null; date:string|null; customer_name:string|null;
+  event_name:string|null; vehicle_model:string|null; vehicle_plate:string|null;
+  driver_name:string|null; driver_id:string|null; schedule_meta:unknown;
+}
+export interface SettlementLogRow {
+  id:string; booking_id:string|null; driver_id:string|null; status:string;
+  customer_service_start:string|null; customer_service_end:string|null;
+}
+export interface SettlementExpenseRow {
+  id:string; booking_id:string|null; driving_log_id:string|null; expense_date:string;
+  category:string; amount:number; merchant:string; billable_to_customer:boolean|null; status:string;
+}
+/** Existing source projection, shared verbatim by legacy VIP and scoped readers. */
+export function buildSettlementSource(scheduleId:string,schedule:SettlementScheduleRow,logs:SettlementLogRow[],expenses:SettlementExpenseRow[]):SettlementSource {
+  const log = logs.length === 1 ? logs[0] : null;
+  const start = log?.customer_service_start || null;
+  const end = log?.customer_service_end || null;
+  const serviceMinutes = calculateServiceMinutes(start,end);
+  const serviceVerified = Boolean(log && SETTLEMENT_APPROVED.has(log.status) &&
+    serviceMinutes !== null && (!schedule.driver_id || !log.driver_id || schedule.driver_id === log.driver_id));
+  const approved = expenses.filter(x => SETTLEMENT_APPROVED.has(x.status));
+  const metadata = (schedule.schedule_meta && typeof schedule.schedule_meta === 'object' &&
+    !Array.isArray(schedule.schedule_meta) ? schedule.schedule_meta : {}) as Record<string,unknown>;
+  const firstReal = (column:unknown, fallback:unknown) =>
+    typeof column==='string' && column.trim() ? column.trim() :
+      typeof fallback==='string' && fallback.trim() ? fallback.trim() : '';
+  return {
+    scheduleId, serviceDate: schedule.date || '',
+    customerName: firstReal(schedule.customer_name,metadata.customerName) || '미등록 고객사',
+    eventName: firstReal(schedule.event_name,metadata.eventName),
+    vehicleModel: firstReal(schedule.vehicle_model,metadata.vehicleModel),
+    vehiclePlate: firstReal(schedule.vehicle_plate,metadata.vehiclePlate),
+    driverName: firstReal(schedule.driver_name,metadata.driverName),
+    startTime: start, endTime: end, serviceMinutes, serviceVerified,
+    approvedLogCount: logs.filter(x => SETTLEMENT_APPROVED.has(x.status)).length,
+    pendingExpenseCount: expenses.filter(x => !SETTLEMENT_APPROVED.has(x.status) && !SETTLEMENT_REJECTED.has(x.status)).length,
+    billableExpenses: approved.filter(x => x.billable_to_customer !== false).map(x => ({
+      id:x.id, date:x.expense_date, category:x.category, amount:x.amount, merchant:x.merchant,
+    })),
+    approvedExpenseTotal: approved.reduce((sum,x)=> sum+x.amount,0),
+  };
+}
+
 export async function loadSettlementSource(scheduleId: string): Promise<{ source: SettlementSource; hash: string }> {
   if (!validScheduleId(scheduleId)) throw new Error('실제 예약 UUID가 필요합니다.');
   const readHash = async () => {
@@ -175,33 +219,7 @@ export async function loadSettlementSource(scheduleId: string): Promise<{ source
     .eq('organization_id', SETTLEMENT_ORG).or(expenseFilter.join(',')).order('id');
   if (e.error) throw new Error('승인 경비 원본을 조회하지 못했습니다.');
   const expenses = e.data || [];
-  const log = logs.length === 1 ? logs[0] : null;
-  const start = log?.customer_service_start || null;
-  const end = log?.customer_service_end || null;
-  const serviceMinutes = calculateServiceMinutes(start,end);
-  const serviceVerified = Boolean(log && SETTLEMENT_APPROVED.has(log.status) &&
-    serviceMinutes !== null && (!s.data.driver_id || !log.driver_id || s.data.driver_id === log.driver_id));
-  const approved = expenses.filter(x => SETTLEMENT_APPROVED.has(x.status));
-  const metadata = (s.data.schedule_meta && typeof s.data.schedule_meta === 'object' &&
-    !Array.isArray(s.data.schedule_meta) ? s.data.schedule_meta : {}) as Record<string,unknown>;
-  const firstReal = (column:unknown, fallback:unknown) =>
-    typeof column==='string' && column.trim() ? column.trim() :
-      typeof fallback==='string' && fallback.trim() ? fallback.trim() : '';
-  const source: SettlementSource = {
-    scheduleId, serviceDate: s.data.date || '',
-    customerName: firstReal(s.data.customer_name,metadata.customerName) || '미등록 고객사',
-    eventName: firstReal(s.data.event_name,metadata.eventName),
-    vehicleModel: firstReal(s.data.vehicle_model,metadata.vehicleModel),
-    vehiclePlate: firstReal(s.data.vehicle_plate,metadata.vehiclePlate),
-    driverName: firstReal(s.data.driver_name,metadata.driverName),
-    startTime: start, endTime: end, serviceMinutes, serviceVerified,
-    approvedLogCount: logs.filter(x => SETTLEMENT_APPROVED.has(x.status)).length,
-    pendingExpenseCount: expenses.filter(x => !SETTLEMENT_APPROVED.has(x.status) && !SETTLEMENT_REJECTED.has(x.status)).length,
-    billableExpenses: approved.filter(x => x.billable_to_customer !== false).map(x => ({
-      id:x.id, date:x.expense_date, category:x.category, amount:x.amount, merchant:x.merchant,
-    })),
-    approvedExpenseTotal: approved.reduce((sum,x)=> sum+x.amount,0),
-  };
+  const source = buildSettlementSource(scheduleId,s.data,logs,expenses);
   const after = await readHash();
   if (before !== after) throw new Error('운행·경비 원본이 조회 중 변경되었습니다. 다시 시도해 주세요.');
   return { source, hash: after };
