@@ -24,6 +24,7 @@ BEGIN
  ELSIF p_op='source' AND p_id IS NOT NULL THEN
   -- Strict identity, no null-org fallback or name/plate matching for new tenants.
   SELECT jsonb_build_object('hash',cockpit.settlement_live_source_hash(s.id,p_org),
+   'document',(SELECT to_jsonb(d) FROM cockpit.settlement_documents d WHERE d.organization_id=p_org AND d.schedule_id=s.id),
    'schedule',jsonb_build_object('id',s.id,'org_id',s.org_id,'date',s.date,'customer_name',s.customer_name,'event_name',s.event_name,
     'vehicle_model',s.vehicle_model,'vehicle_plate',s.vehicle_plate,'driver_name',s.driver_name,'driver_id',s.driver_id,'schedule_meta',s.schedule_meta),
    'logs',coalesce((SELECT jsonb_agg(jsonb_build_object('id',l.id,'organization_id',l.organization_id,'booking_id',l.booking_id,'driver_id',l.driver_id,'status',l.status,

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {calculateSettlement,validateSettlementContract} from '../lib/settlement/serverLedger';
-import {loadTenantSettlementSource,listTenantSettlements,downloadTenantSettlement,tenantSettlementSourceCandidate,type SettlementReadDependencies} from '../lib/taas/tenantSettlement.server';
+import {loadTenantSettlementSource,listTenantSettlements,downloadTenantSettlement,tenantSettlementSourceCandidate,mutateTenantSettlement,tenantSettlementMutationCandidate,type SettlementWriteDependencies,type SettlementReadDependencies} from '../lib/taas/tenantSettlement.server';
 import type {TenantIdentity} from '../lib/auth/tenantIdentity';
 const id='a0000000-0000-4000-8000-000000000001',driver='b0000000-0000-4000-8000-000000000002',log='c0000000-0000-4000-8000-000000000003',expense='d0000000-0000-4000-8000-000000000004',doc='e0000000-0000-4000-8000-000000000005';
 const org='chauffeur_service',vip='vip_limousine_korea',hash='a'.repeat(32);
@@ -34,4 +34,35 @@ test('admin list and download scope; no unauthorized calls or unissued/stale exp
  assert.equal((await loadTenantSettlementSource(identity.hostname,'token',id,denied)).ok,false);assert.equal(calls,0);
  let n=0;
  assert.equal((await loadTenantSettlementSource(identity.hostname,'token',id,{...deps(source),verify:async()=>++n===1?identity:null})).ok,false);
+});
+
+test('existing settlement state machine uses server source and pricing, rejects forged fields and stale approval',async()=>{
+ const good=await loadTenantSettlementSource(identity.hostname,'token',id,deps(source));assert.ok(good.ok);if(!good.ok)return;
+ let current:Record<string,unknown>|null=null,commits=0;
+ const write: SettlementWriteDependencies={
+  verify:async()=>identity,
+  read:async()=>({data:{...source,document:current},error:null}),
+  commit:async(i,c)=>{
+   commits++;assert.equal(i.orgId,org);assert.equal(c.hash,hash);
+   const status={prepare:'draft',price:'reviewing',approve:'approved',issue:'issued'}[c.action];
+   current={...current,id:doc,organization_id:org,schedule_id:id,version:c.expectedVersion+1,status,source_hash:hash,
+    ...(c.source?{source_snapshot:c.source}:{}),...(c.contract?{contract_snapshot:c.contract,totals_snapshot:c.totals}:{})};
+   return {data:current,error:null};
+  }
+ };
+ const run=(action:string,expectedVersion:number,extra:Record<string,unknown>={})=>mutateTenantSettlement(identity.hostname,'token',{scheduleId:id,action,expectedVersion,...extra},write);
+ assert.equal((await run('prepare',0,{totals:{grandTotal:1}})).ok,false);assert.equal(commits,0);
+ assert.ok((await run('prepare',0)).ok);assert.equal((await run('price',0,{contract})).ok,false);
+ assert.ok((await run('price',1,{contract})).ok);
+ const priced=current as unknown as Record<string,unknown>;
+ const totals=priced.totals_snapshot as Record<string,unknown>;
+ // JSONB key ordering must not break genuine approvals.
+ priced.totals_snapshot=Object.fromEntries(Object.entries(totals).reverse());
+ assert.equal(totals.grandTotal,954800);
+ priced.totals_snapshot={...totals,grandTotal:1};
+ assert.equal((await run('approve',2)).ok,false);
+ priced.totals_snapshot=totals;
+ assert.ok((await run('approve',2)).ok);assert.ok((await run('issue',3)).ok);
+ assert.equal((await run('prepare',4)).ok,false);assert.equal(commits,4);
+ assert.equal((await tenantSettlementMutationCandidate(identity.hostname,'token',{scheduleId:id,action:'prepare',expectedVersion:0})).ok,false);
 });

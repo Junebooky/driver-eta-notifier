@@ -1,7 +1,7 @@
 import {supabaseAdmin as db} from '../supabase/server';
 import {verifyTenantAuthCandidate} from '../auth/tenantAuthCandidate.server';
 import type {TenantIdentity} from '../auth/tenantIdentity';
-import {buildSettlementSource,validScheduleId,exportIssuedClientCsv,type LedgerDocument,type SettlementScheduleRow,type SettlementLogRow,type SettlementExpenseRow,type SettlementSource} from '../settlement/serverLedger';
+import {buildSettlementSource,validScheduleId,exportIssuedClientCsv,calculateSettlement,validateSettlementContract,type LedgerAction,type SettlementContract,type SettlementTotals,type LedgerDocument,type SettlementScheduleRow,type SettlementLogRow,type SettlementExpenseRow,type SettlementSource} from '../settlement/serverLedger';
 type Op='list'|'source'|'document';
 type Reply={data:unknown;error:{code?:string}|null};
 export type SettlementReadDependencies={
@@ -74,3 +74,70 @@ const dependencies:SettlementReadDependencies={
 export const tenantSettlementSourceCandidate=(host:string,token:string,id:string)=>loadTenantSettlementSource(host,token,id,dependencies);
 export const tenantSettlementListCandidate=(host:string,token:string)=>listTenantSettlements(host,token,dependencies);
 export const tenantSettlementDownloadCandidate=(host:string,token:string,id:string)=>downloadTenantSettlement(host,token,id,dependencies);
+
+
+export type SettlementWriteDependencies=SettlementReadDependencies & {
+ commit:(i:TenantIdentity,command:{
+ scheduleId:string;action:LedgerAction;expectedVersion:number;hash:string;
+ source:SettlementSource|null;contract:SettlementContract|null;totals:SettlementTotals|null
+ })=>Promise<Reply>;
+};
+// PostgreSQL JSONB normalizes property order. Compare meaning, not key order.
+function canonical(value:unknown):string{
+ if(Array.isArray(value))return '['+value.map(canonical).join(',')+']';
+ const r=record(value);
+ if(r)return '{'+Object.keys(r).sort().map(k=>JSON.stringify(k)+':'+canonical(r[k])).join(',')+'}';
+ return JSON.stringify(value)??'null';
+}
+/** Existing pricing and state rules, with tenant-scoped server source and actor.
+ * Only schedule/action/version/contract are accepted from the UI. */
+export async function mutateTenantSettlement(host:string,token:string,command:unknown,deps:SettlementWriteDependencies):Promise<Result<LedgerDocument>>{
+ try{
+  const i=await deps.verify(host,token);if(!isAdmin(i))return fail(403);
+  const x=record(command);
+  if(!x||Object.keys(x).some(k=>!['scheduleId','action','expectedVersion','contract'].includes(k))
+   ||!validScheduleId(x.scheduleId)||!['prepare','price','approve','issue'].includes(String(x.action))
+   ||typeof x.expectedVersion!=='number'||!Number.isSafeInteger(x.expectedVersion)||x.expectedVersion<0
+   ||(x.action!=='price'&&'contract' in x))return fail(400);
+  const scheduleId=x.scheduleId,action=x.action as LedgerAction,expectedVersion=x.expectedVersion;
+  const r=await read(i,'source',scheduleId,deps);if(!r.ok)return r;
+  const resolved=sourceFrom(r.data,i.orgId,scheduleId),raw=record(r.data);
+  if(!resolved||!raw||!('document' in raw))return fail(403);
+  const current=record(raw.document);
+  if(raw.document!==null&&(!current||current.organization_id!==i.orgId||current.schedule_id!==scheduleId||!validScheduleId(current.id)))return fail(403);
+  if(current?current.version!==expectedVersion:action!=='prepare'||expectedVersion!==0)return fail(409);
+  if(current&&action!=='prepare'&&current.source_hash!==resolved.hash)return fail(409);
+  if(current&&['approved','issued'].includes(String(current.status))&&['prepare','price'].includes(action))return fail(409);
+  const {source,hash}=resolved;
+  let contract:SettlementContract|null=null,totals:SettlementTotals|null=null;
+  try{
+   if(action==='price'){
+    if(!current||!['draft','reviewing'].includes(String(current.status)))return fail(409);
+    contract=validateSettlementContract(x.contract);
+    if(source.customerName==='미등록 고객사'||!source.vehiclePlate)return fail(400);
+    totals=calculateSettlement(source,contract);
+   }
+   if(action==='approve'||action==='issue'){
+    if(!current||current.status!==(action==='approve'?'reviewing':'approved'))return fail(409);
+    const stored=validateSettlementContract(current.contract_snapshot);
+    const fresh=calculateSettlement(source,stored);
+    if(canonical(fresh)!==canonical(current.totals_snapshot)||canonical(source)!==canonical(current.source_snapshot))return fail(409);
+   }
+  }catch{return fail(400);}
+  if(!same(i,await deps.verify(host,token)))return fail(403);
+  const reply=await deps.commit(i,{scheduleId,action,expectedVersion,hash,source:action==='prepare'?source:null,contract,totals});
+  if(reply.error){
+   const error=reply.error as {code?:string;message?:string};
+   return fail(error.code==='42501'?403:error.code==='40001'||/VERSION_CONFLICT|SOURCE_CHANGED|LOCKED|NOT_APPROVABLE|NOT_ISSUABLE|UNVERIFIED|NOT_PREPARED/.test(error.message||'')?409:error.code==='22023'?400:503);
+  }
+  const saved=record(reply.data);
+  const target={prepare:'draft',price:'reviewing',approve:'approved',issue:'issued'}[action];
+  if(!saved||saved.organization_id!==i.orgId||saved.schedule_id!==scheduleId||!validScheduleId(saved.id)||saved.version!==expectedVersion+1||saved.status!==target||saved.source_hash!==hash||(current&&saved.id!==current.id))return fail(503);
+  return {ok:true,data:saved as unknown as LedgerDocument};
+ }catch{return fail(503);}
+}
+const writeDependencies:SettlementWriteDependencies={
+ ...dependencies,
+ async commit(i,c){return db.rpc('commit_tenant_settlement_v1',{p_org:i.orgId,p_schedule:c.scheduleId,p_user:i.userId,p_session:i.sessionId,p_action:c.action,p_expected_version:c.expectedVersion,p_source_hash:c.hash,p_source_snapshot:c.source,p_contract_snapshot:c.contract,p_totals_snapshot:c.totals});}
+};
+export const tenantSettlementMutationCandidate=(host:string,token:string,command:unknown)=>mutateTenantSettlement(host,token,command,writeDependencies);

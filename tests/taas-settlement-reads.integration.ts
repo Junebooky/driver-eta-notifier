@@ -7,6 +7,7 @@ export async function verifyTenantSettlementReads(admin:Client){
  // Reuse existing ledger migration unchanged in the disposable expanded DB.
  await admin.query(readFileSync('supabase/migrations/20261108163000_server_settlement_ledger.sql','utf8'));
  await admin.query(readFileSync('supabase/proposals/taas_settlement_reads.sql','utf8'));
+ await admin.query(readFileSync('supabase/proposals/taas_settlement_writes.sql','utf8'));
  const snapshot=async()=>{const out=[];for(const t of ['schedules','driving_logs','expenses','settlement_documents','settlement_document_audit','report_messages'])out.push((await admin.query('SELECT to_jsonb(t) AS row FROM cockpit.'+t+' t ORDER BY id')).rows);return out;};
  const before=await snapshot();
  const vip='vip_limousine_korea',ch='chauffeur_service',owner=randomUUID(),session=randomUUID(),driver=randomUUID(),a=randomUUID(),b=randomUUID(),unowned=randomUUID();
@@ -36,6 +37,8 @@ export async function verifyTenantSettlementReads(admin:Client){
   await admin.query('SET LOCAL ROLE service_role');
   await fails(()=>call(ch,'source',a),'42501');await fails(()=>call(ch,'source',unowned),'42501');
   await fails(()=>call(ch,'document',foreign),'42501');await fails(()=>call(ch,'list',null,owner,randomUUID()),'42501');
+  const write=(org:string,sid:string,action:string,version:number,hash:string,source:unknown=null,contract:unknown=null,totals:unknown=null)=>admin.query('SELECT * FROM cockpit.commit_tenant_settlement_v1($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10::jsonb)',[org,sid,owner,session,action,version,hash,JSON.stringify(source),JSON.stringify(contract),JSON.stringify(totals)].map((v,i)=>i>=7&&v==='null'?null:v));
+  await fails(()=>write(ch,a,'prepare',0,va,{scheduleId:a}),'42501');
   const data=(await call(ch,'source',b)).rows[0].result;
   assert.equal(data.hash,h);assert.equal(data.schedule.org_id,ch);assert.equal(data.expenses.length,1);assert.equal(data.expenses[0].amount,8000);assert.equal(data.logs.length,1);
   const list=(await call(ch,'list',null)).rows[0].result;
@@ -44,6 +47,26 @@ export async function verifyTenantSettlementReads(admin:Client){
   await admin.query("UPDATE cockpit.expenses SET amount=9000 WHERE booking_id=$1 AND organization_id=$2",[b,ch]);
   assert.notEqual((await call(ch,'source',b)).rows[0].result.hash,h);
   assert.equal((await call(vip,'source',a)).rows[0].result.hash,va);
+  await fails(()=>write(ch,b,'prepare',1,h,{scheduleId:b}),'40001');
+  // Disposable fixture: legacy approved source, no candidate receipt proof fabricated.
+  await admin.query('RESET ROLE');
+  await admin.query("UPDATE cockpit.driving_logs SET status='승인 완료' WHERE booking_id=$1 AND organization_id=$2",[b,ch]);
+  // Rejected expense is excluded by the existing accounting policy.
+  await admin.query("UPDATE cockpit.expenses SET status='반려' WHERE booking_id=$1 AND organization_id=$2",[b,ch]);
+  await admin.query('SET LOCAL ROLE service_role');
+  const hash=(await call(ch,'source',b)).rows[0].result.hash;
+  const src={scheduleId:b,serviceVerified:true,approvedLogCount:1,pendingExpenseCount:0};
+  const contract={reference:'FIXTURE-CONTRACT',laborReference:'FIXTURE-LABOR',baseRate:800000};
+  const totals={supplyAmount:860000,grandTotal:946000};
+  const prepared=(await write(ch,b,'prepare',1,hash,src)).rows[0];assert.equal(prepared.version,2);
+  await fails(()=>write(ch,b,'price',1,hash,null,contract,totals),'P0001');
+  const priced=(await write(ch,b,'price',2,hash,null,contract,totals)).rows[0];assert.equal(priced.status,'reviewing');
+  const approved=(await write(ch,b,'approve',3,hash)).rows[0];assert.equal(approved.status,'approved');
+  const issued=(await write(ch,b,'issue',4,hash)).rows[0];assert.equal(issued.status,'issued');
+  await fails(()=>write(ch,b,'prepare',5,hash,src),'P0001');
+  const audit=(await admin.query('SELECT organization_id,version,action FROM cockpit.settlement_document_audit WHERE document_id=$1 ORDER BY version',[own])).rows;
+  assert.deepEqual(audit.map(x=>x.action),['prepare','price','approve','issue']);assert.ok(audit.every(x=>x.organization_id===ch));
+  assert.equal((await call(vip,'document',foreign)).rows[0].result.version,1);
   await admin.query('RESET ROLE');
   await admin.query("UPDATE cockpit.organization_members SET status='revoked' WHERE org_id=$1 AND user_id=$2",[ch,owner]);
   await admin.query('SET LOCAL ROLE service_role');await fails(()=>call(ch,'list',null),'42501');
