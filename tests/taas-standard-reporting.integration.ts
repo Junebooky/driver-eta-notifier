@@ -1,0 +1,56 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {randomUUID} from 'node:crypto';
+import type {Client} from 'pg';
+
+export async function verifyTenantStandardReporting(admin:Client){
+ const vip='vip_limousine_korea',ch='chauffeur_service';
+ const snapshot=async()=>{const out=[];for(const t of ['driving_logs','expenses','report_messages','report_submissions','report_workbook_versions'])out.push((await admin.query('SELECT to_jsonb(t) AS row FROM cockpit.'+t+' t ORDER BY id')).rows);return out;};
+ const before=await snapshot();
+ await admin.query(readFileSync('supabase/proposals/taas_standard_reporting.sql','utf8'));
+ const owner=randomUUID(),ownerSession=randomUUID(),user=randomUUID(),session=randomUUID(),d1=randomUUID(),d2=randomUUID(),d3=randomUUID();
+ const date='2027-01-12';
+ const call=(org:string,cmd:unknown,u=user,s=session)=>admin.query('SELECT cockpit.tenant_standard_report_v1($1,$2,$3,$4::jsonb) result',[org,u,s,JSON.stringify(cmd)]);
+ const log=(fields:Record<string,unknown>={})=>({kind:'log',op:'create',fields:{date,startKm:100,endKm:180,stops:[{id:'a',place:'A'},{id:'b',place:'B'}],submit:true,...fields}});
+ const exp=(fields:Record<string,unknown>={})=>({kind:'expense',op:'create',fields:{date,time:'10:00',category:'parking',amount:8000,merchant:'fixture',paymentMethod:'company_card',submit:true,...fields}});
+ await admin.query('BEGIN');
+ try{
+  const fails=async(fn:()=>Promise<unknown>,code:string)=>{await admin.query('SAVEPOINT failure');try{await assert.rejects(fn(),{code});}finally{await admin.query('ROLLBACK TO SAVEPOINT failure');await admin.query('RELEASE SAVEPOINT failure');}};
+  await admin.query('SET LOCAL ROLE service_role');await fails(()=>call(vip,log()),'42501');await admin.query('RESET ROLE');
+  await admin.query('ALTER TABLE cockpit.organizations DROP CONSTRAINT organizations_p0_runtime_hold; ALTER TABLE cockpit.organization_members DROP CONSTRAINT organization_members_p0_activation_hold');
+  await admin.query("UPDATE cockpit.organizations SET status='active',runtime_enabled=true WHERE id IN ($1,$2)",[vip,ch]);
+  await admin.query('INSERT INTO auth.sessions(id,user_id) VALUES($1,$2),($3,$4)',[session,user,ownerSession,owner]);
+  for(const [org,id] of [[vip,d1],[ch,d2],[ch,d3]])await admin.query("INSERT INTO cockpit.drivers(id,vehicle_no,driver_name,org_id,driver_meta) VALUES($1,$2,'same name',$3,'{\"status\":\"active\"}')",[id,'fixture-'+id,org]);
+  await admin.query("INSERT INTO cockpit.organization_members(org_id,user_id,role,status,driver_id) VALUES($1,$3,'driver','active',$5),($2,$3,'driver','active',$6),($1,$4,'company_admin','active',NULL),($2,$4,'company_admin','active',NULL)",[vip,ch,user,owner,d1,d2]);
+  const v=(await admin.query('SELECT id FROM cockpit.vehicles WHERE organization_id=$1 LIMIT 1',[vip])).rows[0].id;
+  await admin.query('SET LOCAL ROLE authenticated');await fails(()=>call(ch,log()),'42501');await admin.query('RESET ROLE');
+  await admin.query('SET LOCAL ROLE service_role');
+  await fails(()=>call(ch,log({driverId:d1})),'42501');await fails(()=>call(ch,log({driverId:d3})),'42501');
+  await fails(()=>call(ch,log({vehicleId:v})),'42501');await fails(()=>call(ch,log({bookingId:randomUUID()})),'42501');
+  await fails(()=>call(ch,log({status:'승인 완료'})),'22023');await fails(()=>call(ch,log({startKm:200,endKm:100})),'22023');
+  const a=(await call(vip,log())).rows[0].result;
+  const b=(await call(ch,log())).rows[0].result;
+  assert.notEqual(a.id,b.id);
+  await fails(()=>call(ch,exp({drivingLogId:a.id})),'42501');
+  await fails(()=>call(ch,exp({receiptStoragePath:'fake'})),'22023');
+  const e=(await call(ch,exp({drivingLogId:b.id}))).rows[0].result;
+  assert.equal(e.status,'검수 대기');
+  const totals=(await admin.query('SELECT id,expense_amount,expense_count FROM cockpit.driving_logs WHERE id IN ($1,$2)',[a.id,b.id])).rows;
+  assert.equal(totals.find(x=>x.id===a.id).expense_amount,0);assert.equal(totals.find(x=>x.id===b.id).expense_amount,8000);
+  assert.equal(totals.find(x=>x.id===b.id).expense_count,1);
+  const list=(await call(ch,{kind:'log',op:'list'})).rows[0].result.records;
+  assert.deepEqual(list.map((x:{id:string})=>x.id),[b.id]);assert.equal(list[0].stops.length,2);
+  await call(ch,log({driverId:d3}),owner,ownerSession);
+  assert.equal((await call(ch,{kind:'log',op:'list'})).rows[0].result.records.length,1);
+  assert.equal((await call(ch,{kind:'log',op:'list'},owner,ownerSession)).rows[0].result.records.length,2);
+  const path=ch+'/expenses/receipts/'+d2+'/2027/01/'+'a'.repeat(64)+'.jpg';
+  for(const [p,valid] of [[path,true],[path.replace(ch,vip),false],[path.replace(d2,d1),false],[path.replace('/01/','/13/'),false],[path+'/../x',false],[path.replace('/01/','/%2e%2e/'),false]] as const){
+   assert.equal((await admin.query('SELECT cockpit.tenant_receipt_path_valid_v1($1,$2,$3) valid',[ch,d2,p])).rows[0].valid,valid);
+  }
+  await admin.query('RESET ROLE');
+  await admin.query("UPDATE cockpit.organization_members SET status='revoked' WHERE org_id=$1 AND user_id=$2",[ch,user]);
+  await admin.query('SET LOCAL ROLE service_role');await fails(()=>call(ch,{kind:'log',op:'list'}),'42501');await fails(()=>call(ch,exp()),'42501');
+ }finally{await admin.query('ROLLBACK');await admin.query('RESET ROLE');}
+ assert.deepEqual(await snapshot(),before);
+ console.log('PASS tenant standard reporting: scoped reads/create, same-account tenant separation, expense aggregate, receipt path and preserved legacy data');
+}
