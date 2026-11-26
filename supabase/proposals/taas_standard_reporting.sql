@@ -90,6 +90,16 @@ BEGIN
   RETURN previous.result;
  END IF;
  f:=p_command->'fields';
+ IF kind='log' THEN
+  FOR field_key IN SELECT unnest(ARRAY['customerServiceStart','customerServiceEnd']) LOOP
+   IF f?field_key AND f->field_key IS DISTINCT FROM 'null'::jsonb
+    AND (jsonb_typeof(f->field_key) IS DISTINCT FROM 'string' OR (f->>field_key)!~'^([01][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$') THEN
+    RAISE EXCEPTION 'INVALID_SERVICE_TIME' USING ERRCODE='22023';
+   END IF;
+  END LOOP;
+ ELSIF f?'billableToCustomer' AND jsonb_typeof(f->'billableToCustomer') IS DISTINCT FROM 'boolean' THEN
+  RAISE EXCEPTION 'INVALID_BILLABLE_FLAG' USING ERRCODE='22023';
+ END IF;
  IF op IN ('update','review') THEN
   rid:=(p_command->>'id')::uuid;
   IF rid IS NULL OR coalesce(p_command->>'revision','')!~'^[0-9a-f]{64}$' OR jsonb_typeof(f) IS DISTINCT FROM 'object' OR f='{}'::jsonb THEN
@@ -106,7 +116,7 @@ BEGIN
   END IF;
   at_time:=clock_timestamp();
   IF op='review' THEN
-   IF EXISTS(SELECT 1 FROM jsonb_object_keys(f) k WHERE k NOT IN ('status','notes')) OR
+   IF EXISTS(SELECT 1 FROM jsonb_object_keys(f) k WHERE k NOT IN ('status','notes') AND NOT(kind='expense' AND k='billableToCustomer')) OR
      coalesce(f->>'status','') NOT IN ('승인 완료','보완 필요','반려') OR length(coalesce(f->>'notes',''))>10000 OR
      old_row->>'status' IS DISTINCT FROM (CASE WHEN kind='log' THEN '검토 대기' ELSE '검수 대기' END) THEN
     RAISE EXCEPTION 'INVALID_REVIEW' USING ERRCODE='22023';
@@ -117,8 +127,13 @@ BEGIN
     UPDATE cockpit.driving_logs SET status=next_status,reviewed_at=at_time,reviewed_by=p_user::text,review_notes=f->>'notes',
      review_history=audit||coalesce(review_history,'[]'::jsonb),updated_at=at_time WHERE id=rid AND organization_id=p_org RETURNING * INTO logrow;
    ELSE
+    -- Preserve the original decision and record any customer-billing correction.
+    IF f?'billableToCustomer' THEN
+     audit:=jsonb_build_array((audit->0)||jsonb_build_object('billableToCustomerBefore',old_row->'billable_to_customer','billableToCustomerAfter',f->'billableToCustomer'));
+    END IF;
     -- Existing expense_approval_integrity trigger still requires receipt or Hi-Pass evidence.
     UPDATE cockpit.expenses SET status=next_status,reviewed_at=at_time,reviewed_by=p_user::text,review_notes=f->>'notes',
+     billable_to_customer=CASE WHEN f?'billableToCustomer' THEN (f->>'billableToCustomer')::boolean ELSE billable_to_customer END,
      audit_history=audit||coalesce(audit_history,'[]'::jsonb),updated_at=at_time WHERE id=rid AND organization_id=p_org RETURNING * INTO expense;
    END IF;
   ELSE
@@ -127,7 +142,7 @@ BEGIN
    submitted:=coalesce((f->>'submit')::boolean,false);
    next_status:=CASE WHEN submitted THEN CASE WHEN kind='log' THEN '검토 대기' ELSE '검수 대기' END ELSE old_row->>'status' END;
    IF kind='log' THEN
-    IF EXISTS(SELECT 1 FROM jsonb_object_keys(f) k WHERE k NOT IN ('submit','clockIn','clockOut','startKm','endKm','notes','stops')) THEN RAISE EXCEPTION 'INVALID_FIELDS' USING ERRCODE='22023'; END IF;
+    IF EXISTS(SELECT 1 FROM jsonb_object_keys(f) k WHERE k NOT IN ('submit','clockIn','clockOut','startKm','endKm','notes','stops','customerServiceStart','customerServiceEnd')) THEN RAISE EXCEPTION 'INVALID_FIELDS' USING ERRCODE='22023'; END IF;
     start_value:=CASE WHEN f?'startKm' THEN (f->>'startKm')::integer ELSE (old_row->>'start_km')::integer END;
     end_value:=CASE WHEN f?'endKm' THEN (f->>'endKm')::integer ELSE (old_row->>'end_km')::integer END;
     points:=coalesce(f->'stops','[]'::jsonb);
@@ -142,17 +157,20 @@ BEGIN
     IF jsonb_array_length(points)>200 THEN RAISE EXCEPTION 'INVALID_LOG' USING ERRCODE='22023'; END IF;
     UPDATE cockpit.driving_logs SET start_km=start_value,end_km=end_value,distance_km=end_value-start_value,stops=points,
      clock_in=CASE WHEN f?'clockIn' THEN (f->>'clockIn')::time ELSE clock_in END,clock_out=CASE WHEN f?'clockOut' THEN (f->>'clockOut')::time ELSE clock_out END,
+     customer_service_start=CASE WHEN f?'customerServiceStart' THEN (f->>'customerServiceStart')::time ELSE customer_service_start END,
+     customer_service_end=CASE WHEN f?'customerServiceEnd' THEN (f->>'customerServiceEnd')::time ELSE customer_service_end END,
      notes=CASE WHEN f?'notes' THEN f->>'notes' ELSE notes END,status=next_status,
      submitted_at=CASE WHEN submitted THEN at_time ELSE submitted_at END,submitted_by=CASE WHEN submitted THEN p_user::text ELSE submitted_by END,updated_at=at_time
      WHERE id=rid AND organization_id=p_org RETURNING * INTO logrow;
    ELSE
-    IF EXISTS(SELECT 1 FROM jsonb_object_keys(f) k WHERE k NOT IN ('submit','amount','merchant','category','paymentMethod','memo','time')) THEN RAISE EXCEPTION 'INVALID_FIELDS' USING ERRCODE='22023'; END IF;
+    IF EXISTS(SELECT 1 FROM jsonb_object_keys(f) k WHERE k NOT IN ('submit','amount','merchant','category','paymentMethod','memo','time','billableToCustomer')) THEN RAISE EXCEPTION 'INVALID_FIELDS' USING ERRCODE='22023'; END IF;
     amount_value:=CASE WHEN f?'amount' THEN (f->>'amount')::integer ELSE (old_row->>'amount')::integer END;
     IF amount_value IS NULL OR amount_value<=0 OR coalesce(f->>'category',old_row->>'category','') NOT IN ('fuel','meal','parking','toll','stay','wash','transit','other') OR
      coalesce(f->>'paymentMethod',old_row->>'payment_method','') NOT IN ('company_card','driver_personal','client_card','cash','other') OR
      length(btrim(coalesce(f->>'merchant',old_row->>'merchant',''))) NOT BETWEEN 1 AND 500 OR length(coalesce(f->>'memo',''))>10000 THEN RAISE EXCEPTION 'INVALID_EXPENSE' USING ERRCODE='22023'; END IF;
     UPDATE cockpit.expenses SET amount=amount_value,merchant=btrim(coalesce(f->>'merchant',merchant)),category=coalesce(f->>'category',category),
      payment_method=coalesce(f->>'paymentMethod',payment_method),memo=CASE WHEN f?'memo' THEN f->>'memo' ELSE memo END,expense_time=coalesce((f->>'time')::time,expense_time),
+     billable_to_customer=CASE WHEN f?'billableToCustomer' THEN (f->>'billableToCustomer')::boolean ELSE billable_to_customer END,
      status=next_status,submitted_at=CASE WHEN submitted THEN at_time ELSE submitted_at END,submitted_by=CASE WHEN submitted THEN p_user::text ELSE submitted_by END,updated_at=at_time
      WHERE id=rid AND organization_id=p_org RETURNING * INTO expense;
    END IF;
@@ -162,8 +180,8 @@ BEGIN
  IF jsonb_typeof(f) IS DISTINCT FROM 'object' THEN RAISE EXCEPTION 'INVALID_FIELDS' USING ERRCODE='22023'; END IF;
  FOR field_key IN SELECT jsonb_object_keys(f) LOOP
   IF field_key NOT IN ('driverId','bookingId','vehicleId','date','submit')
-    AND NOT(kind='log' AND field_key IN ('clockIn','clockOut','startKm','endKm','stops','notes'))
-    AND NOT(kind='expense' AND field_key IN ('time','amount','category','merchant','paymentMethod','memo','drivingLogId')) THEN
+    AND NOT(kind='log' AND field_key IN ('clockIn','clockOut','startKm','endKm','stops','notes','customerServiceStart','customerServiceEnd'))
+    AND NOT(kind='expense' AND field_key IN ('time','amount','category','merchant','paymentMethod','memo','drivingLogId','billableToCustomer')) THEN
    RAISE EXCEPTION 'INVALID_FIELD' USING ERRCODE='22023';
   END IF;
  END LOOP;
@@ -202,9 +220,9 @@ BEGIN
     OR EXISTS(SELECT 1 FROM jsonb_array_elements(points) x WHERE jsonb_typeof(x) IS DISTINCT FROM 'object')
     OR length(coalesce(f->>'notes',''))>10000 THEN RAISE EXCEPTION 'INVALID_LOG' USING ERRCODE='22023'; END IF;
   INSERT INTO cockpit.driving_logs(id,organization_id,driver_id,driver_name,booking_id,vehicle_id,vehicle_plate,vehicle_model,customer_id,
-    driving_date,clock_in,clock_out,start_km,end_km,distance_km,stops,notes,status,submitted_at,submitted_by)
+    driving_date,clock_in,clock_out,customer_service_start,customer_service_end,start_km,end_km,distance_km,stops,notes,status,submitted_at,submitted_by)
   VALUES(rid,p_org,driver_key,driver.driver_name,booking_key,vehicle_key::text,vehicle.plate,vehicle.model,booking.customer_id,
-    day_value,(f->>'clockIn')::time,(f->>'clockOut')::time,start_value,end_value,end_value-start_value,points,f->>'notes',
+    day_value,(f->>'clockIn')::time,(f->>'clockOut')::time,(f->>'customerServiceStart')::time,(f->>'customerServiceEnd')::time,start_value,end_value,end_value-start_value,points,f->>'notes',
     CASE WHEN submitted THEN '검토 대기' ELSE 'draft' END,CASE WHEN submitted THEN clock_timestamp() END,CASE WHEN submitted THEN p_user::text END)
   RETURNING * INTO logrow;
   result:=jsonb_build_object('id',logrow.id,'status',logrow.status);
@@ -220,9 +238,9 @@ BEGIN
    IF NOT FOUND THEN RAISE EXCEPTION 'LOG_NOT_OWNED' USING ERRCODE='42501'; END IF;
   END IF;
   INSERT INTO cockpit.expenses(id,organization_id,driver_id,driver_name,booking_id,driving_log_id,vehicle_id,vehicle_plate,vehicle_model,customer_id,
-   expense_date,expense_time,amount,category,merchant,payment_method,memo,status,submitted_at,submitted_by)
+   expense_date,expense_time,amount,category,merchant,payment_method,memo,billable_to_customer,status,submitted_at,submitted_by)
   VALUES(rid,p_org,driver_key,driver.driver_name,booking_key,log_key,vehicle_key::text,vehicle.plate,vehicle.model,booking.customer_id,
-   day_value,(f->>'time')::time,amount_value,f->>'category',btrim(f->>'merchant'),f->>'paymentMethod',f->>'memo',
+   day_value,(f->>'time')::time,amount_value,f->>'category',btrim(f->>'merchant'),f->>'paymentMethod',f->>'memo',coalesce((f->>'billableToCustomer')::boolean,true),
    CASE WHEN submitted THEN '검수 대기' ELSE 'draft' END,CASE WHEN submitted THEN clock_timestamp() END,CASE WHEN submitted THEN p_user::text END)
   RETURNING * INTO expense;
   result:=jsonb_build_object('id',expense.id,'status',expense.status);

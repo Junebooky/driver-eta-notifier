@@ -30,11 +30,14 @@ export async function verifyTenantStandardReporting(admin:Client){
   await fails(()=>call(ch,log({vehicleId:v})),'42501');await fails(()=>call(ch,log({bookingId:randomUUID()})),'42501');
   await fails(()=>call(ch,log({status:'승인 완료'})),'22023');await fails(()=>call(ch,log({startKm:200,endKm:100})),'22023');
   const a=(await call(vip,log())).rows[0].result;
-  const b=(await call(ch,log())).rows[0].result;
+  await fails(()=>call(ch,log({customerServiceStart:'24:00'})),'22023');
+  await fails(()=>call(ch,log({customerServiceEnd:1800})),'22023');
+  await fails(()=>call(ch,exp({billableToCustomer:'false'})),'22023');
+  const b=(await call(ch,log({clockIn:'07:00',clockOut:'23:00',customerServiceStart:'09:00',customerServiceEnd:'20:00'}))).rows[0].result;
   assert.notEqual(a.id,b.id);
   await fails(()=>call(ch,exp({drivingLogId:a.id})),'42501');
   await fails(()=>call(ch,exp({receiptStoragePath:'fake'})),'22023');
-  const expenseCommand=exp({drivingLogId:b.id});
+  const expenseCommand=exp({drivingLogId:b.id,billableToCustomer:false});
   const e=(await call(ch,expenseCommand)).rows[0].result;
   assert.deepEqual((await call(ch,expenseCommand)).rows[0].result,e);
   await fails(()=>call(ch,{...expenseCommand,fields:{...expenseCommand.fields,amount:9000}}),'40001');
@@ -49,25 +52,29 @@ export async function verifyTenantStandardReporting(admin:Client){
   assert.equal((await call(ch,{kind:'log',op:'list'},owner,ownerSession)).rows[0].result.records.length,2);
   const records=async(kind:string,org=ch)=>(await call(org,{kind,op:'list'},owner,ownerSession)).rows[0].result.records;
   const mutation=(kind:string,op:string,row:{id:string,revision:string},fields:Record<string,unknown>)=>({kind,op,id:row.id,revision:row.revision,requestId:randomUUID(),fields});
-  const currentExpense=(await records('expense'))[0];
+  const currentExpense=(await records('expense'))[0];assert.equal(currentExpense.billable_to_customer,false);
   await fails(()=>call(ch,mutation('expense','review',currentExpense,{status:'승인 완료'})),'42501');
   await fails(()=>call(ch,mutation('expense','review',currentExpense,{status:'승인 완료'}),owner,ownerSession),'23514');
-  const revise=mutation('expense','review',currentExpense,{status:'보완 필요',notes:'check'});
+  const revise=mutation('expense','review',currentExpense,{status:'보완 필요',notes:'check',billableToCustomer:true});
   await call(ch,revise,owner,ownerSession);
   assert.equal((await call(ch,revise,owner,ownerSession)).rows[0].result.status,'보완 필요');
   await fails(()=>call(ch,mutation('expense','update',currentExpense,{amount:9000})),'40001');
-  const corrected=(await records('expense'))[0];
+  const corrected=(await records('expense'))[0];assert.equal(corrected.billable_to_customer,true);assert.equal(corrected.audit_history[0].billableToCustomerBefore,false);assert.equal(corrected.audit_history[0].billableToCustomerAfter,true);
   await call(ch,mutation('expense','update',corrected,{amount:9000,submit:true}));
   const finalExpense=(await records('expense'))[0];
   assert.equal(finalExpense.amount,9000);assert.equal(finalExpense.audit_history.length,1);
-  assert.equal(finalExpense.status,'검수 대기');
+  assert.equal(finalExpense.status,'검수 대기');assert.equal(finalExpense.billable_to_customer,true);
   const currentLog=(await records('log')).find((x:{id:string})=>x.id===b.id);
   await call(ch,mutation('log','review',currentLog,{status:'보완 필요'}),owner,ownerSession);
   const needsCorrection=(await records('log')).find((x:{id:string})=>x.id===b.id);
-  await call(ch,mutation('log','update',needsCorrection,{stops:[{id:'b',place:'B corrected'},{id:'c',place:'C'}],submit:true}));
+  await call(ch,mutation('log','update',needsCorrection,{stops:[{id:'b',place:'B corrected'},{id:'c',place:'C'}],customerServiceEnd:'21:00',submit:true}));
   const revisedLog=(await records('log')).find((x:{id:string})=>x.id===b.id);
   assert.equal(revisedLog.stops.length,3);assert.equal(revisedLog.stops[0].id,'a');assert.equal(revisedLog.stops[1].place,'B corrected');assert.equal(revisedLog.review_history.length,1);
   assert.equal(revisedLog.expense_amount,9000);
+  assert.equal(revisedLog.customer_service_start,'09:00:00');assert.equal(revisedLog.customer_service_end,'21:00:00');
+  assert.equal(revisedLog.clock_in,'07:00:00');assert.equal(revisedLog.clock_out,'23:00:00');
+  const unrelated=(await records('log',vip)).find((x:{id:string})=>x.id===a.id);
+  assert.equal(unrelated.customer_service_start,null);assert.equal(unrelated.customer_service_end,null);
   await call(ch,mutation('log','review',revisedLog,{status:'승인 완료'}),owner,ownerSession);
   const approved=(await records('log')).find((x:{id:string})=>x.id===b.id);
   await fails(()=>call(ch,mutation('log','update',approved,{notes:'overwrite'})),'42501');
@@ -79,7 +86,7 @@ export async function verifyTenantStandardReporting(admin:Client){
   // Synthetic trusted-server attestation; byte-level verification is exercised
   // separately in the adapter tests. No object storage is touched by this DB test.
   const receipt=(org:string,id:string,op:string,p:unknown=null,u=user,s=session)=>admin.query('SELECT cockpit.tenant_receipt_v1($1,$2,$3,$4,$5,$6::jsonb) result',[org,u,s,id,op,JSON.stringify(p)]);
-  const draftExpense=(await call(ch,exp({submit:false,amount:3000}))).rows[0].result;
+  const draftExpense=(await call(ch,exp({submit:false,amount:3000,billableToCustomer:false}))).rows[0].result;
   const r0=(await receipt(ch,draftExpense.id,'prepare')).rows[0].result;
   const p={path,sha256:'a'.repeat(64),size:100,mime:'image/jpeg',revision:r0.revision};
   await fails(()=>receipt(vip,draftExpense.id,'prepare'),'42501');
@@ -95,6 +102,7 @@ export async function verifyTenantStandardReporting(admin:Client){
   const pendingReceipt=(await records('expense')).find((x:{id:string})=>x.id===draftExpense.id);
   await call(ch,mutation('expense','review',pendingReceipt,{status:'승인 완료'}),owner,ownerSession);
   assert.equal((await records('expense')).find((x:{id:string})=>x.id===draftExpense.id).status,'승인 완료');
+  assert.equal((await records('expense')).find((x:{id:string})=>x.id===draftExpense.id).billable_to_customer,false);
   await fails(()=>receipt(ch,draftExpense.id,'prepare'),'42501');
   await admin.query('RESET ROLE');
   await admin.query("UPDATE cockpit.organization_members SET status='revoked' WHERE org_id=$1 AND user_id=$2",[ch,user]);
