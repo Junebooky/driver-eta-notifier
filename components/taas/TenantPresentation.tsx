@@ -4,6 +4,7 @@ import {createContext,useContext,type ReactNode} from 'react';
 /** Presentation only; never used to grant authority or derive a data query. */
 export interface TenantPresentation {
  displayName:string;appName:string;iconUrl:string;
+ legacyReportExcel?:boolean;
 }
 const Context=createContext<TenantPresentation|null>(null);
 export function TenantPresentationProvider({brand,children}:{brand:TenantPresentation;children:ReactNode}){
