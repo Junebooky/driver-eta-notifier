@@ -1,4 +1,6 @@
 'use client';
+import { useTenantPresentation } from '@/components/taas/TenantPresentation';
+import { legacyExcelVisible, resolveTenantHqTab } from '@/lib/taas/tenantFeatures';
 
 import React, { useState, useMemo, useEffect, useCallback, Suspense, useSyncExternalStore } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -59,12 +61,10 @@ import { getHqCustomersSnapshot, subscribeSettlementReports } from '@/utils/sett
 import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
 
 function HqDashboardInner({ representativeMode }: { representativeMode: boolean }) {
+  const brand = useTenantPresentation();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const resolveTab = (tab: string | null | undefined): string => {
-    if (!tab || tab === 'dashboard') return 'dispatch';
-    return tab;
-  };
+  const resolveTab = (tab: string | null | undefined): string => resolveTenantHqTab(tab,brand);
 
   const [activeTabOverride, setActiveTabOverride] = useState<string | null>(null);
   const activeSidebarTab = resolveTab(activeTabOverride ?? tabParam);
@@ -90,7 +90,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
       const targetTab = resolveTab(tabParam);
       setActiveTabOverride(targetTab);
       try {
-        sessionStorage.setItem('hq_active_tab', targetTab);
+        if (!brand) sessionStorage.setItem('hq_active_tab', targetTab);
       } catch {}
     }
   }, [tabParam]);
@@ -101,7 +101,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
     try {
       const url = new URL(window.location.href);
       const urlTab = url.searchParams.get('tab');
-      const savedTab = sessionStorage.getItem('hq_active_tab');
+      const savedTab = brand ? null : sessionStorage.getItem('hq_active_tab');
 
       if (!urlTab && savedTab) {
         const resolved = resolveTab(savedTab);
@@ -109,7 +109,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
         url.searchParams.set('tab', resolved);
         window.history.replaceState(null, '', url.pathname + url.search);
       } else if (urlTab) {
-        sessionStorage.setItem('hq_active_tab', resolveTab(urlTab));
+        if (!brand) sessionStorage.setItem('hq_active_tab', resolveTab(urlTab));
       }
     } catch {}
   }, []);
@@ -123,7 +123,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
         const currentFilter = url.searchParams.get('filter');
         setActiveTabOverride(currentTab);
         setActiveKpiFilter(currentFilter && currentFilter !== 'today' ? currentFilter : null);
-        sessionStorage.setItem('hq_active_tab', currentTab);
+        if (!brand) sessionStorage.setItem('hq_active_tab', currentTab);
       } catch {}
     };
 
@@ -458,6 +458,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
     setSelectedBooking(booking); setBookingModalSection('assignment'); setIsDetailModalOpen(true);
   };
   const navigateWorkspace = (tab: string, filter?: string) => {
+    tab = resolveTab(tab);
     setActiveTabOverride(tab);
     setSearchQuery('');
     setActiveKpiFilter(filter && filter !== 'today' ? filter : null);
@@ -469,7 +470,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
 
     if (typeof window !== 'undefined') {
       try {
-        sessionStorage.setItem('hq_active_tab', tab);
+        if (!brand) sessionStorage.setItem('hq_active_tab', tab);
         const url = new URL(window.location.href);
         url.searchParams.set('tab', tab);
         if (filter && filter !== 'today') {
@@ -575,7 +576,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
               initialSearchQuery={searchQuery}
               onOpenSettlementReport={() => navigateWorkspace('reports')}
             />
-          ) : activeSidebarTab === 'excel_import' ? (
+          ) : activeSidebarTab === 'excel_import' && legacyExcelVisible(brand) ? (
             <HqKakaoExcelImportView />
           ) : activeSidebarTab === 'reports' ? (
             <HqReportsView initialSearchQuery={searchQuery} />

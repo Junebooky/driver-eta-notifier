@@ -1,5 +1,6 @@
 'use client';
 import { useTenantPresentation } from '@/components/taas/TenantPresentation';
+import { legacyExcelVisible } from '@/lib/taas/tenantFeatures';
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
@@ -276,7 +277,7 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
 
       {/* Navigation List */}
       <nav className="flex-1 space-y-1 overflow-x-hidden overflow-y-auto px-2.5 pb-3 pt-3">
-        {menuItems.map((item) => {
+        {menuItems.filter(item => item.id !== 'excel_import' || legacyExcelVisible(brand)).map((item) => {
           const isActive = activeTab === item.id;
           const isSettings = item.id === 'settings';
 
