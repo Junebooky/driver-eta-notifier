@@ -1,4 +1,5 @@
 'use client';
+import { useTenantPresentation } from '@/components/taas/TenantPresentation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { accountHome, canAccessPortal } from '@/utils/loginPortal';
@@ -6,10 +7,11 @@ import { usePathname } from 'next/navigation';
 import { ensureClientAuth, logoutClientSession, type ClientSessionInfo } from '@/utils/cockpitClientAuth';
 
 export function SessionGate({ children }: { children: React.ReactNode }) {
+  const brand = useTenantPresentation();
   const pathname = usePathname();
   const [checked, setChecked] = useState<{ path: string; session: ClientSessionInfo } | null>(null);
   useEffect(() => {
-    if(pathname==='/driver/connect'||pathname==='/report')return;
+    if(brand||pathname==='/driver/connect'||pathname==='/report')return;
     let active = true;
     const check=()=>ensureClientAuth(undefined, undefined, {force:true}).then(session => { if (active) setChecked({ path: pathname, session }); });
     void check();
@@ -26,10 +28,13 @@ export function SessionGate({ children }: { children: React.ReactNode }) {
       window.removeEventListener('online',visibleCheck);
       document.removeEventListener('visibilitychange',visibleCheck);
     };
-  }, [pathname]);
-  const destination = checked?.path === pathname && checked.session.authenticated && pathname === '/'
+  }, [pathname,brand]);
+  const destination = !brand && checked?.path === pathname && checked.session.authenticated && pathname === '/'
     ? accountHome(checked.session) : '/';
   useEffect(() => { if (destination !== '/') window.location.replace(destination); }, [destination]);
+  // A brand is not authorization. Until the tenant session/API adapter is
+  // connected, block all legacy business screens even with a legacy cookie.
+  if (brand) return pathname === '/login' ? children : <main role="status" className="m-auto p-8 text-center text-slate-500">업체 전용 서비스 연결 준비 중입니다.</main>;
   if (pathname === '/driver/connect' || pathname === '/report') return children;
   if (pathname === '/login' || pathname === '/hq/login' || pathname === '/representative/login') return children;
   if (checked?.path !== pathname) return <div role="status" className="m-auto p-8 text-slate-500">로그인을 확인하고 있습니다.</div>;

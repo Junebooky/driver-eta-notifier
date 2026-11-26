@@ -1,4 +1,5 @@
 'use client';
+import { useTenantPresentation } from '@/components/taas/TenantPresentation';
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
@@ -29,6 +30,7 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
   onOpenDispatchCard,
   dispatchActionBadgeCount = 0,
 }) => {
+  const brand = useTenantPresentation();
   // 1. Sidebar Pin State with LocalStorage Persistence
   const [isPinned, setIsPinned] = useState(false);
 
@@ -199,8 +201,8 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
         {/* Logo Anchor: Stays strictly in position */}
         <div className="w-10 h-10 flex items-center justify-center shrink-0">
           <img
-            src="/logo.png"
-            alt="VIP Limousine Logo"
+            src={brand?.iconUrl ?? "/logo.png"}
+            alt={brand?.displayName ?? "VIP Limousine Logo"}
             className="w-8 h-8 object-contain shrink-0 drop-shadow-xs"
           />
         </div>
@@ -215,10 +217,10 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
         >
           <div className="flex flex-col min-w-0">
             <span className="truncate text-[12px] font-bold tracking-[-0.02em] text-[#17233B]">
-              VIP LIMOUSINE
+              {brand?.displayName ?? 'VIP LIMOUSINE'}
             </span>
             <span className="truncate text-[10px] font-medium leading-none text-[#95A3B9]">
-              KOREA HQ
+              {brand ? 'HQ' : 'KOREA HQ'}
             </span>
           </div>
 

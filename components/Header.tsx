@@ -1,4 +1,5 @@
 'use client';
+import { useTenantPresentation } from '@/components/taas/TenantPresentation';
 
 import React, { useRef, useEffect } from 'react';
 import { DriverProfile, NaviProvider } from '@/types';
@@ -52,6 +53,7 @@ export const Header: React.FC<HeaderProps> = ({
   isAdmin = false,
   isHidden = false,
 }) => {
+  const brand = useTenantPresentation();
   const headerLabel = formatHeaderDriverLabel(profile.vehicleNo, profile.driverName);
 
   // Header.tsx 내부 상태 및 롱프레스 제어
@@ -210,7 +212,7 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           {/* Local Dev Test Account Switcher */}
-          <DevAuthSwitcher />
+          {!brand && <DevAuthSwitcher />}
 
           {/* Admin / Settings Gear Button */}
           {onOpenAdminModal && (
