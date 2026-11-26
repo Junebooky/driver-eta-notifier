@@ -11,8 +11,8 @@ export async function verifyTenantStandardReporting(admin:Client){
  const owner=randomUUID(),ownerSession=randomUUID(),user=randomUUID(),session=randomUUID(),d1=randomUUID(),d2=randomUUID(),d3=randomUUID();
  const date='2027-01-12';
  const call=(org:string,cmd:unknown,u=user,s=session)=>admin.query('SELECT cockpit.tenant_standard_report_v1($1,$2,$3,$4::jsonb) result',[org,u,s,JSON.stringify(cmd)]);
- const log=(fields:Record<string,unknown>={})=>({kind:'log',op:'create',fields:{date,startKm:100,endKm:180,stops:[{id:'a',place:'A'},{id:'b',place:'B'}],submit:true,...fields}});
- const exp=(fields:Record<string,unknown>={})=>({kind:'expense',op:'create',fields:{date,time:'10:00',category:'parking',amount:8000,merchant:'fixture',paymentMethod:'company_card',submit:true,...fields}});
+ const log=(fields:Record<string,unknown>={})=>({kind:'log',op:'create',requestId:randomUUID(),fields:{date,startKm:100,endKm:180,stops:[{id:'a',place:'A'},{id:'b',place:'B'}],submit:true,...fields}});
+ const exp=(fields:Record<string,unknown>={})=>({kind:'expense',op:'create',requestId:randomUUID(),fields:{date,time:'10:00',category:'parking',amount:8000,merchant:'fixture',paymentMethod:'company_card',submit:true,...fields}});
  await admin.query('BEGIN');
  try{
   const fails=async(fn:()=>Promise<unknown>,code:string)=>{await admin.query('SAVEPOINT failure');try{await assert.rejects(fn(),{code});}finally{await admin.query('ROLLBACK TO SAVEPOINT failure');await admin.query('RELEASE SAVEPOINT failure');}};
@@ -33,7 +33,10 @@ export async function verifyTenantStandardReporting(admin:Client){
   assert.notEqual(a.id,b.id);
   await fails(()=>call(ch,exp({drivingLogId:a.id})),'42501');
   await fails(()=>call(ch,exp({receiptStoragePath:'fake'})),'22023');
-  const e=(await call(ch,exp({drivingLogId:b.id}))).rows[0].result;
+  const expenseCommand=exp({drivingLogId:b.id});
+  const e=(await call(ch,expenseCommand)).rows[0].result;
+  assert.deepEqual((await call(ch,expenseCommand)).rows[0].result,e);
+  await fails(()=>call(ch,{...expenseCommand,fields:{...expenseCommand.fields,amount:9000}}),'40001');
   assert.equal(e.status,'검수 대기');
   const totals=(await admin.query('SELECT id,expense_amount,expense_count FROM cockpit.driving_logs WHERE id IN ($1,$2)',[a.id,b.id])).rows;
   assert.equal(totals.find(x=>x.id===a.id).expense_amount,0);assert.equal(totals.find(x=>x.id===b.id).expense_amount,8000);
@@ -43,6 +46,31 @@ export async function verifyTenantStandardReporting(admin:Client){
   await call(ch,log({driverId:d3}),owner,ownerSession);
   assert.equal((await call(ch,{kind:'log',op:'list'})).rows[0].result.records.length,1);
   assert.equal((await call(ch,{kind:'log',op:'list'},owner,ownerSession)).rows[0].result.records.length,2);
+  const records=async(kind:string,org=ch)=>(await call(org,{kind,op:'list'},owner,ownerSession)).rows[0].result.records;
+  const mutation=(kind:string,op:string,row:{id:string,revision:string},fields:Record<string,unknown>)=>({kind,op,id:row.id,revision:row.revision,requestId:randomUUID(),fields});
+  const currentExpense=(await records('expense'))[0];
+  await fails(()=>call(ch,mutation('expense','review',currentExpense,{status:'승인 완료'})),'42501');
+  await fails(()=>call(ch,mutation('expense','review',currentExpense,{status:'승인 완료'}),owner,ownerSession),'23514');
+  const revise=mutation('expense','review',currentExpense,{status:'보완 필요',notes:'check'});
+  await call(ch,revise,owner,ownerSession);
+  assert.equal((await call(ch,revise,owner,ownerSession)).rows[0].result.status,'보완 필요');
+  await fails(()=>call(ch,mutation('expense','update',currentExpense,{amount:9000})),'40001');
+  const corrected=(await records('expense'))[0];
+  await call(ch,mutation('expense','update',corrected,{amount:9000,submit:true}));
+  const finalExpense=(await records('expense'))[0];
+  assert.equal(finalExpense.amount,9000);assert.equal(finalExpense.audit_history.length,1);
+  assert.equal(finalExpense.status,'검수 대기');
+  const currentLog=(await records('log')).find((x:{id:string})=>x.id===b.id);
+  await call(ch,mutation('log','review',currentLog,{status:'보완 필요'}),owner,ownerSession);
+  const needsCorrection=(await records('log')).find((x:{id:string})=>x.id===b.id);
+  await call(ch,mutation('log','update',needsCorrection,{stops:[{id:'b',place:'B corrected'},{id:'c',place:'C'}],submit:true}));
+  const revisedLog=(await records('log')).find((x:{id:string})=>x.id===b.id);
+  assert.equal(revisedLog.stops.length,3);assert.equal(revisedLog.stops[0].id,'a');assert.equal(revisedLog.stops[1].place,'B corrected');assert.equal(revisedLog.review_history.length,1);
+  assert.equal(revisedLog.expense_amount,9000);
+  await call(ch,mutation('log','review',revisedLog,{status:'승인 완료'}),owner,ownerSession);
+  const approved=(await records('log')).find((x:{id:string})=>x.id===b.id);
+  await fails(()=>call(ch,mutation('log','update',approved,{notes:'overwrite'})),'42501');
+  await fails(()=>call(vip,mutation('log','review',approved,{status:'반려'}),owner,ownerSession),'42501');
   const path=ch+'/expenses/receipts/'+d2+'/2027/01/'+'a'.repeat(64)+'.jpg';
   for(const [p,valid] of [[path,true],[path.replace(ch,vip),false],[path.replace(d2,d1),false],[path.replace('/01/','/13/'),false],[path+'/../x',false],[path.replace('/01/','/%2e%2e/'),false]] as const){
    assert.equal((await admin.query('SELECT cockpit.tenant_receipt_path_valid_v1($1,$2,$3) valid',[ch,d2,p])).rows[0].valid,valid);
