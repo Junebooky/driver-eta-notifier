@@ -1,5 +1,7 @@
 import { supabaseAdmin } from '../supabase/server';
 import { evaluateTenantIdentity, type TenantAuthDependencies, type TenantIdentity } from './tenantIdentity';
+import { ownsActiveDriver } from '../taas/resourceOwnership';
+import { readScopedResource } from '../taas/resourceStore.server';
 
 /** P0-02 release interlock: no tenant candidate may grant live access.
  * Changing an env var, domain record or staged membership cannot lift it.
@@ -35,11 +37,8 @@ const dependencies: TenantAuthDependencies = {
       .eq('org_id', orgId).eq('user_id', userId).maybeSingle();
     return error ? null : data;
   },
-  async ownsActiveDriver() {
-    // The live legacy drivers table has no verified tenant ownership column.
-    // An ID-only lookup would be unsafe. P0-03 must implement real ownership
-    // and active-driver verification before a driver can ever be authorized.
-    return false;
+  async ownsActiveDriver(orgId, driverId) {
+    return ownsActiveDriver(readScopedResource, orgId, driverId);
   },
 };
 
