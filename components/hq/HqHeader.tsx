@@ -1,4 +1,5 @@
 'use client';
+import { useTenantPresentation } from '@/components/taas/TenantPresentation';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, X, ChevronDown } from 'lucide-react';
@@ -40,6 +41,7 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
   searchPlaceholder = '고객명, 예약번호, 기사명, 차량번호 검색...',
 }) => {
 
+  const brand = useTenantPresentation();
   // 1-minute alert pulse & speech bubble
   const [isMinutePulsing, setIsMinutePulsing] = useState(false);
   const [showMinuteBubble, setShowMinuteBubble] = useState(false);
@@ -184,7 +186,7 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
           )}
 
           {/* Dev Test Account Switcher (only renders on localhost with DEV_AUTH_ENABLED) */}
-          <DevAuthSwitcher />
+          {!brand && <DevAuthSwitcher />}
 
           {/* Admin Profile Pill */}
           <button
@@ -199,7 +201,7 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
             title="본사 관제 세션 (클릭하여 관리자 로그인)"
           >
             <div className="flex size-8 shrink-0 items-center justify-center rounded-[11px] bg-[#EEF3FF] text-[12px] font-semibold text-[#1E60F3]">
-              V
+              {brand ? Array.from(brand.displayName)[0] : 'V'}
             </div>
             <div className="text-left hidden lg:block">
               <div className="text-[12px] font-semibold leading-tight text-[#17233B]">본사 관제</div>

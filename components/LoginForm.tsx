@@ -1,9 +1,11 @@
 'use client';
+import { useTenantPresentation } from '@/components/taas/TenantPresentation';
 import { useState } from 'react';
 import { canAccessPortal, loginDestination, type LoginPortal } from '@/utils/loginPortal';
 import { purgeLocalCaches } from '@/utils/cockpitClientAuth';
 
 export function LoginForm({ initialPortal = 'driver' }: { initialPortal?: LoginPortal }) {
+  const brand = useTenantPresentation();
   const [role, setRole] = useState<LoginPortal>(
     initialPortal === 'hq' || initialPortal === 'representative' ? 'hq' : 'driver'
   );
@@ -16,7 +18,7 @@ export function LoginForm({ initialPortal = 'driver' }: { initialPortal?: LoginP
   const isHq = role === 'hq' || role === 'representative';
 
   async function handleQuickLogin(target: 'driver' | 'admin') {
-    if (loading) return;
+    if (loading || brand) return;
     setLoading(true);
     setError('');
     const targetPortal: LoginPortal = target === 'driver' ? 'driver' : 'hq';
@@ -66,7 +68,8 @@ export function LoginForm({ initialPortal = 'driver' }: { initialPortal?: LoginP
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (loading) return;
+    // The tenant password/MFA API is not released. Never post tenant credentials to legacy auth.
+    if (loading || brand) return;
     setLoading(true);
     setError('');
     try {
@@ -93,8 +96,10 @@ export function LoginForm({ initialPortal = 'driver' }: { initialPortal?: LoginP
 
   return (
     <main className="m-auto w-full max-w-md px-6 py-12">
-      <p className="mb-3 text-xs font-bold tracking-widest text-[#1E60F3]">VIP LIMOUSINE KOREA</p>
+      <p className="mb-3 text-xs font-bold tracking-widest text-[#1E60F3]">{brand?.displayName ?? 'VIP LIMOUSINE KOREA'}</p>
 
+      {brand && <img src={brand.iconUrl} alt={brand.displayName} className="mb-5 size-14 rounded-[14px] object-contain" />}
+      {!brand && <>
       {/* 1. 빠른 원클릭 접속 (개발 및 테스트용) */}
       <div className="mb-6 rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
         <div className="mb-2.5 flex items-center justify-between">
@@ -153,17 +158,20 @@ export function LoginForm({ initialPortal = 'driver' }: { initialPortal?: LoginP
         </button>
       </div>
 
+      </>}
       <h1 className="mb-2 text-2xl font-bold tracking-tight">
-        {isHq ? '본사 관리자 로그인' : 'Driver Cockpit'}
+        {brand ? brand.appName : isHq ? '본사 관리자 로그인' : 'Driver Cockpit'}
       </h1>
       <p className="mb-6 text-sm text-slate-500">
-        {isHq
+        {brand ? '등록된 계정으로 로그인해 주세요.' : isHq
           ? '본사 관리자 전용 통합 로그인입니다.'
           : '기사 전용 로그인 — 담당 계정으로 로그인해 주세요.'}
       </p>
 
       {/* 3. 계정 직접 입력 폼 */}
+      {brand && <p role="status" className="mb-4 text-sm text-slate-500">업체 로그인 연동 준비 중입니다.</p>}
       <form onSubmit={submit} className="space-y-4">
+        <fieldset disabled={!!brand} className="space-y-4">
         <label className="block text-sm font-bold">
           계정 이메일
           <input
@@ -204,11 +212,12 @@ export function LoginForm({ initialPortal = 'driver' }: { initialPortal?: LoginP
         )}
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !!brand}
           className="h-12 w-full rounded-xl bg-[#1E60F3] text-sm font-bold text-white disabled:opacity-50 cursor-pointer"
         >
-          {loading ? '로그인 중…' : `${isHq ? '관리자' : '기사'} 로그인`}
+          {loading ? '로그인 중…' : brand ? '로그인' : `${isHq ? '관리자' : '기사'} 로그인`}
         </button>
+        </fieldset>
       </form>
     </main>
   );

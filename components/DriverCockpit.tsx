@@ -1,4 +1,5 @@
 'use client';
+import { useTenantPresentation } from '@/components/taas/TenantPresentation';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Link from 'next/link';
@@ -76,6 +77,7 @@ const ADMIN_MODE_KEY = 'protocol_cockpit_admin_mode_v1';
 const LAST_ROUTE_STORAGE_KEY = 'cockpit_last_route';
 
 export default function DriverCockpit() {
+  const brand = useTenantPresentation();
   const { profile, isLoaded, updateProfile, setPreferredNavi } = useDriverProfile();
   const {
     currentLocation: origin,
@@ -1659,15 +1661,15 @@ export default function DriverCockpit() {
       <div className="fixed inset-0 z-50 bg-inherit flex flex-col items-center justify-center p-6 text-center select-none">
         <div className="flex flex-col items-center max-w-xs animate-in zoom-in-95 duration-300">
           <img
-            src="/cockpit_app_icon.png"
-            alt="Protocol Cockpit"
+            src={brand?.iconUrl ?? "/cockpit_app_icon.png"}
+            alt={brand?.appName ?? "Protocol Cockpit"}
             className="w-20 h-20 rounded-[20px] shadow-[0_12px_32px_rgba(30,96,243,0.22)] ring-1 ring-slate-200/80 mb-6 animate-pulse"
           />
           <h1 className="text-3xl font-extrabold text-[#1E60F3] tracking-tight mb-3">
             환영합니다!
           </h1>
           <p className="text-sm font-semibold text-slate-800 mb-1.5 leading-snug">
-            VIP 의전 관제 시스템에 접속하셨습니다.
+            {brand ? brand.displayName + ' 의전 관제 시스템에 접속하셨습니다.' : 'VIP 의전 관제 시스템에 접속하셨습니다.'}
           </p>
           <p className="text-sm text-slate-500 font-normal leading-relaxed">
             원활한 이동 보고를 위해 드라이버 정보를 등록해 주세요.
