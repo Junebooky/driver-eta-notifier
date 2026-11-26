@@ -348,8 +348,11 @@ export function matchHipassTransactions(params: {
   bookings: HqBooking[];
   drivingLogs: HqDrivingLog[];
   existingExpenses: HqExpenseRecord[];
+  /** Existing VIP callers retain the legacy default; tenant callers MUST
+   * explicitly supply the validated organization fleet, including an empty list. */
+  fleet?: ReadonlyArray<{plate:string;model:string;defaultDriver?:string}>;
 }): ReconciledHipassItem[] {
-  const { rows, bookings, drivingLogs, existingExpenses } = params;
+  const { rows, bookings, drivingLogs, existingExpenses, fleet = VIP_REAL_VEHICLES } = params;
 
   const existingKeys = new Set<string>();
   existingExpenses.forEach((exp) => {
@@ -368,13 +371,13 @@ export function matchHipassTransactions(params: {
     const last4 = digitsMatch ? digitsMatch[1] : '';
 
     // 1. Resolve vehicle against VIP_REAL_VEHICLES
-    let fleetMatches = VIP_REAL_VEHICLES.filter(
+    let fleetMatches = fleet.filter(
       (v) => cleanInputPlate && cleanVehicleIdentity(v.plate) === cleanInputPlate
     );
     let isAmbiguousSuffix = false;
     if (fleetMatches.length === 0 && last4 && cleanInputPlate.length === 4) {
       // Only allow 4-digit shorthand if strictly unique in fleet
-      const suffixMatches = VIP_REAL_VEHICLES.filter((v) => v.plate.endsWith(last4));
+      const suffixMatches = fleet.filter((v) => v.plate.endsWith(last4));
       if (suffixMatches.length === 1) {
         fleetMatches = suffixMatches;
       } else if (suffixMatches.length > 1) {
