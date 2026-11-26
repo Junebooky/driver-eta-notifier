@@ -6,7 +6,7 @@ import type {Client} from 'pg';
 export async function verifyTenantDraft(admin:Client){
  const vip='vip_limousine_korea',ch='chauffeur_service';
  // Disposable fixture only: live schedule already has customer_id.
- await admin.query('ALTER TABLE cockpit.schedules ADD COLUMN IF NOT EXISTS customer_id text');
+ await admin.query('ALTER TABLE cockpit.schedules ADD COLUMN IF NOT EXISTS customer_id text, ADD COLUMN IF NOT EXISTS group_id text');
  // The real role has CRM grants; this synthetic CRM fixture must have them for the candidate.
  await admin.query('GRANT SELECT,UPDATE ON cockpit.customers TO service_role');
  await admin.query(readFileSync('supabase/proposals/taas_atomic_draft.sql','utf8'));
@@ -50,14 +50,21 @@ export async function verifyTenantDraft(admin:Client){
   await fails(()=>call(vip,'save',[{row:{...row,destination:'different'}}]),'40001');
   const saved=(await admin.query('SELECT * FROM cockpit.schedules WHERE id=$1',[id])).rows[0];
   assert.equal(saved.org_id,vip);assert.equal(saved.dispatch_status,'draft');
-  assert.deepEqual(saved.schedule_meta.routeWaypoints,route);assert.equal(saved.customer_id,cust1);
+  assert.deepEqual(saved.schedule_meta.routeWaypoints,route);assert.equal(saved.customer_id,cust1);assert.equal(saved.group_id,'fixture-group');
   await fails(()=>call(ch,'edit-other',[{row:{...row,driver_id:d2,vehicle_id:null,customer_id:cust2},expected_updated_at:first[0].updated_at}]),'42501');
+  await fails(()=>call(vip,'missing-route',[{row:{...row,routeWaypoints:undefined},expected_updated_at:first[0].updated_at}]),'22023');
   const next=(await call(vip,'edit',[{row:{...row,destination:'D'},expected_updated_at:first[0].updated_at}])).rows[0].result;
   assert.equal(next[0].id,id);
   await fails(()=>call(vip,'stale',[{row,expected_updated_at:first[0].updated_at}]),'40001');
   // Same request ID in another org is independent; no automatic VIP fallback.
   const other=(await call(ch,'save',[{row:{...row,id:id2,driver_id:d2,vehicle_id:null,customer_id:cust2}}])).rows[0].result;
   assert.equal(other[0].org_id,ch);
+  const dayA=randomUUID(),dayB=randomUUID();
+  const two=[{row:{...row,id:dayA,date:'2027-02-04'}},{row:{...row,id:dayB,date:'2027-02-05'}}];
+  const grouped=(await call(vip,'multi-day',two)).rows[0].result;
+  assert.equal(grouped.length,2);
+  const days=await admin.query('SELECT group_id,schedule_meta FROM cockpit.schedules WHERE id IN ($1,$2) ORDER BY date',[dayA,dayB]);
+  assert.equal(days.rowCount,2);assert.ok(days.rows.every(x=>x.group_id==='fixture-group'&&x.schedule_meta.routeWaypoints.length===3));
   await admin.query('RESET ROLE');
   await admin.query("UPDATE cockpit.organization_members SET status='revoked' WHERE org_id=$1 AND user_id=$2",[vip,user]);
   await admin.query('SET LOCAL ROLE service_role');

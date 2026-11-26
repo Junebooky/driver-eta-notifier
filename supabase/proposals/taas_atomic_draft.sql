@@ -64,7 +64,8 @@ BEGIN
       OR (patch?'group_id' AND length(coalesce(patch->>'group_id',''))>160)
       OR coalesce(patch->>'serviceMode','with_driver') NOT IN ('with_driver','vehicle_only')
       THEN RAISE EXCEPTION 'INVALID_DRAFT' USING ERRCODE='22023'; END IF;
-    points:=coalesce(patch->'routeWaypoints','[]'::jsonb);
+    -- A complete replacement must supply the route explicitly; never silently drop stops.
+    points:=patch->'routeWaypoints';
     IF jsonb_typeof(points) IS DISTINCT FROM 'array' OR jsonb_array_length(points)>200
       OR EXISTS(SELECT 1 FROM jsonb_array_elements(points) x WHERE jsonb_typeof(x) IS DISTINCT FROM 'object') THEN
       RAISE EXCEPTION 'INVALID_ROUTE' USING ERRCODE='22023';
@@ -109,15 +110,15 @@ BEGIN
       'groupId',patch->>'group_id','dispatchStatus','draft');
     IF old_row.id IS NULL THEN
       INSERT INTO cockpit.schedules(id,org_id,date,pickup_time,end_date,end_time,time_display,origin,destination,
-        driver_id,driver_name,vehicle_id,vehicle_plate,vehicle_no,customer_id,status,dispatch_status,schedule_meta,updated_at)
+        driver_id,driver_name,vehicle_id,vehicle_plate,vehicle_no,customer_id,group_id,status,dispatch_status,schedule_meta,updated_at)
       VALUES(schedule_id,p_org,day_value,start_value,end_day_value,end_value,'',patch->>'origin',patch->>'destination',
-        driver_id_value,driver_name_value,vehicle_id_value,vehicle_plate_value,coalesce(vehicle_plate_value,'미배정'),customer_id_value,
+        driver_id_value,driver_name_value,vehicle_id_value,vehicle_plate_value,coalesce(vehicle_plate_value,'미배정'),customer_id_value,patch->>'group_id',
         'draft','draft',meta,clock_timestamp()) RETURNING * INTO saved;
     ELSE
       UPDATE cockpit.schedules s SET date=day_value,pickup_time=start_value,end_date=end_day_value,end_time=end_value,
         origin=patch->>'origin',destination=patch->>'destination',driver_id=driver_id_value,driver_name=driver_name_value,
         vehicle_id=vehicle_id_value,vehicle_plate=vehicle_plate_value,vehicle_no=coalesce(vehicle_plate_value,'미배정'),
-        customer_id=customer_id_value,schedule_meta=meta,updated_at=clock_timestamp()
+        customer_id=customer_id_value,group_id=patch->>'group_id',schedule_meta=meta,updated_at=clock_timestamp()
       WHERE s.id=schedule_id AND s.org_id=p_org RETURNING * INTO saved;
     END IF;
     result:=result||jsonb_build_array(jsonb_build_object('id',saved.id,'org_id',saved.org_id,'updated_at',saved.updated_at,'dispatch_status',saved.dispatch_status));
