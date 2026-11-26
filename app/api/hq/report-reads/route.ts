@@ -1,3 +1,4 @@
+import {hasLegacyExcelAccess} from '@/lib/driverReports/legacyExcelPolicy';
 import {NextRequest} from 'next/server';
 import {requireHqAdmin} from '@/lib/auth/serverAuth';
 import {supabaseAdmin as db} from '@/lib/supabase/server';
@@ -7,6 +8,7 @@ export const dynamic='force-dynamic';
 export async function GET(req:NextRequest){
  const auth=await requireHqAdmin(req);
  if(!auth.ok||!auth.session)return privateJson({ok:false,error:'HQ 권한이 필요합니다.'},auth.statusCode);
+ if(!hasLegacyExcelAccess(auth.session.org))return privateJson({ok:false,error:'이 업체는 Excel 운행보고를 사용할 수 없습니다.'},403);
  const r=await db.rpc('unread_applied_reports',{p_org:auth.session.org,p_actor:auth.session.userId});
  if(r.error)return privateJson({ok:false,error:'새 보고 알림을 확인하지 못했습니다.'},503);
  return privateJson({ok:true,unreadIds:(r.data||[]).map((v:{submission_id:string})=>v.submission_id)});
@@ -14,6 +16,7 @@ export async function GET(req:NextRequest){
 export async function POST(req:NextRequest){
  const auth=await requireHqAdmin(req);
  if(!auth.ok||!auth.session)return privateJson({ok:false,error:'HQ 권한이 필요합니다.'},auth.statusCode);
+ if(!hasLegacyExcelAccess(auth.session.org))return privateJson({ok:false,error:'이 업체는 Excel 운행보고를 사용할 수 없습니다.'},403);
  if(!sameOrigin(req))return privateJson({ok:false,error:'허용되지 않은 요청입니다.'},403);
  try{
   const body=JSON.parse(new TextDecoder().decode(await boundedBody(req,800)));

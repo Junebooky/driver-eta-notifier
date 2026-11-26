@@ -1,3 +1,4 @@
+import {assertLegacyExcelAccess,VIP_EXCEL_ORG} from './legacyExcelPolicy';
 import {reportWorkbookYear} from '@/utils/reportWorkbookYear';
 import {findWorkbookMonthSheetName,workbookMonthSheetNames} from '@/utils/reportWorkbookMonth';
 import {createHash} from 'node:crypto';
@@ -19,6 +20,7 @@ function check(error:{message:string;code?:string}|null){
 }
 const bytesFromDb=(value:string)=>new Uint8Array(Buffer.from(value.replace(/^\\x/,''),'hex'));
 export async function currentWorkbook(org:string,year?:number){
+ assertLegacyExcelAccess(org);
  const registry=year?await db.from('report_ledgers').select('active_version,filename').eq('org_id',org).eq('year',year).maybeSingle():await db.from('report_workbooks').select('active_version,filename').eq('org_id',org).maybeSingle();check(registry.error);
  if(!registry.data)return null;
  const version=await db.from('report_workbook_versions').select('*').eq('org_id',org).eq('id',registry.data.active_version).single();check(version.error);
@@ -27,6 +29,7 @@ export async function currentWorkbook(org:string,year?:number){
  return {...registry.data,id:version.data.id,bytes,generation:version.data.generation,year:resolvedYear as number|null,manifest:version.data.manifest as Record<string,{sheet:string;row:number}>};
 }
 export async function processReport(org:string,id:string,actor:string,lease?:string){
+ assertLegacyExcelAccess(org);
  if(!lease){await runReportWorker(org,1,id);return;}
  try{
   for(let attempt=0;attempt<12;attempt++){
@@ -68,16 +71,22 @@ export async function processReport(org:string,id:string,actor:string,lease?:str
  }catch(error){const f=await db.rpc('finish_report_failure',{p_org:org,p_id:id,p_lease:lease,p_reason:error instanceof Error?error.message:'Excel 반영 오류'});check(f.error);}
 }
 export async function runReportWorker(org?:string,limit=15,id?:string){
- const claim=await db.rpc('claim_report_jobs',{p_limit:limit,p_org:org||null,p_id:id||null});check(claim.error);
+ const scope=org===undefined?VIP_EXCEL_ORG:org;
+ assertLegacyExcelAccess(scope);
+ const claim=await db.rpc('claim_report_jobs',{p_limit:limit,p_org:scope,p_id:id||null});check(claim.error);
+ // Defensive validation before any workbook processing. Never mutate a foreign job.
+ for(const job of claim.data||[])assertLegacyExcelAccess(job.org_id);
  for(const job of claim.data||[])await processReport(job.org_id,job.submission_id,'00000000-0000-4000-8000-000000000001',job.lease_token);
  return claim.data?.length||0;
 }
 export async function activeLedgerYear(org:string){
+ assertLegacyExcelAccess(org);
  const registry=await db.from('report_workbooks').select('active_version').eq('org_id',org).maybeSingle();check(registry.error);if(!registry.data)return null;
  const version=await db.from('report_workbook_versions').select('ledger_year').eq('org_id',org).eq('id',registry.data.active_version).single();check(version.error);
  return version.data?.ledger_year??(await currentWorkbook(org))?.year??null;
 }
 export async function submitReport(session:CockpitAuthSession,raw:string,requestKey:string,serviceType?:ReportServiceType){
+ assertLegacyExcelAccess(session.org);
  if(session.role!=='driver'||!session.driverId)throw new Error('기사 계정이 필요합니다.');
  const gate=validateReportInput(raw);
  if(!gate.accepted)return {accepted:false as const,needsTemplate:true as const,reply:gate.reply,missing:gate.missing,duplicate:false};
@@ -95,6 +104,7 @@ export async function submitReport(session:CockpitAuthSession,raw:string,request
 
 }
 export async function registerWorkbook(session:CockpitAuthSession,bytes:Uint8Array,filename:string){
+ assertLegacyExcelAccess(session.org);
  workbookFromFile(bytes);const year=reportWorkbookYear(bytes,filename);if(year===null)throw new Error('파일명과 날짜의 연도가 다르거나 혼합되어 있습니다. 장부를 확인해 주세요.');
  const saved=await db.rpc('register_report_ledger',{p_org:session.org,p_year:year,p_actor:session.userId,p_filename:filename,p_storage:await storeWorkbook(session.org,bytes)});check(saved.error);
 }
@@ -107,6 +117,7 @@ export async function replaceWorkbook(
  session:CockpitAuthSession, bytes:Uint8Array, filename:string,
  expectedYear:number,expectedVersion:string,
 ){
+ assertLegacyExcelAccess(session.org);
  const book=workbookFromFile(bytes);
  const year=reportWorkbookYear(bytes,filename);
  if(year===null||year!==expectedYear)
@@ -128,6 +139,7 @@ export async function replaceWorkbook(
  return committed.data as {version:string;previousVersion:string;archivedReports:number;year:number;filename:string};
 }
 export async function approveMonth(session:CockpitAuthSession,year:number,month:number,source:string){
+ assertLegacyExcelAccess(session.org);
  const w=await currentWorkbook(session.org,year);if(!w)throw new Error('해당 장부가 없습니다.');
  const bytes=addApprovedMonth(w.bytes,source,month);const r=await db.rpc('commit_report_template',{p_org:session.org,p_year:year,p_month:month,p_source:source,p_actor:session.userId,p_expected:w.id,p_storage:await storeWorkbook(session.org,bytes)});check(r.error);if(!r.data)throw new Error('장부가 변경되었습니다. 새로고침해 주세요.');
  await runReportWorker(session.org);

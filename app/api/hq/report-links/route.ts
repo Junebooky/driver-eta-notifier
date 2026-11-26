@@ -1,3 +1,4 @@
+import {hasLegacyExcelAccess} from '@/lib/driverReports/legacyExcelPolicy';
 import {NextRequest} from 'next/server';
 import {requireHqAdmin} from '@/lib/auth/serverAuth';
 import {supabaseAdmin as db} from '@/lib/supabase/server';
@@ -12,6 +13,7 @@ const unavailable='공용 링크 보관 기능을 사용할 수 없습니다. �
 export async function GET(req:NextRequest){
  const auth=await requireHqAdmin(req);
  if(!auth.ok||!auth.session)return privateJson({ok:false,error:'HQ 관리자 로그인이 필요합니다.'},auth.statusCode);
+ if(!hasLegacyExcelAccess(auth.session.org))return privateJson({ok:false,error:'이 업체는 Excel 운행보고를 사용할 수 없습니다.'},403);
  const r=await db.from('report_shared_links').select('issued_at,expires_at,revoked_at,sealed_token,token_hash').eq('org_id',auth.session.org).maybeSingle();
  if(r.error)return privateJson({ok:false,error:unavailable},503);
  const item=r.data;
@@ -26,6 +28,7 @@ export async function GET(req:NextRequest){
 export async function POST(req:NextRequest){
  const auth=await requireHqAdmin(req);
  if(!auth.ok||!auth.session)return privateJson({ok:false,error:'HQ 관리자 로그인이 필요합니다.'},auth.statusCode);
+ if(!hasLegacyExcelAccess(auth.session.org))return privateJson({ok:false,error:'이 업체는 Excel 운행보고를 사용할 수 없습니다.'},403);
  if(!sameOrigin(req))return privateJson({ok:false,error:'허용되지 않은 요청입니다.'},403);
  try{
   const body=JSON.parse(new TextDecoder().decode(await boundedBody(req,3000)));

@@ -1,3 +1,4 @@
+import {hasLegacyExcelAccess} from '@/lib/driverReports/legacyExcelPolicy';
 import {NextRequest} from 'next/server';
 import {requireHqAdmin} from '@/lib/auth/serverAuth';
 import {supabaseAdmin as db} from '@/lib/supabase/server';
@@ -8,6 +9,7 @@ import {boundedBody,UUID,privateJson,failure,sameOrigin} from '@/lib/driverRepor
 export const dynamic='force-dynamic';
 export async function GET(req:NextRequest) {
  const auth=await requireHqAdmin(req);if(!auth.ok||!auth.session)return privateJson({ok:false,error:'HQ 권한이 필요합니다.'},auth.statusCode||403);
+ if(!hasLegacyExcelAccess(auth.session.org))return privateJson({ok:false,error:'이 업체는 Excel 운행보고를 사용할 수 없습니다.'},403);
  const org=auth.session.org,driver=req.nextUrl.searchParams.get('driverId'),before=req.nextUrl.searchParams.get('before');
  if(before&&!/^\d{1,15}$/.test(before))return privateJson({ok:false,error:'목록 위치가 올바르지 않습니다.'},400);
  if(driver&&!UUID.test(driver))return privateJson({ok:false,error:'기사를 확인해 주세요.'},400);
@@ -27,6 +29,7 @@ export async function GET(req:NextRequest) {
 }
 export async function POST(req:NextRequest) {
  const auth=await requireHqAdmin(req);if(!auth.ok||!auth.session)return privateJson({ok:false,error:'HQ 권한이 필요합니다.'},auth.statusCode||403);
+ if(!hasLegacyExcelAccess(auth.session.org))return privateJson({ok:false,error:'이 업체는 Excel 운행보고를 사용할 수 없습니다.'},403);
  if(!sameOrigin(req))return privateJson({ok:false,error:'허용되지 않은 요청입니다.'},403);
  try{
   const b=JSON.parse(new TextDecoder().decode(await boundedBody(req,90000))),s=auth.session;

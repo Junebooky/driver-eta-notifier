@@ -28,6 +28,7 @@ function dbError(error: unknown) {
 export async function GET(req: NextRequest) {
   const auth=await requireHqAdmin(req);
   if(!auth.ok || !auth.session) return fail(auth.error || '권한이 없습니다.',auth.statusCode);
+  if(auth.session.org!==SETTLEMENT_ORG)return fail('현재 업체의 정산 기능을 사용할 수 없습니다.',403);
   try{
     const downloadId=new URL(req.url).searchParams.get('download');
     if(downloadId){
@@ -71,6 +72,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req:NextRequest){
   const auth=await requireHqAdmin(req);
   if(!auth.ok || !auth.session) return fail(auth.error || '권한이 없습니다.',auth.statusCode);
+  if(auth.session.org!==SETTLEMENT_ORG)return fail('현재 업체의 정산 기능을 사용할 수 없습니다.',403);
   let body:Record<string,unknown>;
   try{body=await req.json();}catch{return fail('요청 형식이 올바르지 않습니다.',400);}
   const scheduleId=body?.scheduleId, action=body?.action, expectedVersion=body?.expectedVersion;
