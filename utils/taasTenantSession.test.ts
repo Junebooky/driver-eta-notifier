@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {loginTenantSession,readTenantSession,logoutTenantSession,TENANT_ACCESS_COOKIE,TENANT_BINDING_COOKIE,type TenantSessionDependencies} from '../lib/auth/tenantSession';
+import {loginTenantSession,readTenantSession,logoutTenantSession,refreshTenantSession,TENANT_ACCESS_COOKIE,TENANT_BINDING_COOKIE,TENANT_REFRESH_COOKIE,TENANT_REFRESH_BINDING_COOKIE,type TenantSessionDependencies} from '../lib/auth/tenantSession';
 import {loginTenantSessionCandidate} from '../lib/auth/tenantSession.server';
 import type {TenantIdentity} from '../lib/auth/tenantIdentity';
 const host='chauffeur.example.test',other='vip.example.test',org='chauffeur_service',id='a0000000-0000-4000-8000-000000000001',token='fixture.jwt.signature';
@@ -51,4 +51,34 @@ test('revoked membership or expiry denies existing session; unconfirmed revoke c
  assert.equal((await readTenantSession(host,cookies,{...deps,now:()=>401})).status,401);
  const failed=await logoutTenantSession(host,'https://'+host,cookies,{...deps,revoke:async()=>false});
  assert.equal(failed.status,503);assert.equal(failed.cookies.get(TENANT_ACCESS_COOKIE)?.maxAge,0);
+});
+
+test('refresh rotates only signed same-host identity; absolute lifetime and expiry logout',async()=>{
+ const {deps}=setup();let now=200,rotations=0,revokes=0;
+ const first='refresh-fixture-one',next='refresh-fixture-two',fresh='rotated.jwt.signature';
+ deps.now=()=>now;
+ deps.signIn=async()=>({kind:'ok',token,refreshToken:first});
+ deps.checkRefresh=async i=>i.orgId===org&&i.sessionId===id;
+ deps.refresh=async r=>{rotations++;assert.equal(r,first);return {kind:'ok',token:fresh,refreshToken:next};};
+ deps.verify=async(h,t)=>h===host?(t===fresh?{...identity,issuedAt:now,expiresAt:now+300}:identity):null;
+ deps.revokeBound=async i=>{revokes++;assert.equal(i.sessionId,id);return true;};
+ const r=await login(deps),cookies={access:r.cookies.get(TENANT_ACCESS_COOKIE)?.value,binding:r.cookies.get(TENANT_BINDING_COOKIE)?.value,refresh:r.cookies.get(TENANT_REFRESH_COOKIE)?.value,refreshBinding:r.cookies.get(TENANT_REFRESH_BINDING_COOKIE)?.value};
+ assert.equal(cookies.refresh,first);assert.equal(r.cookies.get(TENANT_REFRESH_COOKIE)?.maxAge,604800);
+ now=401;
+ const expired={refresh:cookies.refresh,refreshBinding:cookies.refreshBinding};
+ const read=await readTenantSession(host,expired,deps);assert.equal(read.status,401);assert.equal((await read.json()).code,'REFRESH_REQUIRED');assert.equal(read.cookies.getAll().length,0);
+ assert.equal((await refreshTenantSession(other,'https://'+other,expired,deps)).status,401);
+ assert.equal((await refreshTenantSession(host,'https://evil.test',expired,deps)).status,403);
+ assert.equal((await refreshTenantSession(host,'https://'+host,{...expired,refresh:'forged-refresh'},deps)).status,401);
+ assert.equal((await refreshTenantSession(host,'https://'+host,expired,{...deps,checkRefresh:async()=>false})).status,401);
+ assert.equal(rotations,0);
+ const rotated=await refreshTenantSession(host,'https://'+host,expired,deps);assert.equal(rotated.status,200);
+ assert.equal(rotated.cookies.get(TENANT_REFRESH_COOKIE)?.value,next);
+ assert.equal(rotated.cookies.get(TENANT_REFRESH_COOKIE)?.maxAge,604800-201);
+ assert.ok(!JSON.stringify(await rotated.json()).includes(next));
+ const bad=await refreshTenantSession(host,'https://'+host,expired,{...deps,verify:async()=>({...identity,expiresAt:1000,role:'driver',driverId:id,home:'/'})});
+ assert.equal(bad.status,403);assert.equal(bad.cookies.getAll().length,0);
+ const out=await logoutTenantSession(host,'https://'+host,expired,deps);assert.equal(out.status,200);assert.equal(revokes,1);
+ assert.equal(out.cookies.get(TENANT_REFRESH_COOKIE)?.maxAge,0);
+ now=605001;assert.equal((await refreshTenantSession(host,'https://'+host,expired,deps)).status,401);
 });
