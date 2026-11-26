@@ -86,7 +86,7 @@ BEGIN
   IF NOT(k=ANY(allowed)) OR (op='update' AND k='plate') THEN RAISE EXCEPTION 'INVALID_FIELD' USING ERRCODE='22023'; END IF;
   IF k='englishAvailable' THEN
    IF jsonb_typeof(v)<>'boolean' THEN RAISE EXCEPTION 'INVALID_FIELD' USING ERRCODE='22023'; END IF;
-  ELSIF jsonb_typeof(v)<>'string' OR length(f->>k)>CASE WHEN k='memo' THEN 5000 ELSE 500 END THEN
+  ELSIF jsonb_typeof(v)<>'string' OR length(f->>k)>(CASE WHEN k='memo' THEN 5000 ELSE 500 END) THEN
    RAISE EXCEPTION 'INVALID_FIELD' USING ERRCODE='22023';
   END IF;
   IF k IN ('name','model','brand','category','categoryLabel','capacity','fuelType','plate') AND length(btrim(f->>k))=0 THEN
